@@ -978,7 +978,6 @@ create_dir = function (pathway, clusterNum, factorNum) {
   }
 }
 
-
 #### Combine files with the same name pattern  ####
 
 # function to generate the file name based on Cluster and Factor
