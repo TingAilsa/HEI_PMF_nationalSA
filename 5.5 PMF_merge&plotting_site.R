@@ -379,7 +379,7 @@ ggplot(subset(Month_aggregated_use,
         axis.text.y = element_text(color="grey25", size = 18, angle = 0, hjust = 0.5))
 
 
-###### 1.3.2. Spatial distribution of Changes between 2011 & 2020 ######
+###### 1.3.2. Spatial distribution of Changes between 2011 & 2020 - Absolute difference ######
 
 # Load the dplyr package
 library(dplyr)
@@ -388,7 +388,6 @@ library(dplyr)
 annual_source_selectd <- Year_aggregated %>% 
   filter(Year %in% c(2011, 2019))
 
-# Calculate the differences in Contribution for each Source_use and SiteCode
 contribution_diff <- 
   annual_source_selectd %>%
   dplyr::group_by(Source_use, SiteCode) %>%
@@ -404,41 +403,14 @@ contribution_diff <-
 
 
 contribution_diff = subset(contribution_diff, 
-                           Source_use %in% c("F2-Secondary Nitrate", "F3-Secondary Sulfate", "F4-Aged Sea Salte", 
+                           Source_use %in% c("F2-Secondary Nitrate", "F3-Secondary Sulfate", "F4-Aged Sea Salt", 
                                              "F6-Fresh Sea Salt", "F8-Biomass", "F9-Soil/Dust",
                                              "F5-Industry", "F1-Vehicle", "F7-Non-Pipeline"))
-
-contribution_diff$col = contribution_diff$row = 1
-
-contribution_diff$row[
-  contribution_diff$Source_use %in%
-    c("F6-Fresh Sea Salt", "F8-Biomass", "F9-Soil/Dust")] = 2
-
-contribution_diff$row[
-  contribution_diff$Source_use %in%
-    c("F5-Industry", "F1-Vehicle", "F7-Non-Pipeline")] = 3
-
-contribution_diff$col[
-  contribution_diff$Source_use %in%
-    c("F3-Secondary Sulfate", "F8-Biomass", "F1-Vehicle")] = 2
-
-contribution_diff$col[
-  contribution_diff$Source_use %in%
-    c("F4-Aged Sea Salt", "F9-Soil/Dust", "F7-Non-Pipeline")] = 3
-
-# Create a new variable to uniquely identify each facet
-contribution_diff <- contribution_diff %>%
-  mutate(facet_id = interaction(col, row, lex.order = TRUE))
-
-contribution_diff = na.omit(contribution_diff)
-
-contribution_diff <- contribution_diff %>%
-  mutate(facet_id = interaction(Source_use, col, row, lex.order = TRUE))
 
 # Create the plot
 ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
-  geom_point(data = subset(contribution_diff, 
+  geom_point(data = subset(source9_diff_map, 
                            !is.na(diff_contribution)), 
              aes(x = Longitude, y = Latitude, 
                  color = diff_contribution),
@@ -447,8 +419,47 @@ ggplot() +
                         high = color_npg[8], 
                         midpoint = 0) +
   coord_sf(datum = NA) +
-  facet_wrap(~ facet_id, 
-             labeller = labeller(facet_id = 
+  facet_wrap(~ Source_use, 
+             labeller = labeller(Source_use = 
+                                   as_labeller(as.character, 
+                                               default = label_value))) +
+  theme_minimal() +
+  theme(panel.background = element_blank(),
+        strip.text = element_text(color = "black", size = 16))
+
+
+###### 1.3.3. Spatial distribution of Changes between 2011 & 2020 - Slope ######
+
+slope_diff <- 
+  Year_aggregated %>%
+  dplyr::group_by(Dataset.x, SiteCode, Source_use, Longitude, Latitude) %>%
+  dplyr::summarize(diff_slope = get_slope(cur_data(), "Year", "Contribution")) %>%
+  ungroup()
+
+slope_diff = subset(slope_diff, 
+                           Source_use %in% c("F2-Secondary Nitrate", "F3-Secondary Sulfate", "F4-Aged Sea Salt", 
+                                             "F6-Fresh Sea Salt", "F8-Biomass", "F9-Soil/Dust",
+                                             "F5-Industry", "F1-Vehicle", "F7-Non-Pipeline"))
+slope_diff = na.omit(slope_diff)
+
+
+# Create the plot
+slope_range <- quantile(slope_diff$diff_slope, c(0.0025, 0.9975))
+
+ggplot() +
+  geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
+  geom_point(data = subset(slope_diff, 
+                           diff_slope > slope_range[1] & 
+                             diff_slope < slope_range[2]), 
+             aes(x = Longitude, y = Latitude, 
+                 color = diff_slope),
+             size = 2.5, alpha = 0.8) +
+  scale_color_gradient2(low = color_npg[2], 
+                        high = color_npg[8], 
+                        midpoint = 0) +
+  coord_sf(datum = NA) +
+  facet_wrap(~ Source_use, 
+             labeller = labeller(Source_use = 
                                    as_labeller(as.character, 
                                                default = label_value))) +
   theme_minimal() +

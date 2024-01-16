@@ -1013,6 +1013,14 @@ read_and_combine_files <- function(combination, patternPre, patternPost, file_pa
 }
 
 
+####  Perform linear regression and return the slope #### 
+get_slope <- function(df, x, y) {
+  formula <- as.formula(paste(y, "~", x))
+  model <- lm(formula, data = df)
+  slope <- coef(model)[x]
+  return(slope)
+}
+
 
 
 
