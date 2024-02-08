@@ -16,7 +16,11 @@ format_variable <- function(variable) {
   variable <- gsub("NaIon", "Na\u207A", variable)
   variable <- gsub("KIon", "K\u207A", variable)
   variable <- gsub("PM25", "PM\u2082.\u2085", variable)
+<<<<<<< HEAD
   variable <- gsub("m3", "m\u00B3", variable)
+=======
+  variable <- gsub("m3", "µm\u00B3", variable)
+>>>>>>> origin/main
   return(variable)
 }
 
@@ -35,6 +39,7 @@ theme_text_speciesName = theme(axis.title.x = element_text(color="grey25", size 
                                                           family = "Arial Unicode MS",
                                                           angle = 0, hjust = 0.5))
 
+<<<<<<< HEAD
 theme_ts = theme(axis.title.x = element_text(color="grey25", size = 12,
                                              family = "Arial Unicode MS", 
                                              vjust=0, margin=margin(0,0,0,300)), 
@@ -47,6 +52,8 @@ theme_ts = theme(axis.title.x = element_text(color="grey25", size = 12,
                  axis.text.y = element_text(color="grey25", size = 10.5,
                                             family = "Arial Unicode MS",
                                             angle = 0, hjust = 0.5))
+=======
+>>>>>>> origin/main
 
 # Figures arrangement
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
@@ -141,6 +148,7 @@ panel.corr <- function(x, y, ...){
   return(list(correlation = r, p_value = p_value))
 }
 
+<<<<<<< HEAD
 # Function to calculate correlation and create a label
 calculate_corr_label <- function(data, variable1, variable2) {
   # not data$variable1 directly
@@ -153,6 +161,8 @@ calculate_corr_label <- function(data, variable1, variable2) {
         "\np =", signif(corr_test$p.value, 2))
 }
 
+=======
+>>>>>>> origin/main
 
 # !!! Important for pairs plot 1&2 is, pairs function provides only the x and y arguments to the upper.panel and lower.panel functions
 # !!! For other setting such as pch and col, take ... (ellipsis), and explicitly state them outside the function 
@@ -443,7 +453,11 @@ lowest_Qm_task <- function(base_file) {
 
 #### Extract data in Base Model results for selected task number ####
 # time series info from base output
+<<<<<<< HEAD
 base_results <- function(base_output, task, input.row) {
+=======
+base_results <- function(base_output, task, cluster.row) {
+>>>>>>> origin/main
   # Extract Factor matrix AA & BB from base result
   # the regular expression pattern
   pattern_start <- paste0("Results written by postprocessing for task #\\s+", task, "\\s+---------------------------")
@@ -462,7 +476,39 @@ base_results <- function(base_output, task, input.row) {
       (base.start.line+3):
         (base.end.line-4)]
   
+<<<<<<< HEAD
   #### Extract time series normalized contributions
+=======
+  #### Extract fitted G vs. reference G Regression matrix
+  # fitted G vs. reference G, regression
+  #G.correl.start = grep("Regression matrix T1 of fitted G vs. reference G:", 
+  #                      base_selectQtask) + 1
+  
+  # Identify segments that are not spaces
+  #info_segments = non_space_segments(base_selectQtask[G.correl.start])
+  
+  # Estimate the factor number
+  #factor.No <- sum(info_segments) - 1
+  
+  # fitted G vs. reference G regression matrix
+  #base_G_correl_txt = 
+  #  base_selectQtask[
+  #    G.correl.start : 
+  #      (G.correl.start + factor.No - 1)]
+  
+  # lines to dataframe
+  #base_G_cor = line_to_df(base_G_correl_txt, factor.No, factor.No+2)
+  #base_G_cor$X1 = NULL
+  #base_G_cor = mutate_all(base_G_cor, as.numeric)
+  
+  # rename the columns and replace the first column values
+  #colnames(base_G_cor)[1] = "Factors"
+  #Factor.serial = paste0("Factor", 1:factor.No)
+  #colnames(base_G_cor)[2:(factor.No+1)] = Factor.serial
+  #base_G_cor$Factors = Factor.serial
+  
+  #### Extract time series data
+>>>>>>> origin/main
   ts.start = grep("Factor matrix AA", 
                   base_selectQtask) + 1
   
@@ -475,10 +521,17 @@ base_results <- function(base_output, task, input.row) {
   base_ts_txt = 
     base_selectQtask[
       ts.start : 
+<<<<<<< HEAD
         (ts.start + input.row - 1)]
   
   # lines to dataframe
   base_ts = line_to_df(base_ts_txt, input.row, factor.No+2)
+=======
+        (ts.start + cluster.row - 1)]
+  
+  # lines to dataframe
+  base_ts = line_to_df(base_ts_txt, cluster.row, factor.No+2)
+>>>>>>> origin/main
   base_ts$X1 = NULL
   base_ts = mutate_all(base_ts, as.numeric)
   
@@ -504,10 +557,15 @@ base_results <- function(base_output, task, input.row) {
   base_conc = mutate_all(base_conc, as.numeric)
   base_conc$X1 = NULL
 
+<<<<<<< HEAD
+=======
+  
+>>>>>>> origin/main
   # rename the columns and replace the first column values
   colnames(base_conc)[1] = "Species"
   colnames(base_conc)[2:(factor.No+1)] = Factor.serial
   
+<<<<<<< HEAD
   ##### Extract factor-specific contribution
   
   ## overall fraction contribution
@@ -555,6 +613,12 @@ base_results <- function(base_output, task, input.row) {
               base_contri = base_conc,
               base_ts_conc = base_ts_conc, 
               base_fraction = base_fraction))
+=======
+  # Return a list containing both data frames
+  return(list(base_G_cor = base_G_cor, 
+              base_ts = base_ts, 
+              base_conc = base_conc))
+>>>>>>> origin/main
 }
 
 #### Match site & date, preparing for base model result plotting  #### 
@@ -575,6 +639,7 @@ time_series = function(base_ts, site_date){
   base_ts_date$Serial.No = NULL
   
   #### 1. Gather the data for time series plotting
+<<<<<<< HEAD
   base_ts_gather = gather(base_ts_date, 
                           "Factor", 
                           "Normalize_contri", 
@@ -583,11 +648,24 @@ time_series = function(base_ts, site_date){
   #### 2. Linear regression resutls - contributions 
   # OLS multiple regression model without an intercept using all other columns
   ts_PM_lm = lm(PM2.5 ~ . - 1, 
+=======
+  base_ts_plot = gather(base_ts_date, 
+                        "Factor", 
+                        "Contribution", 
+                        -Date, -SiteCode)
+  
+  #### 2. Linear regression resutls - contributions 
+  ts_PM_lm = lm(PM2.5 ~ ., 
+>>>>>>> origin/main
                 data = base_ts_all[, 
                                    c("PM2.5", 
                                      paste0("Factor", 1:factor.No))])
   ts_PM_lm_beta = summary(ts_PM_lm)$coefficients[, 1]
+<<<<<<< HEAD
   ts_PM_lm_beta = data.frame(ts_PM_lm_beta)
+=======
+  ts_PM_lm_beta = data.frame(ts_PM_lm_beta[2:length(ts_PM_lm_beta)])
+>>>>>>> origin/main
   colnames(ts_PM_lm_beta) = "lm.beta.site"
   ts_PM_lm_beta$Factor = rownames(ts_PM_lm_beta)
   ts_PM_lm_beta$Factor.contribution = (ts_PM_lm_beta$lm.beta.site/
@@ -598,6 +676,7 @@ time_series = function(base_ts, site_date){
            3),
     "%")
   
+<<<<<<< HEAD
   base_ts_gather$Date = as.Date(base_ts_gather$Date)
   
   # Return a list containing both data frames
@@ -606,6 +685,14 @@ time_series = function(base_ts, site_date){
               ts_PM_lm_beta = ts_PM_lm_beta,
               cor_PM_sumSpecies = cor_PM_sumSpecies,
               base_ts_nmContri_all = base_ts_all))
+=======
+  base_ts_plot$Date = as.Date(base_ts_plot$Date)
+   
+  # Return a list containing both data frames
+  return(list(base_ts_date = base_ts_date,
+              base_ts_plot = base_ts_plot, 
+              ts_PM_lm_beta = ts_PM_lm_beta))
+>>>>>>> origin/main
 }
 
 
@@ -627,8 +714,11 @@ conc_percent_contri = function(conc_contribution){
 }
 
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> origin/main
 #### Extract info in Displacement results DISP and prepare for plotting #### 
 library(dplyr)
 
@@ -970,6 +1060,7 @@ dispbcmask_rp = function(params_file, dispbcmask, n){
 # dispbcmask = "0\t0\t1\t1\t1\t1\t1\t1\t1\t1\t0\t1\t1\t1\t0\t1\t1\t1\t0\t0\t0\t0\t1\t1\t"
 # dispbcmask_rp(base_par, dispbcmask, 6)
 
+<<<<<<< HEAD
 #### source contribution estimation of each time period ####
 source_time_periods <- function(df, time_col) {
   # Unique time periods
@@ -1009,6 +1100,8 @@ source_time_periods <- function(df, time_col) {
   
   return(period_source)
 }
+=======
+>>>>>>> origin/main
 
 ##########################################################################################
 ############ 4. DATA MANAGEMENT ############ 
@@ -1095,6 +1188,7 @@ read_and_combine_files <- function(combination, patternPre, patternPost, file_pa
 }
 
 
+<<<<<<< HEAD
 #### Source profile figure, Transfer data (percent contribution) to logged value, and match the scale used in logged normalized contribution #### 
 trans_log <- function(value, log_min) {
   log_trans = log(value + 1) / 
@@ -1113,6 +1207,8 @@ get_slope <- function(df, x, y) {
   return(slope)
 }
 
+=======
+>>>>>>> origin/main
 
 
 
