@@ -23,7 +23,7 @@ data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
 data_folders = c("CSN_Cluster_25TimesMean", "CSN_Cluster_noSeason99", "CSN_Site_25TimesMean")
 file_endings <- c("_overall.csv", "_annual.csv", "_month.csv") # Replace with your actual file endings
 result_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data"
- 
+
 ########   combine outputs
 
 for (data_folder in data_folders){
