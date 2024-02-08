@@ -15,11 +15,7 @@ library(dplyr)
 library(plyr)
 
 
-<<<<<<< HEAD
 #### A. create cluster & sub-factor folders for clusters, DONE!!!  ####
-=======
-#### A. create cluster & sub-factor folders, DONE!!!  ####
->>>>>>> origin/main
 ## set path for all new folders
 # pathway = paste0(data.dir,"/CSN_CMD_txt/")
 # pathway = paste0(data.dir,"/CSN_CMD_txt_noCsub/")
@@ -36,10 +32,6 @@ factorNum = paste0("Factor_", 6:11)
 ## create new folders
 create_dir(pathway, clusterNum, factorNum)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 #### B1 start. read iniparams files  ####
 base_par_org = readLines("iniparams_base_1.txt")
 BS_par_org = readLines("iniparams_BS_2.txt")
@@ -74,11 +66,7 @@ pathway = paste0(data.dir,"/CSN_CMD_txt_noCsub_25TimesMean/")
 name.prefix = "CSN_noCsub_25TimesMean_C_" # prefix in names for input/output files
 
 ### No extreme values, Delete K-extreme - 99thSeasonal, NO OC/EC Subgroups, CSN
-<<<<<<< HEAD
 cluster_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_noSeason99_cluster/CSN_noCsub_noSeason99_PMF_CMD_StrongWeakBad_Cluster.csv")
-=======
-cluster_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_noSeason99_cluster/CSN_noCsub_noExtreme_PMF_CMD_StrongWeakBad_Cluster.csv")
->>>>>>> origin/main
 pathway = paste0(data.dir,"/CSN_CMD_txt_noCsub_noSeason99/")
 name.prefix = "CSN_noCsub_noSeason99_C_" # prefix in names for input/output files
 
@@ -220,10 +208,6 @@ for(i in 1:length(cluster.NO)){
 }
 
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 ###### Copy and paste the updated .csv file in cluster folders ######
 # Specify the source directory path & the base path for destination directories
 # CSN, no sub, no any extreme 

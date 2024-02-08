@@ -1,6 +1,5 @@
 library(sf)
 library(dplyr)
-<<<<<<< HEAD
 library(plyr)
 library(tidyr)
 library(stringr)
@@ -12,14 +11,6 @@ library(ggplot2)
 library(magick)
 library(gridExtra)
 library(ggsci)
-=======
-library(readr)
-library(dplyr)
-library(tidyr)
-library(stringr)
-library(gganimate)
-library(ggplot2)
->>>>>>> origin/main
 
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/")
 
@@ -29,11 +20,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/")
 ########################################################
 
 library(pdftools)
-<<<<<<< HEAD
 
-=======
-library(gridExtra)
->>>>>>> origin/main
 # library(magick)
 
 # CSN
@@ -307,12 +294,9 @@ write_csv(combined_annual, "combined_annual_data.csv")
 
 ##### National level Plotting #####
 
-<<<<<<< HEAD
 dir_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/annual_results"
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/annual_results")
 
-=======
->>>>>>> origin/main
 combined_annual = read.csv("combined_annual_data.csv")
 cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_rural_urban$X = cty_rural_urban$X.1 = NULL
@@ -742,13 +726,9 @@ ggplot() +
         strip.text = element_text(color = "black", size = 16))
 
 
-<<<<<<< HEAD
 ###### 4 Temporal trends & Map, 9 parts in the US ######
 
 ######## 4.1 Temporal trends & Map - common setting ########
-=======
-###### 3. Temporal trends for differnt parts of the mainland US ######
->>>>>>> origin/main
 
 # Define the grouping for the regions using state abbreviations
 # Census Regions and Divisions of the U.S.
@@ -769,17 +749,12 @@ state_regions <- tibble(
                  "Mountain", "Pacific"), c(6, 3, 8, 4, 4, 5, 7, 8, 3))
 )
 
-<<<<<<< HEAD
 census_region = c("New England", "Mid-Atlantic", "South Atlantic", 
                   "East South Central", "West South Central", "East North Central", 
                   "West North Central", "Mountain", "Pacific")
 
 # map place: left, "Pacific" (up, 1) & "Mountain" (down, 2); bottom, "West South Central"(left, 1), "East South Central" (right, 2) & "South Atlantic" (right, 3)
 # map place: right, "New England" (up, 1) & "Mid-Atlantic" (down, 2); top "West North Central" (left, 1) & "East North Central" (right, 2)
-=======
-# map place: left, "Pacific" (up, 1) & "Mountain" (down, 2); bottom, "West South Central"(left, 1), "East South Central" (right, 2) & "South Atlantic" (right, 3)
-# map place: top, ; right, "New England" (up, 1) & "Mid-Atlantic" (down, 2); top "West North Central" (left, 1) & "East North Central" (right, 2)
->>>>>>> origin/main
 
 
 # shape is a bit weird, from the Nature paper, not use
@@ -801,7 +776,6 @@ census_region = c("New England", "Mid-Atlantic", "South Atlantic",
 # )
 
 
-<<<<<<< HEAD
 us_states_region = merge(us_states, state_regions)
 annual_singleSource_region = merge(annual_singleSource, state_regions)
 
@@ -819,88 +793,22 @@ annual_singleSource_region = merge(annual_singleSource, state_regions)
 #   theme_map() +
 #   theme(strip.background = element_blank(),
 #         strip.text.x = element_text( size = 0))
-=======
-
-us_states_region = merge(us_states, state_regions)
-annual_Biomass_region = merge(annual_Biomass, state_regions)
-
-# Map
-biomass_point_region <-
-  ggplot() +
-  geom_sf(data = us_states_region, aes(fill = region), color = "white") +
-  geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
-             aes(x = Longitude, y = Latitude),
-             color = "white", alpha = 0.5, size = 2) +
-  theme_minimal() +
-  scale_fill_npg() +
-  theme(legend.position = "bottom") +
-  facet_wrap(~ region, ncol = 3) +
-  theme_map() +
-  theme(strip.background = element_blank(),
-        strip.text.x = element_text( size = 0))
-
-biomass_point_region
->>>>>>> origin/main
 
 # dissolve states into regions
 us_states_region$region <- as.factor(us_states_region$region)
 
 regions_dissolved = 
-<<<<<<< HEAD
   us_states_region %>%
   group_by(region) %>%
   # !!!! summarize from dplyr, not plyr !!!!
   dplyr::summarize(geometry = st_union(geometry)) 
 class(regions_dissolved)
-=======
-  st_as_sf(
-    ddply(
-      us_states_region, 
-      .(region), 
-      summarise, 
-      geometry = st_union(geometry)))
-
-dim(regions_dissolved)
-
-# check and set CRS for both datasets (example uses EPSG:4326, but use the appropriate CRS for your data)
-crs_to_use <- st_crs(4326)
-us_states_region <- st_set_crs(us_states_region, crs_to_use)
-regions_dissolved <- st_set_crs(regions_dissolved, crs_to_use)
-
-# Optionally, simplify geometries if they are too complex
-# regions_dissolved <- st_simplify(regions_dissolved, preserveTopology = TRUE)
-
-ggplot() +
-  geom_sf(data = us_states_region, aes(fill = region), 
-          color = "white", lwd = 2) 
-
-# Plotting
-ggplot() +
-  geom_sf(data = regions_dissolved, fill = NA, color = "white", lwd = 2) +  # Thicker borders for regions
-  geom_sf(data = us_states_region, aes(fill = region), color = NA) +  # Fill color for states without border
-  geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
-             aes(x = Longitude, y = Latitude),
-             color = "white", alpha = 0.5, size = 2) +
-  theme_minimal() +
-  scale_fill_npg() +
-  theme(legend.position = "bottom") +
-  theme_map() +
-  theme(strip.background = element_blank(),
-        strip.text.x = element_text(size = 10))
-
-
-
-
-ggsave("map_points_biomass.pdf", plot = biomass_point_region, width = 16, height = 12)
-
->>>>>>> origin/main
 
 # Calculate the centroid of each region
 # Compute the centroid for each region
 region_centroids <- 
   us_states_region %>%
   group_by(region) %>%
-<<<<<<< HEAD
   # !!!! summarize from dplyr, not plyr !!!!
   dplyr::summarize(geometry = 
                      st_centroid(st_union(geometry)), 
@@ -935,26 +843,6 @@ show_col(pal_material("red")(10))
 # temporal trends for each region
 annual_singleSource_region_plot = 
   ddply(annual_singleSource_region, 
-=======
-  summarize(geometry = 
-              st_centroid(st_union(geometry)), 
-            .groups = "keep")
-
-ggplot() +
-  geom_sf(data = us_states_region, aes(fill = region), 
-          color = "white") +
-  geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
-             aes(x = Longitude, y = Latitude),
-             color = "white", alpha = 0.5, size = 2) +
-  geom_text(data = labels_df, aes(x = x, y = y, label = region), size = 4) +
-  theme_map() +
-  scale_fill_npg() +
-  theme(legend.position = "bottom")
-
-# Temporal trends for each region
-annual_Biomass_region_plot = 
-  ddply(annual_Biomass_region, 
->>>>>>> origin/main
         .(region, Year, Source_reference),
         summarise,
         med.contri = median(Contribution, na.rm = T),
@@ -966,7 +854,6 @@ annual_Biomass_region_plot =
         state_abbr = last(state_abbr)
   )
 
-<<<<<<< HEAD
 # create the data list, one for each region
 annual_singleSource_region_split = split(annual_singleSource_region_plot, 
                                     annual_singleSource_region_plot$region)
@@ -1181,26 +1068,6 @@ grid_layout
 
 
 
-=======
-ggplot(annual_Biomass_region_plot, 
-       aes(x = Year, y = med.contri)) +
-  geom_line(color = "red") +
-  geom_point(shape = 3) +
-  geom_errorbar(aes(ymin = down.contri, ymax = up.contri), width = 0.2) +
-  facet_wrap(~ region, ncol = 3, scales='free') +
-  scale_x_continuous(breaks = c(2011, 2014, 2017, 2020)) +
-  # scale_y_continuous(breaks = c(0, 1, 2, 3)) +
-  labs(title = "Annual Change in Biomass Contributions for Each Region",
-       x = "Year",
-       y = "Median Contribution") +
-  # theme_minimal() +
-  theme_classic() +
-  theme(strip.background = element_blank(),
-        strip.text.x = element_text( size = 16), # facet text, face = "bold",
-        axis.text.x = element_text(size = 14, hjust = 0.5, vjust = 0), 
-        axis.text.y = element_text(size = 14, hjust = 0.5),
-        axis.title.y = element_text(size = 15, hjust = 0.5, angle = 90))
->>>>>>> origin/main
 
 ###########################################################################
 #######  5. Merge files and National - Month #######
