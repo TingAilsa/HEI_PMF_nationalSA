@@ -16,7 +16,7 @@ format_variable <- function(variable) {
   variable <- gsub("NaIon", "Na\u207A", variable)
   variable <- gsub("KIon", "K\u207A", variable)
   variable <- gsub("PM25", "PM\u2082.\u2085", variable)
-  variable <- gsub("m3", "µm\u00B3", variable)
+  variable <- gsub("m3", "m\u00B3", variable)
   return(variable)
 }
 
@@ -35,6 +35,18 @@ theme_text_speciesName = theme(axis.title.x = element_text(color="grey25", size 
                                                           family = "Arial Unicode MS",
                                                           angle = 0, hjust = 0.5))
 
+theme_ts = theme(axis.title.x = element_text(color="grey25", size = 12,
+                                             family = "Arial Unicode MS", 
+                                             vjust=0, margin=margin(0,0,0,300)), 
+                 axis.title.y = element_text(color="grey25", size = 12,
+                                             family = "Arial Unicode MS", 
+                                             vjust=1, margin=margin(0,2,0,0)),
+                 axis.text.x = element_text(color="grey25", size = 10.5,
+                                            family = "Arial Unicode MS",
+                                            angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
+                 axis.text.y = element_text(color="grey25", size = 10.5,
+                                            family = "Arial Unicode MS",
+                                            angle = 0, hjust = 0.5))
 
 # Figures arrangement
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
@@ -127,6 +139,18 @@ panel.corr <- function(x, y, ...){
   
   # Return correlation and p-value
   return(list(correlation = r, p_value = p_value))
+}
+
+# Function to calculate correlation and create a label
+calculate_corr_label <- function(data, variable1, variable2) {
+  # not data$variable1 directly
+  # R interprets variable1 and variable2 literally rather than as variable names passed to the function.
+  var1 <- data[[variable1]] 
+  var2 <- data[[variable2]]
+  corr_test <- cor.test(var1, var2, method = "pearson")
+  
+  paste("R =", round(corr_test$estimate, 2), 
+        "\np =", signif(corr_test$p.value, 2))
 }
 
 
@@ -419,7 +443,7 @@ lowest_Qm_task <- function(base_file) {
 
 #### Extract data in Base Model results for selected task number ####
 # time series info from base output
-base_results <- function(base_output, task, cluster.row) {
+base_results <- function(base_output, task, input.row) {
   # Extract Factor matrix AA & BB from base result
   # the regular expression pattern
   pattern_start <- paste0("Results written by postprocessing for task #\\s+", task, "\\s+---------------------------")
@@ -438,35 +462,7 @@ base_results <- function(base_output, task, cluster.row) {
       (base.start.line+3):
         (base.end.line-4)]
   
-  #### Extract fitted G vs. reference G Regression matrix
-  # fitted G vs. reference G, regression
-  #G.correl.start = grep("Regression matrix T1 of fitted G vs. reference G:", 
-  #                      base_selectQtask) + 1
-  
-  # Identify segments that are not spaces
-  #info_segments = non_space_segments(base_selectQtask[G.correl.start])
-  
-  # Estimate the factor number
-  #factor.No <- sum(info_segments) - 1
-  
-  # fitted G vs. reference G regression matrix
-  #base_G_correl_txt = 
-  #  base_selectQtask[
-  #    G.correl.start : 
-  #      (G.correl.start + factor.No - 1)]
-  
-  # lines to dataframe
-  #base_G_cor = line_to_df(base_G_correl_txt, factor.No, factor.No+2)
-  #base_G_cor$X1 = NULL
-  #base_G_cor = mutate_all(base_G_cor, as.numeric)
-  
-  # rename the columns and replace the first column values
-  #colnames(base_G_cor)[1] = "Factors"
-  #Factor.serial = paste0("Factor", 1:factor.No)
-  #colnames(base_G_cor)[2:(factor.No+1)] = Factor.serial
-  #base_G_cor$Factors = Factor.serial
-  
-  #### Extract time series data
+  #### Extract time series normalized contributions
   ts.start = grep("Factor matrix AA", 
                   base_selectQtask) + 1
   
@@ -479,10 +475,10 @@ base_results <- function(base_output, task, cluster.row) {
   base_ts_txt = 
     base_selectQtask[
       ts.start : 
-        (ts.start + cluster.row - 1)]
+        (ts.start + input.row - 1)]
   
   # lines to dataframe
-  base_ts = line_to_df(base_ts_txt, cluster.row, factor.No+2)
+  base_ts = line_to_df(base_ts_txt, input.row, factor.No+2)
   base_ts$X1 = NULL
   base_ts = mutate_all(base_ts, as.numeric)
   
@@ -508,15 +504,57 @@ base_results <- function(base_output, task, cluster.row) {
   base_conc = mutate_all(base_conc, as.numeric)
   base_conc$X1 = NULL
 
-  
   # rename the columns and replace the first column values
   colnames(base_conc)[1] = "Species"
   colnames(base_conc)[2:(factor.No+1)] = Factor.serial
   
+  ##### Extract factor-specific contribution
+  
+  ## overall fraction contribution
+  factor_concen_contri = base_conc[nrow(base_conc), ]
+  factor_concen_contri_sum = sum(factor_concen_contri[1, -1])
+  factor_fraction_contri = factor_concen_contri/factor_concen_contri_sum
+  factor_fraction_contri$Species = factor_concen_contri$Species
+  
+  ##  factor-specific overall concentration
+  factor_concen <- as.numeric(factor_concen_contri[1, -1])
+  
+  # apply the multiply to base_ts, excluding the first column
+  base_ts_conc <- base_ts
+  base_ts_conc[,-1] <- sweep(base_ts[,-1], 2, factor_concen, "*")
+  
+  # estimate overall fraction contribution based on base_conc
+  base_fraction = factor_concen_contri[1, -1] / sum(factor_concen)
+  
+  #### Extract fitted G vs. reference G Regression matrix
+  # fitted G vs. reference G, regression
+  #G.correl.start = grep("Regression matrix T1 of fitted G vs. reference G:", 
+  #                      base_selectQtask) + 1
+  
+  # fitted G vs. reference G regression matrix
+  #base_G_correl_txt = 
+  #  base_selectQtask[
+  #    G.correl.start : 
+  #      (G.correl.start + factor.No - 1)]
+  
+  # lines to dataframe
+  #base_G_cor = line_to_df(base_G_correl_txt, factor.No, factor.No+2)
+  #base_G_cor$X1 = NULL
+  #base_G_cor = mutate_all(base_G_cor, as.numeric)
+  
+  # rename the columns and replace the first column values
+  #colnames(base_G_cor)[1] = "Factors"
+  #Factor.serial = paste0("Factor", 1:factor.No)
+  #colnames(base_G_cor)[2:(factor.No+1)] = Factor.serial
+  #base_G_cor$Factors = Factor.serial
+  
+  
   # Return a list containing both data frames
-  return(list(base_G_cor = base_G_cor, 
+  return(list(#base_G_cor = base_G_cor, 
               base_ts = base_ts, 
-              base_conc = base_conc))
+              base_contri = base_conc,
+              base_ts_conc = base_ts_conc, 
+              base_fraction = base_fraction))
 }
 
 #### Match site & date, preparing for base model result plotting  #### 
@@ -537,18 +575,19 @@ time_series = function(base_ts, site_date){
   base_ts_date$Serial.No = NULL
   
   #### 1. Gather the data for time series plotting
-  base_ts_plot = gather(base_ts_date, 
-                        "Factor", 
-                        "Contribution", 
-                        -Date, -SiteCode)
+  base_ts_gather = gather(base_ts_date, 
+                          "Factor", 
+                          "Normalize_contri", 
+                          -Date, -SiteCode)
   
   #### 2. Linear regression resutls - contributions 
-  ts_PM_lm = lm(PM2.5 ~ ., 
+  # OLS multiple regression model without an intercept using all other columns
+  ts_PM_lm = lm(PM2.5 ~ . - 1, 
                 data = base_ts_all[, 
                                    c("PM2.5", 
                                      paste0("Factor", 1:factor.No))])
   ts_PM_lm_beta = summary(ts_PM_lm)$coefficients[, 1]
-  ts_PM_lm_beta = data.frame(ts_PM_lm_beta[2:length(ts_PM_lm_beta)])
+  ts_PM_lm_beta = data.frame(ts_PM_lm_beta)
   colnames(ts_PM_lm_beta) = "lm.beta.site"
   ts_PM_lm_beta$Factor = rownames(ts_PM_lm_beta)
   ts_PM_lm_beta$Factor.contribution = (ts_PM_lm_beta$lm.beta.site/
@@ -559,12 +598,14 @@ time_series = function(base_ts, site_date){
            3),
     "%")
   
-  base_ts_plot$Date = as.Date(base_ts_plot$Date)
-   
+  base_ts_gather$Date = as.Date(base_ts_gather$Date)
+  
   # Return a list containing both data frames
-  return(list(base_ts_date = base_ts_date,
-              base_ts_plot = base_ts_plot, 
-              ts_PM_lm_beta = ts_PM_lm_beta))
+  return(list(base_ts_nmContri_spread = base_ts_date,
+              base_ts_nmContri_gather = base_ts_gather, 
+              ts_PM_lm_beta = ts_PM_lm_beta,
+              cor_PM_sumSpecies = cor_PM_sumSpecies,
+              base_ts_nmContri_all = base_ts_all))
 }
 
 
@@ -584,6 +625,8 @@ conc_percent_contri = function(conc_contribution){
   
   return(percent_contribution)
 }
+
+
 
 
 #### Extract info in Displacement results DISP and prepare for plotting #### 
@@ -927,6 +970,45 @@ dispbcmask_rp = function(params_file, dispbcmask, n){
 # dispbcmask = "0\t0\t1\t1\t1\t1\t1\t1\t1\t1\t0\t1\t1\t1\t0\t1\t1\t1\t0\t0\t0\t0\t1\t1\t"
 # dispbcmask_rp(base_par, dispbcmask, 6)
 
+#### source contribution estimation of each time period ####
+source_time_periods <- function(df, time_col) {
+  # Unique time periods
+  unique_periods <- unique(df[[time_col]])
+  
+  # Create a workbook
+  period_source <- NULL
+  
+  # Process each time period
+  for (period in unique_periods) {
+    # Subset data for the period
+    base_period <- subset(df, df[[time_col]] == period)
+    base_period[[time_col]] <- NULL  # Remove the time period column
+    
+    # Perform linear regression
+    # OLS multiple regression model without an intercept using all other columns
+    period_PM_lm <- lm(PM25 ~ . - 1, data = base_period)
+    period_PM_lm_beta <- summary(period_PM_lm)$coefficients[, 1]
+    period_PM_lm_beta <- data.frame(period_PM_lm_beta[-1])
+    colnames(period_PM_lm_beta) <- "lm.beta.site"
+    period_PM_lm_beta$Source <- rownames(period_PM_lm_beta)
+    rownames(period_PM_lm_beta) = 1:nrow(period_PM_lm_beta)
+    period_PM_lm_beta$Source.percent <- 
+      (period_PM_lm_beta$lm.beta.site / sum(period_PM_lm_beta$lm.beta.site)) * 100
+    period_PM_lm_beta$Source.concentration <-
+      period_PM_lm_beta$Source.percent * mean(base_period$PM25) / 100
+    
+    period_PM_lm_beta$mean.PM25 = mean(base_period$PM25) 
+    period_PM_lm_beta$median.PM25 = median(base_period$PM25) 
+    period_PM_lm_beta$PM.range = 
+      paste0(min(base_period$PM25), "-", max(base_period$PM25))
+    period_PM_lm_beta$Period = period
+    
+    # Add to summary
+    period_source = rbind(period_source, period_PM_lm_beta)
+  }
+  
+  return(period_source)
+}
 
 ##########################################################################################
 ############ 4. DATA MANAGEMENT ############ 
@@ -1012,6 +1094,16 @@ read_and_combine_files <- function(combination, patternPre, patternPost, file_pa
   }
 }
 
+
+#### Source profile figure, Transfer data (percent contribution) to logged value, and match the scale used in logged normalized contribution #### 
+trans_log <- function(value, log_min) {
+  log_trans = log(value + 1) / 
+    log(100) * 
+    (log(1e-01) - log_min) + 
+    log_min
+  
+  return(log_trans)
+}
 
 ####  Perform linear regression and return the slope #### 
 get_slope <- function(df, x, y) {
