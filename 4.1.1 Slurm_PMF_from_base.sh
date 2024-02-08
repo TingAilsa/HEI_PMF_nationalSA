@@ -26,10 +26,10 @@
 
 ## create an array of jobs
 #SBATCH --array=1-150%10
-#SBATCH --array=1,2,8,13,15,22,46,57,59,60,67,74,80,85,93,104,115,122,123,128,143,144,146%6 ##CSN
+##SBATCH --array=1,2,8,13,15,22,46,57,59,60,67,74,80,85,93,104,115,122,123,128,143,144,146%6 ##CSN
 
 # Select specific nodes
-### SBATCH --nodelist=amd006,amd011,amd012,amd013,amd015,amd020,amd038,amd043,amd046,amd047,amd048,hop051,hop053,hop054,hop055,hop059,hop061,hop064,hop065,hop066,hop072,hop073
+###SBATCH --nodelist=amd006,amd011,amd012,amd013,amd015,amd020,amd038,amd043,amd046,amd047,amd048,hop051,hop053,hop054,hop055,hop059,hop061,hop064,hop065,hop066,hop072,hop073
 #SBATCH --constraint=amd ##intel
 
 #load modules

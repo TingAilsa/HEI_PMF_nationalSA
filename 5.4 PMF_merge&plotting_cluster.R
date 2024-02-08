@@ -1,11 +1,16 @@
 library(sf)
 library(dplyr)
-library(readr)
-library(dplyr)
+library(plyr)
 library(tidyr)
 library(stringr)
+library(scales)
+library(readr)
 library(gganimate)
+library(ggthemes)
 library(ggplot2)
+library(magick)
+library(gridExtra)
+library(ggsci)
 
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/")
 
@@ -15,7 +20,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/")
 ########################################################
 
 library(pdftools)
-library(gridExtra)
+
 # library(magick)
 
 # CSN
@@ -288,6 +293,9 @@ write_csv(combined_annual, "combined_annual_data.csv")
 
 
 ##### National level Plotting #####
+
+dir_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/annual_results"
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/annual_results")
 
 combined_annual = read.csv("combined_annual_data.csv")
 cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
@@ -718,7 +726,9 @@ ggplot() +
         strip.text = element_text(color = "black", size = 16))
 
 
-###### 3. Temporal trends for differnt parts of the mainland US ######
+###### 4 Temporal trends & Map, 9 parts in the US ######
+
+######## 4.1 Temporal trends & Map - common setting ########
 
 # Define the grouping for the regions using state abbreviations
 # Census Regions and Divisions of the U.S.
@@ -739,8 +749,12 @@ state_regions <- tibble(
                  "Mountain", "Pacific"), c(6, 3, 8, 4, 4, 5, 7, 8, 3))
 )
 
+census_region = c("New England", "Mid-Atlantic", "South Atlantic", 
+                  "East South Central", "West South Central", "East North Central", 
+                  "West North Central", "Mountain", "Pacific")
+
 # map place: left, "Pacific" (up, 1) & "Mountain" (down, 2); bottom, "West South Central"(left, 1), "East South Central" (right, 2) & "South Atlantic" (right, 3)
-# map place: top, ; right, "New England" (up, 1) & "Mid-Atlantic" (down, 2); top "West North Central" (left, 1) & "East North Central" (right, 2)
+# map place: right, "New England" (up, 1) & "Mid-Atlantic" (down, 2); top "West North Central" (left, 1) & "East North Central" (right, 2)
 
 
 # shape is a bit weird, from the Nature paper, not use
@@ -762,95 +776,73 @@ state_regions <- tibble(
 # )
 
 
-
 us_states_region = merge(us_states, state_regions)
-annual_Biomass_region = merge(annual_Biomass, state_regions)
+annual_singleSource_region = merge(annual_singleSource, state_regions)
 
-# Map
-biomass_point_region <-
-  ggplot() +
-  geom_sf(data = us_states_region, aes(fill = region), color = "white") +
-  geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
-             aes(x = Longitude, y = Latitude),
-             color = "white", alpha = 0.5, size = 2) +
-  theme_minimal() +
-  scale_fill_npg() +
-  theme(legend.position = "bottom") +
-  facet_wrap(~ region, ncol = 3) +
-  theme_map() +
-  theme(strip.background = element_blank(),
-        strip.text.x = element_text( size = 0))
-
-biomass_point_region
+# Map, NO LONGER USED
+# biomass_point_region <-
+#   ggplot() +
+#   geom_sf(data = us_states_region, aes(fill = region), color = "white") +
+#   geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
+#              aes(x = Longitude, y = Latitude),
+#              color = "white", alpha = 0.5, size = 2) +
+#   theme_minimal() +
+#   scale_fill_npg() +
+#   theme(legend.position = "bottom") +
+#   facet_wrap(~ region, ncol = 3) +
+#   theme_map() +
+#   theme(strip.background = element_blank(),
+#         strip.text.x = element_text( size = 0))
 
 # dissolve states into regions
 us_states_region$region <- as.factor(us_states_region$region)
 
 regions_dissolved = 
-  st_as_sf(
-    ddply(
-      us_states_region, 
-      .(region), 
-      summarise, 
-      geometry = st_union(geometry)))
-
-dim(regions_dissolved)
-
-# check and set CRS for both datasets (example uses EPSG:4326, but use the appropriate CRS for your data)
-crs_to_use <- st_crs(4326)
-us_states_region <- st_set_crs(us_states_region, crs_to_use)
-regions_dissolved <- st_set_crs(regions_dissolved, crs_to_use)
-
-# Optionally, simplify geometries if they are too complex
-# regions_dissolved <- st_simplify(regions_dissolved, preserveTopology = TRUE)
-
-ggplot() +
-  geom_sf(data = us_states_region, aes(fill = region), 
-          color = "white", lwd = 2) 
-
-# Plotting
-ggplot() +
-  geom_sf(data = regions_dissolved, fill = NA, color = "white", lwd = 2) +  # Thicker borders for regions
-  geom_sf(data = us_states_region, aes(fill = region), color = NA) +  # Fill color for states without border
-  geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
-             aes(x = Longitude, y = Latitude),
-             color = "white", alpha = 0.5, size = 2) +
-  theme_minimal() +
-  scale_fill_npg() +
-  theme(legend.position = "bottom") +
-  theme_map() +
-  theme(strip.background = element_blank(),
-        strip.text.x = element_text(size = 10))
-
-
-
-
-ggsave("map_points_biomass.pdf", plot = biomass_point_region, width = 16, height = 12)
-
+  us_states_region %>%
+  group_by(region) %>%
+  # !!!! summarize from dplyr, not plyr !!!!
+  dplyr::summarize(geometry = st_union(geometry)) 
+class(regions_dissolved)
 
 # Calculate the centroid of each region
 # Compute the centroid for each region
 region_centroids <- 
   us_states_region %>%
   group_by(region) %>%
-  summarize(geometry = 
-              st_centroid(st_union(geometry)), 
-            .groups = "keep")
+  # !!!! summarize from dplyr, not plyr !!!!
+  dplyr::summarize(geometry = 
+                     st_centroid(st_union(geometry)), 
+                   .groups = "keep")
 
-ggplot() +
-  geom_sf(data = us_states_region, aes(fill = region), 
-          color = "white") +
-  geom_point(data = subset(annual_Biomass_region, Year %in% c(2011)), 
-             aes(x = Longitude, y = Latitude),
-             color = "white", alpha = 0.5, size = 2) +
-  geom_text(data = labels_df, aes(x = x, y = y, label = region), size = 4) +
-  theme_map() +
-  scale_fill_npg() +
-  theme(legend.position = "bottom")
 
-# Temporal trends for each region
-annual_Biomass_region_plot = 
-  ddply(annual_Biomass_region, 
+######## 4.2 Temporal trends & Map - specific source ########
+
+annual_singleSource_region_contri = 
+  annual_singleSource_region %>%
+  group_by(region) %>%
+  dplyr::summarize(Contribution = mean(Contribution)) 
+annual_singleSource_region_contri$geometry = NULL  
+
+regions_dissolved_annual_singleSource =
+  merge(regions_dissolved, annual_singleSource_region_contri)
+
+singleSource_allSites = 
+  ddply(annual_singleSource_region, 
+        .(SiteCode), 
+        summarise,
+        Longitude = mean(Longitude, na.rm = T),
+        Latitude = mean(Latitude, na.rm = T))
+
+# Optionally, simplify geometries if they are too complex
+# regions_dissolved <- st_simplify(regions_dissolved, preserveTopology = TRUE)
+
+# continuous-material.R in ggsci{}, https://github.com/nanxstats/ggsci/blob/master/R/continuous-material.R
+show_col(pal_material("indigo")(10))
+show_col(pal_material("red")(10))
+
+# temporal trends for each region
+annual_singleSource_region_plot = 
+  ddply(annual_singleSource_region, 
         .(region, Year, Source_reference),
         summarise,
         med.contri = median(Contribution, na.rm = T),
@@ -862,24 +854,220 @@ annual_Biomass_region_plot =
         state_abbr = last(state_abbr)
   )
 
-ggplot(annual_Biomass_region_plot, 
-       aes(x = Year, y = med.contri)) +
-  geom_line(color = "red") +
-  geom_point(shape = 3) +
-  geom_errorbar(aes(ymin = down.contri, ymax = up.contri), width = 0.2) +
-  facet_wrap(~ region, ncol = 3, scales='free') +
-  scale_x_continuous(breaks = c(2011, 2014, 2017, 2020)) +
-  # scale_y_continuous(breaks = c(0, 1, 2, 3)) +
-  labs(title = "Annual Change in Biomass Contributions for Each Region",
-       x = "Year",
-       y = "Median Contribution") +
-  # theme_minimal() +
-  theme_classic() +
+# create the data list, one for each region
+annual_singleSource_region_split = split(annual_singleSource_region_plot, 
+                                    annual_singleSource_region_plot$region)
+
+############# 4.2.1 arrange with image list and magick ##################
+
+# center map
+singleSource_map_center <- 
+  ggplot() +
+  geom_sf(data = us_states_region, 
+          fill = NA, color = "lightgrey") +  # Fill color for states without border
+  geom_sf(data = regions_dissolved_annual_singleSource, 
+          aes(fill = Contribution), 
+          color = "white", lwd = 2, alpha = 0.5) +  # Thicker borders for regions
+  geom_point(data = singleSource_allSites, 
+             aes(x = Longitude, y = Latitude),
+             color = "white", alpha = 0.5, size = 1.5) +
+  # geom_text(data = region_centroids, aes(label = region), size = 3, color = "black") +
+  theme_minimal() +
+  # gradient_color(color_npg[1]) +
+  # gradient_color("red") +
+  scale_fill_material("red") +
+  theme(legend.position = "bottom") +
+  theme_map() +
   theme(strip.background = element_blank(),
-        strip.text.x = element_text( size = 16), # facet text, face = "bold",
-        axis.text.x = element_text(size = 14, hjust = 0.5, vjust = 0), 
-        axis.text.y = element_text(size = 14, hjust = 0.5),
-        axis.title.y = element_text(size = 15, hjust = 0.5, angle = 90))
+        strip.text.x = element_text(size = 10),
+        legend.position="none") +
+  # extend margin space to place other figures
+  theme(plot.margin = margin(4, 4, 5, 5, "cm"))
+singleSource_map_center
+
+# create the plot list, one for each region
+annual_singleSource_list_plots <- 
+  lapply(annual_singleSource_region_split, function(x) {
+    ggplot(data=x, aes(x = Year, y = med.contri), fill = NA) + 
+      geom_line(color = "red") +
+      geom_point(shape = 3) +
+      geom_errorbar(aes(ymin = down.contri, ymax = up.contri), width = 0.2) +
+      scale_x_continuous(breaks = c(2011, 2014, 2017, 2020)) +
+      labs(title = unique(x$region),
+           # x = "Year",
+           y = "Median Contribution") +
+      theme_classic() +
+      theme(strip.background = element_blank(),
+            plot.title = element_text(hjust = 0.5, vjust = -6),
+            axis.title.x = element_text(size = 0),
+            axis.text.x = element_text(size = 14, hjust = 0.5, vjust = 0), 
+            axis.text.y = element_text(size = 14, hjust = 0.5),
+            axis.title.y = element_text(size = 15, hjust = 0.5, angle = 90))
+  }) 
+# annual_singleSource_list_plots$`East North Central`
+
+
+# Convert the plots to images using ggsave and image_read
+# dpi too low, some info (title, labels) might be missing
+image_list <- lapply(annual_singleSource_list_plots, function(plot) {
+  tmp_file <- tempfile(fileext = ".png")
+  ggsave(tmp_file, plot, width = 8, height = 6, dpi = 20)
+  image <- image_read(tmp_file)
+  file.remove(tmp_file)  # Clean up temporary file
+  image
+})
+image_list$`East South Central`
+
+offsets <- c(
+  "1x1+0-300",    # f1, East North Center, at the bottom right
+  "1x1+200+300",  # f2, East South Center, at the bottom center
+  "1x1+400+0",    # f3, Mid-Atlantic, at the right middle
+  "1x1-200+0",    # f4, Mountain, at the left middle
+  "1x1+400-300",  # f5, New England, at the right top
+  "1x1-200-300",  # f6, Pacific, at the left top
+  "1x1+400+300",  # f7, South Atlantic, at the bottom left
+  "1x1+0+300",    # f8, West North Central, at the bottom left
+  "1x1-400+300"   # f9, West South Central, at the bottom left
+)
+
+offsets <- c(
+  "1x1+0-150",    # f1, East North Center, at the bottom right
+  "1x1+100+150",  # f2, East South Center, at the bottom center
+  "1x1+200+0",    # f3, Mid-Atlantic, at the right middle
+  "1x1-100+0",    # f4, Mountain, at the left middle
+  "1x1+200-150",  # f5, New England, at the right top
+  "1x1-100-150",  # f6, Pacific, at the left top
+  "1x1+200+150",  # f7, South Atlantic, at the bottom left
+  "1x1+0+150",    # f8, West North Central, at the bottom left
+  "1x1-200+150"   # f9, West South Central, at the bottom left
+)
+
+
+# convert the center map from ggplot to image for magick
+composite_map <- image_graph(width = 800, height = 600, res = 100)  # Set your desired dimensions and resolution
+print(singleSource_map_center)
+dev.off()  # Close the graphics device
+
+for (i in seq_along(image_list)) {
+  composite_map <- image_composite(composite_map, image_list[[i]], offset = offsets[i], gravity = "none")
+}
+
+composite_map
+
+image_write(composite_map, "composite_map.png")
+
+############# 4.2.2 arrange with grid.arrange ##################
+
+regions_dissolved_annual_singleSource
+singleSource_allSites
+annual_singleSource_list_plots
+annual_singleSource_region_split
+
+
+# center map
+singleSource_map_center <- 
+  ggplot() +
+  geom_sf(data = us_states_region, 
+          fill = NA, color = "lightgrey") +  # Fill color for states without border
+  geom_sf(data = regions_dissolved_annual_singleSource, 
+          aes(fill = Contribution), 
+          color = "white", lwd = 2, alpha = 0.5) +  # Thicker borders for regions
+  geom_point(data = singleSource_allSites, 
+             aes(x = Longitude, y = Latitude),
+             color = "white", alpha = 0.5, size = 1.5) +
+  # geom_text(data = region_centroids, aes(label = region), size = 3, color = "black") +
+  theme_minimal() +
+  # gradient_color(color_npg[1]) +
+  # gradient_color("red") +
+  scale_fill_material("red") +
+  theme(legend.position = "bottom") +
+  theme_map() +
+  theme(strip.background = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.position="none") # +
+  # extend margin space to place other figures
+  # theme(plot.margin = margin(1.5, 1.5, 2, 2, "cm"))
+singleSource_map_center
+
+# create the plot list, one for each region
+annual_singleSource_list_plots <- 
+  lapply(annual_singleSource_region_split, function(x) {
+    ggplot(data=x, aes(x = Year, y = med.contri), fill = NA) + 
+      geom_line(color = "red") +
+      geom_point(shape = 3) +
+      geom_errorbar(aes(ymin = down.contri, ymax = up.contri), width = 0.2) +
+      scale_x_continuous(breaks = c(2011, 2014, 2017, 2020)) +
+      labs(title = unique(x$region),
+           # x = "Year",
+           y = "Median Contribution") +
+      theme_classic() +
+      theme(strip.background = element_blank(),
+            plot.title = element_text(hjust = 0.5, vjust = -2),
+            axis.title.x = element_text(size = 0),
+            axis.text.x = element_text(size = 14, hjust = 0.5, vjust = 0), 
+            axis.text.y = element_text(size = 14, hjust = 0.5),
+            axis.title.y = element_text(size = 14, hjust = 0.5, angle = 90))
+  }) 
+# annual_singleSource_list_plots$`East North Central`
+
+East_North_Central_p = annual_singleSource_list_plots$`East North Central`
+East_South_Central_p = annual_singleSource_list_plots$`East South Central`
+Mid_Atlantic_p = annual_singleSource_list_plots$`Mid-Atlantic`
+Mountain_p = annual_singleSource_list_plots$Mountain
+New_England_p = annual_singleSource_list_plots$`New England`
+Pacific_p = annual_singleSource_list_plots$Pacific
+South_Atlantic_p = annual_singleSource_list_plots$`South Atlantic`
+West_North_Central_p = annual_singleSource_list_plots$`West North Central`
+West_South_Central_p = annual_singleSource_list_plots$`West South Central`
+
+# Create an empty grob to use as a spacer
+# spacer_grob <- ggplot() + theme_void()
+
+# Create a list of grobs
+grob_list_tempral <- 
+  list(
+    West_North_Central_grob = ggplotGrob(West_North_Central_p),
+    East_North_Central_grob = ggplotGrob(East_North_Central_p),
+    Pacific_grob = ggplotGrob(Pacific_p),
+    Mountain_grob = ggplotGrob(Mountain_p),
+    New_England_grob = ggplotGrob(New_England_p),
+    Mid_Atlantic_grob = ggplotGrob(Mid_Atlantic_p),
+    West_South_Central_grob = ggplotGrob(West_South_Central_p),
+    East_South_Central_grob = ggplotGrob(East_South_Central_p),
+    South_Atlantic_grob = ggplotGrob(South_Atlantic_p),
+    singleSource_map_center_grob = ggplotGrob(singleSource_map_center)
+  )
+
+# Arrange the plots using grid.arrange
+layout_matrix <- rbind(
+  c(NA, NA, NA, NA, NA, NA, NA, NA,  NA, NA, NA, NA,  NA, NA, NA, NA, NA), 
+  c(NA, NA, NA, NA, NA, 1, 1, 1, NA, 2, 2, 2, NA, NA, NA, NA, NA), 
+  c(NA, NA, NA, NA, NA, 1, 1, 1, NA, 2, 2, 2, NA, NA, NA, NA, NA), 
+  c(NA, 3, 3, 3,  NA, 1, 1, 1, NA, 2, 2, 2, NA, NA, NA, NA, NA), 
+  c(NA, 3, 3, 3, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 5, 5, NA), 
+  c(NA, 3, 3, 3, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 5, 5, NA), 
+  c(NA, NA, NA, NA, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 5, 5, NA), 
+  c(NA, 4, 4, 4, 10, 10, 10, 10, 10, 10, 10, 10, 10, NA, NA, NA, NA), 
+  c(NA, 4, 4, 4, 10, 10, 10, 10, 10, 10, 10, 10, 10, 6, 6, 6, NA), 
+  c(NA, 4, 4, 4, 10, 10, 10, 10, 10, 10, 10, 10, 10, 6, 6, 6, NA), 
+  c(NA, NA, NA, NA, 10, 10, 10, 10, 10, 10, 10, 10, 10, 6, 6, 6, NA), 
+  c(NA, NA, 7, 7, 7, NA, 8, 8, 8, NA, 9, 9, 9, NA, NA, NA, NA), 
+  c(NA, NA, 7, 7, 7, NA, 8, 8, 8, NA, 9, 9, 9, NA, NA, NA, NA), 
+  c(NA, NA, 7, 7, 7, NA, 8, 8, 8, NA, 9, 9, 9, NA, NA, NA, NA),
+  c(NA, NA, NA, NA, NA, NA, NA, NA,  NA, NA, NA, NA,  NA, NA, NA, NA, NA)
+)
+
+grid_layout <- grid.arrange(
+  grobs = grob_list_tempral,
+  layout_matrix = layout_matrix,
+  widths = c(0.2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.2),  # Adjust as needed
+  heights = c(0.2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.2)     # Adjust as needed
+)
+
+grid_layout
+
+
+
 
 ###########################################################################
 #######  5. Merge files and National - Month #######
