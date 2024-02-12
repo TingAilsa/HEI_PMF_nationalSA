@@ -17,21 +17,19 @@ library(ggpattern)
 library(ggthemes)
 library(scales)
 library(extrafont) 
+library(purrr)
 
 ####### 1. Read & process other files to use ####### 
 
 #### 1.1 CSN 25TimesMean noCsub #### 
 
 ##set working directory
+#setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/CSN_Site_25TimesMean_2024.01_selected/")
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/CSN_Site_25TimesMean/")
 
 site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
 species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
 site_info_all$X = species_class$X = NULL
-site_info_all$cluster_site = 
-  paste0(site_info_all$Finaly.Decision, 
-         "_", 
-         site_info_all$SiteCode)
 
 noCsub_noExtreme = "CSN_NoGUI_NoCsub_25TimesMean_Site"
 data.prefix = "CSN_noCsub_25TimesMean_"
@@ -55,6 +53,12 @@ site_info_all = plyr::rename(
 source_cluster = paste0("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
                         noCsub_noExtreme)
 
+### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
+site_info_all$cluster_site = 
+  paste0(site_info_all$Finaly.Decision, 
+         "_", 
+         site_info_all$SiteCode)
+
 cluster_sites <- c("1_10732003", "1_391510017", "10_421010055", "11_270530963", 
                    "12_450790007", "12_540390020", "13_540511002", "14_160010010", 
                    "15_180890022", "16_420450109", "17_360551007", "18_371190041", 
@@ -63,6 +67,17 @@ cluster_sites <- c("1_10732003", "1_391510017", "10_421010055", "11_270530963",
                    "25_420030064", "3_320030540", "4_320310031", "5_130210007", 
                    "6_60731022", "7_120110034", "7_60670006", "8_380171004", 
                    "9_530530031", "9_550790010")
+### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
+
+### for ALL sites
+site_info_all =
+  site_info_all[with(site_info_all, order(serial.No)), ]
+site_info_all$serial.No =
+  ifelse(site_info_all$serial.No < 100,
+         sprintf("%03d", site_info_all$serial.No),
+         as.character(site_info_all$serial.No))
+cluster_sites = unique(site_info_all$serial.No)
+
 
 ########################################################
 ######## 2. Process the PMF non-GUI outputs & Plot ####### 
@@ -72,15 +87,16 @@ correl_r_p_summary = NULL
 summary_base = NULL
 
 for (cluster.site in cluster_sites) { # 1:25
-  for (factor.No in 6:11) { # 6:11, 6:6
+  for (factor.No in 5:11) { # 6:11, 6:6
     
-    cluster.site.factor.pre = paste0("C_", cluster.site, "_F_", factor.No, "_")
+    # cluster.site.factor.pre = paste0("C_", cluster.site, "_F_", factor.No, "_")
+    cluster.site.factor.pre = paste0("S_", cluster.site, "_F_", factor.No, "_")
     name.prefix = paste0(data.prefix, cluster.site.factor.pre)
     
     tryCatch({
       ####### Read the results from bash script ####### 
       # Access the input file name passed as an argument
-      folder_path <- paste0("C_", cluster.site, "/Factor_", factor.No, "/")
+      folder_path <- paste0("S_", cluster.site, "/Factor_", factor.No, "/") # "C_"
       base_output = readLines(paste0(folder_path, 
                                      data.prefix, 
                                      cluster.site.factor.pre,
@@ -134,9 +150,9 @@ for (cluster.site in cluster_sites) { # 1:25
       base_contri$Species = site.weak.strong
       base_percent = conc_percent_contri(base_contri)
       
-      base_nmContri_plot = gather(base_contri,
+      base_conc_plot = gather(base_contri,
                                   "Factor", 
-                                  "Normalized_Contri", 
+                                  "Concentration", 
                                   -Species)
       
       base_percent_plot = gather(base_percent,
@@ -147,31 +163,36 @@ for (cluster.site in cluster_sites) { # 1:25
       # Extract site & date info
       site_date_cluster = read.csv(
         file.path(
-          paste0(source_cluster, "_SiteDate"),
-          paste0(data.prefix, "C_", cluster.site, "_PM_Date.csv")),
+          paste0(source_cluster, "_SiteDate"), # "_SiteDate_2024.01"
+          paste0(data.prefix, "S_", cluster.site, "_PM_Date.csv")), #"C_"
         header = T)
       
       # normalized and overall contributions based on OLS MLR
       time_series_analyses = time_series(base_ts, site_date_cluster)
-      base_ts_nmContri_gather = time_series_analyses$base_ts_nmContri_gather
+      # base_ts_nmContri_gather = time_series_analyses$base_ts_nmContri_gather
       base_ts_nmContri_spread = time_series_analyses$base_ts_nmContri_spread
       ts_PM_lm_beta = time_series_analyses$ts_PM_lm_beta
       cor_PM_sumSpecies = time_series_analyses$cor_PM_sumSpecies
-      base_ts_nmContri_all = time_series_analyses$base_ts_nmContri_all
+      # base_ts_nmContri_all = time_series_analyses$base_ts_nmContri_all
+      
+      base_ts_conc_all = cbind(base_ts_conc, site_date_cluster)
+      base_ts_conc_all$Date = as.Date(base_ts_conc_all$Date)
+      base_ts_conc_all$SerialNumber = NULL
+      colnames(base_ts_conc_all)[ncol(base_ts_conc_all)] = "PM2.5"
       
       # pivot data from wide to long
-      base_ts_nmContri_long <-
-        base_ts_nmContri_all %>% 
+      base_ts_conc_long <-
+        base_ts_conc_all %>% 
         pivot_longer(
           cols = Factor.serial[1]:Factor.serial[length(Factor.serial)],
           names_to = c("Factor"),
           # names_pattern = "new_?(.*)_(.)(.*)",
-          values_to = "Normalized_Contri"
+          values_to = "Concentration"
         )
       
       # Get annual and seasonal contributions
-      base_ts_nmContri_gather <- 
-        base_ts_nmContri_gather %>%
+      base_ts_conc_long <- 
+        base_ts_conc_long %>%
         mutate(Year = year(Date),
                Season = case_when(
                  month(Date) %in% c(12, 1, 2) ~ "Winter",
@@ -181,20 +202,20 @@ for (cluster.site in cluster_sites) { # 1:25
                ),
                Month = month(Date))
       
-      ts_annual_nmContri = ddply(base_ts_nmContri_gather, 
-                                 .(Year, SiteCode, Factor),
-                                 summarise,
-                                 Normalize_contri = median(Normalize_contri))
+      ts_annual_conc = ddply(base_ts_conc_long, 
+                             .(Year, SiteCode, Factor),
+                             summarise,
+                             Concentration = median(Concentration))
       
-      ts_season_nmContri = ddply(base_ts_nmContri_gather, 
-                                 .(Season, SiteCode, Factor),
-                                 summarise,
-                                 Normalize_contri = median(Normalize_contri))
+      ts_season_conc = ddply(base_ts_conc_long, 
+                             .(Season, SiteCode, Factor),
+                             summarise,
+                             Concentration = median(Concentration))
       
-      ts_month_nmContri = ddply(base_ts_nmContri_gather, 
-                                .(Year, Month, SiteCode, Factor),
-                                summarise,
-                                Normalize_contri = median(Normalize_contri))
+      ts_month_conc = ddply(base_ts_conc_long, 
+                            .(Year, Month, SiteCode, Factor),
+                            summarise,
+                            Concentration = median(Concentration))
       
       ####### Extract DISP info from PMF CMD, and validation results #######
       
@@ -237,34 +258,38 @@ for (cluster.site in cluster_sites) { # 1:25
       base_ts_nmContri_spread = site_color(base_ts_nmContri_spread)
       
       # merge datasets for source profile plotting
-      base_disp_nmContri_to_merge <- 
-        list(base_nmContri_plot, base_percent_plot, 
+      base_disp_conc_to_merge <- 
+        list(base_conc_plot, base_percent_plot, 
              disp_down_percent_plot, disp_up_percent_plot, 
              species_class, main_source)
       
-      nmContri_percent_bsDisp <- 
+      conc_percent_bsDisp <- 
         Reduce(function(x, y) 
           merge(x, y), 
-          base_disp_nmContri_to_merge)
+          base_disp_conc_to_merge)
       
       # match time-series normalized contribution data with source info
-      ts_nmContri_plot = merge(base_ts_nmContri_gather, main_source)
-      ts_annual_nmContri = merge(ts_annual_nmContri, main_source)
-      ts_season_nmContri = merge(ts_season_nmContri, main_source)
-      ts_month_nmContri = merge(ts_month_nmContri, main_source)
+      ts_conc_plot = merge(base_ts_conc_long, main_source)
+      ts_annual_conc = merge(ts_annual_conc, main_source)
+      ts_season_conc = merge(ts_season_conc, main_source)
+      ts_month_conc = merge(ts_month_conc, main_source)
       lm_beta_plot = merge(ts_PM_lm_beta, main_source)
-      base_ts_nmContri_long_plot = merge(base_ts_nmContri_long, main_source)
+      base_ts_conc_long_plot = merge(base_ts_conc_long, main_source)
       
       # match overall contribution based on normalized data with that from mass concentration
       lm_beta_plot = merge(lm_beta_plot, base_conc_fraction)
       lm_beta_plot$Fractrion_conc_based = 100 * lm_beta_plot$Fractrion_conc_based
       
+      cor.two.fraction.contri = cor.test(lm_beta_plot$Factor.contribution,
+                                         lm_beta_plot$Fractrion_conc_based,
+                                         method = "pearson")$estimate
+      
       ####### Number of Factor & Factor_source #######
       Factor_source_count = 
-        ddply(ts_annual_nmContri, 
+        ddply(ts_annual_conc, 
               .(Factor_source, Factor), 
               summarise,
-              Normalize_contri = mean(Normalize_contri))
+              Concentration = median(Concentration))
       
       Factor_source_match = 
         data.frame(
@@ -292,24 +317,24 @@ for (cluster.site in cluster_sites) { # 1:25
       ####### Plotting #######
       
       #### Source Profile - Concentration & percent Normalize_contri #### 
-      nmContri_percent_bsDisp_use = nmContri_percent_bsDisp
-      nmContri_percent_bsDisp_use = merge(nmContri_percent_bsDisp_use, lm_beta_plot)
-      # nmContri_percent_bsDisp_use = subset(nmContri_percent_bsDisp, Source.No != "F")
+      conc_percent_bsDisp_use = conc_percent_bsDisp
+      conc_percent_bsDisp_use = merge(conc_percent_bsDisp_use, lm_beta_plot)
+      # conc_percent_bsDisp_use = subset(conc_percent_bsDisp, Source.No != "F")
       
       # Convert 0 to 1e-10 for columns to be used for y-axis, there is log transfer later
-      nmContri_percent_bsDisp_use <- 
-        nmContri_percent_bsDisp_use %>%
-        mutate(across(Normalized_Contri:Percent.up, 
+      conc_percent_bsDisp_use <- 
+        conc_percent_bsDisp_use %>%
+        mutate(across(Concentration:Percent.up, 
                       ~replace(., . == 0, 1e-10)))
 
       # Convert percent values to make the scale pattern similar to log Normalize_contri
-      # nmContri_percent_bsDisp_use$LogNormalized_Contri <- log10(nmContri_percent_bsDisp_use$Normalized_Contri)
-      nmContri_percent_bsDisp_use$Trans.Percent = 
-        trans_log(nmContri_percent_bsDisp_use$Percent, log(1e-05))
-      nmContri_percent_bsDisp_use$Trans.Percent.down = 
-        trans_log(nmContri_percent_bsDisp_use$Percent.down, log(1e-05))
-      nmContri_percent_bsDisp_use$Trans.Percent.up = 
-        trans_log(nmContri_percent_bsDisp_use$Percent.up, log(1e-05))
+      # conc_percent_bsDisp_use$LogConcentration <- log10(conc_percent_bsDisp_use$Concentration)
+      conc_percent_bsDisp_use$Trans.Percent = 
+        trans_log(conc_percent_bsDisp_use$Percent, log(1e-05))
+      conc_percent_bsDisp_use$Trans.Percent.down = 
+        trans_log(conc_percent_bsDisp_use$Percent.down, log(1e-05))
+      conc_percent_bsDisp_use$Trans.Percent.up = 
+        trans_log(conc_percent_bsDisp_use$Percent.up, log(1e-05))
       
       #### Step trying to identify the trans for sec.axis
       #numbers = 60
@@ -320,19 +345,19 @@ for (cluster.site in cluster_sites) { # 1:25
       #trans.y = trans_log(y.values, log(1e-05))
       
       #log(exp(log(c(1e-10, 10, 20, 50, 100) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
-      #log(exp(log(c(min(nmContri_percent_bsDisp_use$Percent), max(nmContri_percent_bsDisp_use$Percent)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
+      #log(exp(log(c(min(conc_percent_bsDisp_use$Percent), max(conc_percent_bsDisp_use$Percent)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
       
       
       # Correcting any inverted values
-      inverted_rows <- nmContri_percent_bsDisp_use$Trans.Percent.up < nmContri_percent_bsDisp_use$Trans.Percent.down
+      inverted_rows <- conc_percent_bsDisp_use$Trans.Percent.up < conc_percent_bsDisp_use$Trans.Percent.down
       # Swapping the values using a temporary variable
-      temp <- nmContri_percent_bsDisp_use$Trans.Percent.up[inverted_rows]
-      nmContri_percent_bsDisp_use$Trans.Percent.up[inverted_rows] <- nmContri_percent_bsDisp_use$Trans.Percent.down[inverted_rows]
-      nmContri_percent_bsDisp_use$Trans.Percent.down[inverted_rows] <- temp
+      temp <- conc_percent_bsDisp_use$Trans.Percent.up[inverted_rows]
+      conc_percent_bsDisp_use$Trans.Percent.up[inverted_rows] <- conc_percent_bsDisp_use$Trans.Percent.down[inverted_rows]
+      conc_percent_bsDisp_use$Trans.Percent.down[inverted_rows] <- temp
       
       # find the middle position of the factor/source names on x-axis
       middle_positions <- 
-        nmContri_percent_bsDisp_use %>%
+        conc_percent_bsDisp_use %>%
         dplyr::group_by(Factor_source) %>%
         dplyr::summarize(middle = custom_median(as.numeric(sequence)),
                          Factor_nm_contr = paste(unique(Factor.contr), 
@@ -342,8 +367,8 @@ for (cluster.site in cluster_sites) { # 1:25
         dplyr::arrange(Factor_source)
       
       middle_species = 
-        nmContri_percent_bsDisp_use$Species[
-          nmContri_percent_bsDisp_use$sequence == 
+        conc_percent_bsDisp_use$Species[
+          conc_percent_bsDisp_use$sequence == 
             middle_positions$middle[1]]
       
       middle_positions$Species = middle_species[1]
@@ -360,11 +385,11 @@ for (cluster.site in cluster_sites) { # 1:25
       
       # Create the plot
       nmContri_percent_source <- 
-        ggplot(nmContri_percent_bsDisp_use,
+        ggplot(conc_percent_bsDisp_use,
                aes(x = reorder(Species, sequence), 
                    group = Factor_source)) +
-        # Bar plot for Normalized_Contri
-        geom_bar(aes(y = Normalized_Contri, fill = Factor_source), 
+        # Bar plot for Concentration
+        geom_bar(aes(y = Concentration, fill = Factor_source), 
                  stat = "identity", width = 0.6, alpha = 0.8) +
         # Point plot for transformed Percent
         geom_point(aes(y = exp(Trans.Percent)), color = "black", shape = 15) +
@@ -376,7 +401,7 @@ for (cluster.site in cluster_sites) { # 1:25
                        ", Error.Code = ", disp.error.code, 
                        ", DISP.Qdrop = ", disp.qdrop)) + 
         scale_y_log10(
-          name = "Normalized Contribution",
+          name = format_variable("Concentration µg/m3"),
           limits = c(1e-05, 1e-01),
           breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
           labels = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
@@ -388,9 +413,10 @@ for (cluster.site in cluster_sites) { # 1:25
           )
         ) +
         scale_y_continuous(trans = mylog_trans(base=10, from=-5),
-                           limits = c(1E-5, max(nmContri_percent_bsDisp$Normalized_Contri))) +
+                           limits = c(1E-5, max(conc_percent_bsDisp$Concentration))) +
         scale_fill_npg() +
         xlab(format_variable("PM25 Species")) +
+        ylab(format_variable("Concentration µg/m3")) +
         scale_x_discrete(labels = function(x) format_variable(x)) +
         geom_text(data = middle_positions, size = 4,
                   aes(x = Species, y = 1e-01, label = Factor_source_contr), 
@@ -410,25 +436,25 @@ for (cluster.site in cluster_sites) { # 1:25
       #### Time-series factor percent Normalize_contri #### 
       
       #### Daily
-      # daily_plot_use = subset(ts_nmContri_plot, Source.No != "F")
-      daily_plot_use = ts_nmContri_plot
+      # daily_plot_use = subset(ts_conc_plot, Source.No != "F")
+      daily_plot_use = ts_conc_plot
       
       middle_positions$middle_day = median(daily_plot_use$Date)
       middle_positions$middle_month = month(median(daily_plot_use$Date))
       middle_positions$middle_year = year(median(daily_plot_use$Date))
 
-      daily_nmContri_plot <- 
+      daily_conc_plot <- 
         ggplot(daily_plot_use, 
                # ggplot(daily_plot_use,
-               aes(x = Date, y = Normalize_contri, 
+               aes(x = Date, y = Concentration, 
                    group = Factor_source, color = Factor_source)) +
-        labs(x = "Date", y = "Normalized Contribution") +
+        labs(x = "Date", y = format_variable("Concentration µg/m3")) +
         facet_grid(Factor_source ~., scales = "free_y") +
         geom_line(linewidth = 0.3, alpha = 0.8)+
         geom_point(size = 0.3, alpha = 0.4) +
         scale_color_npg() +
         geom_text(data = middle_positions, size = 4,
-                  aes(x = middle_day, y = 4, label = Factor_source_contr), 
+                  aes(x = middle_day, y = 1.5, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
         theme_ts +
         theme(
@@ -439,16 +465,16 @@ for (cluster.site in cluster_sites) { # 1:25
         )
       
       #### Annual
-      # annual_plot_use = subset(ts_annual_nmContri, Source.No != "F")
-      annual_plot_use = ts_annual_nmContri
+      # annual_plot_use = subset(ts_annual_conc, Source.No != "F")
+      annual_plot_use = ts_annual_conc
       
-      annual_nmContri_plot <- 
+      annual_conc_plot <- 
         #  ggplot(subset(annual_plot_use,
         #                SiteCode = unique(annual_plot_use$SiteCode)[2]), 
         ggplot(annual_plot_use,
-               aes(x = as.factor(Year), y = Normalize_contri, 
+               aes(x = as.factor(Year), y = Concentration, 
                    group = Factor_source, color = Factor_source)) +
-        labs(x = "Year", y = "Normalized Contribution") +
+        labs(x = "Year", y = format_variable("Concentration µg/m3")) +
         facet_grid(Factor_source ~., scales = "free_y") +
         geom_line(linewidth = 0.3, alpha = 0.4)+
         geom_point(size = 1.5, alpha = 0.8) +
@@ -461,21 +487,21 @@ for (cluster.site in cluster_sites) { # 1:25
       
       
       #### Month
-      # month_plot_use = subset(ts_month_nmContri, Source.No != "F")
-      month_plot_use = ts_month_nmContri
+      # month_plot_use = subset(ts_month_conc, Source.No != "F")
+      month_plot_use = ts_month_conc
       month_plot_use =  ddply(month_plot_use, 
                               .(Month, SiteCode, Factor, Main_Species, 
                                 Source_reference, Source.No, Factor_source),
                               summarise,
-                              Normalize_contri = mean(Normalize_contri))
+                              Concentration = median(Concentration))
       
-      month_nmContri_plot <- 
+      month_conc_plot <- 
         #  ggplot(subset(month_plot_use,
         #                SiteCode = unique(month_plot_use$SiteCode)[2]), 
         ggplot(month_plot_use,
-               aes(x = as.factor(Month), y = Normalize_contri, 
+               aes(x = as.factor(Month), y = Concentration, 
                    group = Factor_source, color = Factor_source)) +
-        labs(x = "Month", y = "Normalized Contribution") +
+        labs(x = "Month", y = format_variable("Concentration µg/m3")) +
         facet_grid(Factor_source ~., scales = "free_y") +
         geom_line(linewidth = 0.3, alpha = 0.4)+
         geom_point(size = 1.5, alpha = 0.8) +
@@ -588,6 +614,7 @@ for (cluster.site in cluster_sites) { # 1:25
       
       colnames(correl_r_p) <- c("Var1", "Var2", "Correlation", "P_Value")
       correl_r_p$cluster.site = cluster.site
+      
       correl_r_p$factor.No = factor.No
       correl_r_p$Dataset = disp.prefix
       
@@ -608,7 +635,8 @@ for (cluster.site in cluster_sites) { # 1:25
                                   Correlation.between.factors.Max = correl_r_percentile[7],
                                   With.multiple.factors.assigned.to.one.source = length(unique(source_2more_factor)), 
                                   Name.of.source.with.multiple.factors. = source_2more_factor,
-                                  Number.of.factors.not.intepretated.Before.screening = count_not_intepretate)
+                                  Number.of.factors.not.intepretated.Before.screening = count_not_intepretate,
+                                  Correlation.lm.conc.fraction = cor.two.fraction.contri)
       
       summary_base = rbind(summary_base, base_oneFactor[1, ])
       
@@ -631,7 +659,7 @@ for (cluster.site in cluster_sites) { # 1:25
       
       # calculate correlation for each Factor_source
       corr_labels_site_PM <- 
-        base_ts_nmContri_long_plot %>%
+        base_ts_conc_long_plot %>%
         group_by(Factor_source) %>%
         nest() %>%
         dplyr::mutate(
@@ -640,20 +668,20 @@ for (cluster.site in cluster_sites) { # 1:25
                     ~calculate_corr_label(
                       .x, 
                       "PM2.5", 
-                      "Normalized_Contri"))) %>%
+                      "Concentration"))) %>%
         select(-data)
       
       corr_labels_site_PM = 
         subset(corr_labels_site_PM,
                !(grepl("Factor", Factor_source, fixed = T)))
       
-      base_ts_nmContri_long_plot = 
-        merge(base_ts_nmContri_long_plot, corr_labels_site_PM)
+      base_ts_conc_long_plot = 
+        merge(base_ts_conc_long_plot, corr_labels_site_PM)
       
       PM_source_daily<-
-        ggplot(base_ts_nmContri_long_plot,
+        ggplot(base_ts_conc_long_plot,
              aes(x = PM2.5,
-                 y = Normalized_Contri)) +
+                 y = Concentration)) +
         geom_point() +
         geom_abline(slope=1, intercept=0, color = "red") +
         facet_wrap(~ Factor_source, ncol = 3) +
@@ -663,7 +691,7 @@ for (cluster.site in cluster_sites) { # 1:25
                   check_overlap = TRUE) +
         # labs(x = "Percent Contribution  %", y = "Count") +
         labs(x = format_variable("Daily PM25 µg/m3"), 
-             y = "Normalized Contribution") +
+             y = format_variable("Concentration µg/m3")) +
         theme_minimal() +
         theme(legend.position = "none",
               strip.background = element_blank(), 
@@ -676,27 +704,27 @@ for (cluster.site in cluster_sites) { # 1:25
       
       ####### Output files #######
       
-      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_nmContri_plot, width = 6, height = 7.5)
-      ggsave(paste0(name.prefix, "month.pdf"), plot = month_nmContri_plot, width = 6, height = 7.5)
-      ggsave(paste0(name.prefix, "annual.pdf"), plot = annual_nmContri_plot, width = 6, height = 7.5)
+      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_conc_plot, width = 6, height = 7.5)
+      ggsave(paste0(name.prefix, "month.pdf"), plot = month_conc_plot, width = 6, height = 7.5)
+      ggsave(paste0(name.prefix, "annual.pdf"), plot = annual_conc_plot, width = 6, height = 7.5)
       ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri_2df, width = 12, height = 9)
       ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
       
-      nmContri_percent_bsDisp_output = nmContri_percent_bsDisp
-      ts_nmContri_plot_output = ts_nmContri_plot
+      conc_percent_bsDisp_output = conc_percent_bsDisp
+      ts_conc_plot_output = ts_conc_plot
       lm_beta_plot_output = lm_beta_plot
       lm_beta_plot_output
       
-      nmContri_percent_bsDisp_output$cluster.site = ts_nmContri_plot_output$cluster.site = lm_beta_plot_output$cluster.site = cluster.site
-      nmContri_percent_bsDisp_output$Factor.No = ts_nmContri_plot_output$Factor.No = lm_beta_plot_output$Factor.No = factor.No
+      conc_percent_bsDisp_output$cluster.site = ts_conc_plot_output$cluster.site = lm_beta_plot_output$cluster.site = cluster.site
+      conc_percent_bsDisp_output$Factor.No = ts_conc_plot_output$Factor.No = lm_beta_plot_output$Factor.No = factor.No
       
-      ts_annual_nmContri$cluster.site = ts_month_nmContri$cluster.site = cluster.site
-      ts_annual_nmContri$Factor.No = ts_month_nmContri$Factor.No = factor.No
+      ts_annual_conc$cluster.site = ts_month_conc$cluster.site = cluster.site
+      ts_annual_conc$Factor.No = ts_month_conc$Factor.No = factor.No
       
-      write.csv(nmContri_percent_bsDisp_output, paste0(name.prefix, "source_profile.csv"))
-      write.csv(ts_nmContri_plot_output, paste0(name.prefix, "daily.csv"))
-      write.csv(ts_annual_nmContri, paste0(name.prefix, "annual.csv"))
-      write.csv(ts_month_nmContri, paste0(name.prefix, "month.csv"))
+      write.csv(conc_percent_bsDisp_output, paste0(name.prefix, "source_profile.csv"))
+      write.csv(ts_conc_plot_output, paste0(name.prefix, "daily.csv"))
+      write.csv(ts_annual_conc, paste0(name.prefix, "annual.csv"))
+      write.csv(ts_month_conc, paste0(name.prefix, "month.csv"))
       write.csv(lm_beta_plot_output, paste0(name.prefix, "overall.csv"))
       
       

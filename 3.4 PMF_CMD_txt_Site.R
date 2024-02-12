@@ -13,6 +13,8 @@ library(ggplot2)
 library(scales) 
 library(dplyr)
 library(plyr)
+library(stringr)
+# library(file.copy)
 
 #### A. create cluster & sub-factor folders for sites, DONE!!!  ####
 
@@ -29,12 +31,11 @@ dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
 # dropbox_sitedate = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site_SiteDate")
 # dir.create(file.path(dropbox_sitedate), showWarnings = FALSE)
 
-library(stringr)
-# library(file.copy)
-
 #  all CSV files in the dropbox_site folder
-site_files <- list.files(path = dropbox_site, pattern = ".*_C_.*_.*\\.csv", full.names = TRUE)
+# site_files <- list.files(path = dropbox_site, pattern = ".*_C_.*_.*\\.csv", full.names = TRUE)
+site_files <- list.files(path = dropbox_site, pattern = ".*_S_.*\\.csv", full.names = TRUE)
 
+########### ONLY used when selecting the some Cluster_Site groups for sensitivity analyses in 2024.01
 # extract the pattern (ClusterNo_SiteCode) "_.*_.*" between "C_" and ".csv"
 ClusterNo_SiteCode_pattern <- 
   sapply(site_files, function(file) {
@@ -51,20 +52,23 @@ cluster_sites <- paste('cluster_sites=("',
 print(cluster_sites)
 # output ignoring "\" and use for Slurm scripts
 cat(cluster_sites)
+########### ONLY used when selecting the some Cluster_Site groups for sensitivity analyses in 2024.01
 
 # Process each file
 for (site_file in site_files) {
   # Extract cluster_site number from the file name
-  cluster_site <- str_extract(basename(site_file), "C_.*(?=\\.csv)")
+  #cluster_site <- str_extract(basename(site_file), "C_.*(?=\\.csv)")
+  cluster_site <- str_extract(basename(site_file), "S_.*(?=\\.csv)")
   
   # Create a new folder for cluster_site 
   cluster_site_folder <- file.path(new_cluster_folder, cluster_site)
+  
   if (!dir.exists(cluster_site_folder)) {
     dir.create(cluster_site_folder, recursive = TRUE)
   }
   
   # create subfolders Factor_6 to Factor_11 under cluster_site
-  for (i in 6:11) {
+  for (i in 5:11) {
     subfolder <- file.path(cluster_site_folder, paste0("Factor_", i))
     if (!dir.exists(subfolder)) {
       dir.create(subfolder, recursive = TRUE)
@@ -102,7 +106,7 @@ DISP_par_org = readLines("iniparams_DISP_3.txt")
 before_BS_DISP_par_org = readLines("iniparams_BS_PHASE_of_BSDISP_4.txt")
 BS_DISP_par_org = readLines("iniparams_BS-DISP_5.txt")
 
-factor.number = c(6:11)
+factor.number = c(5:11)
 
 #### B2. edit and output new iniparams.txt ####
 
@@ -117,15 +121,30 @@ site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_noSeason99_Site")
 name.prefix = "CSN_noCsub_noSeason99_" # prefix in names for input/output files
 
 site_sum$X = NULL
+site_sum$serial.No =
+  ifelse(site_sum$serial.No < 100,
+         sprintf("%03d", site_sum$serial.No),
+         as.character(site_sum$serial.No))
+
+site_sum_serial = select(site_sum, serial.No, SiteCode)
+site_sum_serial = site_sum_serial[with(site_sum_serial, order(serial.No)), ]
+
 site_folder <- list.dirs(site_folder_pathway, recursive = FALSE, full.names = TRUE)
 cluster_site_select <- basename(site_folder)
 
 for(cluster_site in cluster_site_select){
+  
+  ######### sensitivity analysis of individual site selection 
   ## data of selected cluster
   cluster.No = str_extract(cluster_site, "(?<=C_)[A-Za-z0-9]+(?=_)")
   site.code <- sub(".*_", "", cluster_site)
   site_info = subset(site_sum, 
                      Finaly.Decision == cluster.No & SiteCode == site.code)
+  
+  ######### all single site analysis
+  site.code = sub(".*_", "", cluster_site)
+  site_info = subset(site_sum, 
+                     serial.No == site.code)
   
   # specific info to use for the site
   site.row = site_info$site.row
@@ -152,7 +171,8 @@ for(cluster_site in cluster_site_select){
     BS_DISP_par = BS_DISP_par_org
     
     # output path
-    path.CF = paste0(pathway, cluster_site, "/Factor_", j, "/")
+    # path.CF = paste0(site_folder_pathway, cluster_site, "/Factor_", j, "/")
+    path.CF = paste0(site_folder_pathway, "/", cluster_site, "/Factor_", j, "/")
     
     # replace with the row, variable, & factor number 
     base_par = row_var_factor(base_par, site.row, variable.NO, j)
