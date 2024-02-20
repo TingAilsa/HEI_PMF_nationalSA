@@ -53,6 +53,7 @@ site_info_all = plyr::rename(
 source_cluster = paste0("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
                         noCsub_noExtreme)
 
+########## single site list defination
 ### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
 site_info_all$cluster_site = 
   paste0(site_info_all$Finaly.Decision, 
@@ -118,7 +119,7 @@ for (cluster.site in cluster_sites) { # 1:25
       
       ####### Cluster-specific species strong, weak, bad #######
       cluster_info = subset(site_info_all, 
-                            cluster_site == cluster.site)
+                            serial.No == cluster.site)
       site.data.row = cluster_info$site.row
       
       # detect the column range for PM species & PM2.5
@@ -151,9 +152,9 @@ for (cluster.site in cluster_sites) { # 1:25
       base_percent = conc_percent_contri(base_contri)
       
       base_conc_plot = gather(base_contri,
-                                  "Factor", 
-                                  "Concentration", 
-                                  -Species)
+                              "Factor", 
+                              "Concentration", 
+                              -Species)
       
       base_percent_plot = gather(base_percent,
                                  "Factor", 
@@ -312,7 +313,7 @@ for (cluster.site in cluster_sites) { # 1:25
       
       # Replace character(0) with NA or another placeholder
       source_2more_factor <- if(length(source_2more_factor) == 0) NA else source_2more_factor
-
+      
       
       ####### Plotting #######
       
@@ -326,7 +327,7 @@ for (cluster.site in cluster_sites) { # 1:25
         conc_percent_bsDisp_use %>%
         mutate(across(Concentration:Percent.up, 
                       ~replace(., . == 0, 1e-10)))
-
+      
       # Convert percent values to make the scale pattern similar to log Normalize_contri
       # conc_percent_bsDisp_use$LogConcentration <- log10(conc_percent_bsDisp_use$Concentration)
       conc_percent_bsDisp_use$Trans.Percent = 
@@ -400,20 +401,32 @@ for (cluster.site in cluster_sites) { # 1:25
         ggtitle(paste0(paste0(disp.prefix, cluster.site.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
                        ", DISP.Qdrop = ", disp.qdrop)) + 
-        scale_y_log10(
-          name = format_variable("Concentration µg/m3"),
-          limits = c(1e-05, 1e-01),
-          breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
-          labels = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
-          sec.axis = sec_axis(
-            trans = ~ log(. + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05),
-            name = "% of Species",
-            breaks = log_breaks,
-            labels = c(0, 10, 20, 50, 100)
-          )
-        ) +
-        scale_y_continuous(trans = mylog_trans(base=10, from=-5),
-                           limits = c(1E-5, max(conc_percent_bsDisp$Concentration))) +
+        # scale_y_log10(
+        # name = format_variable("Concentration µg/m3"),
+        # limits = c(1e-05, max(conc_percent_bsDisp$Concentration)),
+        # breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
+        # labels = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
+        # sec.axis = sec_axis(
+        #   trans = ~ log(. + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05),
+        #   name = "% of Species",
+        #   breaks = log_breaks,
+        #   labels = c(0, 10, 20, 50, 100)
+        # )
+      # ) +
+      scale_y_continuous(
+        name = format_variable("Concentration µg/m3"),
+        # limits = c(1e-05, max(conc_percent_bsDisp$Concentration)),
+        breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
+        labels = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
+        sec.axis = sec_axis(
+          trans = ~ log(. + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05),
+          name = "% of Species",
+          breaks = log_breaks,
+          labels = c(0, 10, 20, 50, 100)
+        ),
+        trans = mylog_trans(base=10, from=-5),
+        limits = c(1E-5, max(conc_percent_bsDisp$Concentration))
+      ) +
         scale_fill_npg() +
         xlab(format_variable("PM25 Species")) +
         ylab(format_variable("Concentration µg/m3")) +
@@ -430,9 +443,9 @@ for (cluster.site in cluster_sites) { # 1:25
           legend.position = "none"
         )
       
-      # nmContri_percent_source
+      nmContri_percent_source
       
-
+      
       #### Time-series factor percent Normalize_contri #### 
       
       #### Daily
@@ -442,7 +455,7 @@ for (cluster.site in cluster_sites) { # 1:25
       middle_positions$middle_day = median(daily_plot_use$Date)
       middle_positions$middle_month = month(median(daily_plot_use$Date))
       middle_positions$middle_year = year(median(daily_plot_use$Date))
-
+      
       daily_conc_plot <- 
         ggplot(daily_plot_use, 
                # ggplot(daily_plot_use,
@@ -557,7 +570,7 @@ for (cluster.site in cluster_sites) { # 1:25
               axis.text.y = element_text(color="grey25", size = 16, angle = 90, hjust = 5, vjust = -0.5),
               axis.title.x = element_text(color="grey25", size = 22, angle = 180, hjust = 0.5),
               axis.title.y = element_text(color = "grey25", size = 0, angle = 27, vjust = 3, hjust = 1.1))
-
+      
       overall_contri <-
         ggplot(lm_beta_plot_use, 
                aes(x = Factor, y = Factor.contribution)) +
@@ -680,8 +693,8 @@ for (cluster.site in cluster_sites) { # 1:25
       
       PM_source_daily<-
         ggplot(base_ts_conc_long_plot,
-             aes(x = PM2.5,
-                 y = Concentration)) +
+               aes(x = PM2.5,
+                   y = Concentration)) +
         geom_point() +
         geom_abline(slope=1, intercept=0, color = "red") +
         facet_wrap(~ Factor_source, ncol = 3) +
@@ -726,6 +739,8 @@ for (cluster.site in cluster_sites) { # 1:25
       write.csv(ts_annual_conc, paste0(name.prefix, "annual.csv"))
       write.csv(ts_month_conc, paste0(name.prefix, "month.csv"))
       write.csv(lm_beta_plot_output, paste0(name.prefix, "overall.csv"))
+      
+      ggsave("aaaaaa.pdf", plot = nmContri_percent_source, width = 6, height = 7.5, device = cairo_pdf)
       
       
       ggsave(paste0(name.prefix, "source_profile.pdf"), plot = nmContri_percent_source, width = 6, height = 7.5)

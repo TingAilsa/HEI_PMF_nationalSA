@@ -20,7 +20,8 @@ data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
 #### 1. Data Preparation FINISHED ####
 
 ########   source assignment results 
-data_folders = c("CSN_Cluster_25TimesMean", "CSN_Cluster_noSeason99", "CSN_Site_25TimesMean")
+# data_folders = c("CSN_Cluster_25TimesMean", "CSN_Cluster_noSeason99", "CSN_Site_25TimesMean")
+data_folders = "CSN_Site_25TimesMean"
 file_endings <- c("_overall.csv", "_annual.csv", "_month.csv") # Replace with your actual file endings
 result_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data"
 
@@ -46,6 +47,31 @@ for (data_folder in data_folders){
               row.names = FALSE)
   }
 }
+
+overall_site = read.csv("results_R_data/CSN_Site_25TimesMean_overall.csv")
+nrow(subset(overall_site, Factor.contribution<0))/nrow(overall_site)
+site_factor_all = select(overall_site, cluster.site, Factor.No)
+site_factor_all = 
+  site_factor_all[!duplicated(site_factor_all), ]  
+data.frame(table(site_factor_all$Factor.No))
+
+overall_site_0contri =
+  select(overall_site, 
+         cluster.site, Factor.No, Fractrion_conc_based)
+overall_site_0contri = subset(overall_site_0contri,
+                              Fractrion_conc_based == 0)
+overall_site_0contri = 
+  overall_site_0contri[!duplicated(overall_site_0contri), ]  
+
+site_factor_0contri = data.frame(
+  table(overall_site_0contri$Factor.No)
+)
+site_site_0contri = data.frame(
+  table(overall_site_0contri$cluster.site)
+)
+
+nrow(subset(overall_site_0contri, Factor.No == 5))
+nrow(subset(overall_site_0contri, Factor.No == 6))
 
 ##### Source assignment
 source_assign = read.csv("results_R_data/Final_SA_noCsub_25TimesMean_2024.01.csv")

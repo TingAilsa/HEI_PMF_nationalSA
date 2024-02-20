@@ -48,10 +48,6 @@ dataset="CSN"
 extremeMethod="25TimesMean"
 #extremeMethod="noSeason99"
 
-# Singularity container set-up
-SINGULARITY_BASE=/containers/hopper/Containers
-CONTAINER=${SINGULARITY_BASE}/wine/wine.sif
-
 # Create an associative array
 declare -A SLURM_MAP
 
@@ -81,12 +77,17 @@ ShR_SCRIPT_DIR="/projects/HAQ_LAB/tzhang/pmf_no_gui/${dataset}_${extremeMethod}_
 # C_
 BASE_SCRIPT_DIR="$ShR_SCRIPT_DIR/S_${Site_serial}/Factor_${Factor_number}"
 
+# Singularity container set-up
+SINGULARITY_BASE=/containers/hopper/Containers
+export CONTAINER=${SINGULARITY_BASE}/wine/wine.sif
+
 # Set up singularity run
-SINGULARITY_RUN="singularity exec  -B ${BASE_SCRIPT_DIR}:/host_pwd --pwd /host_pwd"
-SCRIPT=PMF_bs_6f8xx_sealed_GUI_MOD.ini
+# SINGULARITY_RUN="singularity exec  -B ${BASE_SCRIPT_DIR}:/host_pwd --pwd /host_pwd"
+export SINGULARITY_RUN="singularity exec --pwd=/scratch/aneil2/CSN_25TimesMean_site/${BASE_SCRIPT_DIR}"
+export SCRIPT=PMF_bs_6f8xx_sealed_GUI_MOD.ini
 
 # Define the DOS command to be used
-DOS_COMMAND="${SINGULARITY_RUN} ${CONTAINER} wine ${BASE_SCRIPT_DIR}/ME-2.exe ${SCRIPT}"
+export DOS_COMMAND="${SINGULARITY_RUN} ${CONTAINER} wine ${BASE_SCRIPT_DIR}/ME-2.exe ${SCRIPT}"
 
 # Set the directory path for the Cluster and Factor folders
 cd "S_${Site_serial}/Factor_${Factor_number}"
