@@ -16,6 +16,7 @@ format_variable <- function(variable) {
   variable <- gsub("NaIon", "Na\u207A", variable)
   variable <- gsub("KIon", "K\u207A", variable)
   variable <- gsub("PM25", "PM\u2082.\u2085", variable)
+  variable <- gsub("PM2.5", "PM\u2082.\u2085", variable)
   variable <- gsub("m3", "m\u00B3", variable)
   return(variable)
 }
@@ -526,6 +527,32 @@ base_results <- function(base_output, task, input.row) {
   # estimate overall fraction contribution based on base_conc
   base_fraction = factor_concen_contri[1, -1] / sum(factor_concen)
   
+  #### Estimate the predicted daily contribution of each species
+
+  # initialize an empty matrix to store the species-specific daily concentraion contributions 
+  daily_contribution_matrix <- 
+    matrix(0, nrow = nrow(base_ts), 
+           ncol = nrow(base_conc))
+  
+  # column names for the matrix will be species names from base_conc
+  colnames(daily_contribution_matrix) <- base_conc$Species # to be replaced in later process
+  
+  # Loop through each species to calculate daily contributions
+  # multiply and sum the contributions
+  base_ts_factors <- base_ts[-1]
+  
+  for(i in 1:nrow(base_conc)) {
+    factor_species_conc <- as.numeric(base_conc[i, -1])
+    
+    daily_contribution_matrix[, i] <- 
+      rowSums(t(t(base_ts_factors) * 
+                  factor_species_conc))
+  }
+
+  predict_daily_species_conc <- 
+    data.frame(Serial.No = base_ts$Serial.No, 
+               daily_contribution_matrix)
+  
   #### Extract fitted G vs. reference G Regression matrix
   # fitted G vs. reference G, regression
   #G.correl.start = grep("Regression matrix T1 of fitted G vs. reference G:", 
@@ -554,7 +581,8 @@ base_results <- function(base_output, task, input.row) {
               base_ts = base_ts, 
               base_contri = base_conc,
               base_ts_conc = base_ts_conc, 
-              base_fraction = base_fraction))
+              base_fraction = base_fraction,
+              predict_daily_species_conc = predict_daily_species_conc))
 }
 
 #### Match site & date, preparing for base model result plotting  #### 
@@ -564,7 +592,7 @@ time_series = function(base_ts, site_date){
   
   # match "Date", "SiteCode", "PM2.5", "State" info
   base_ts_all[c("Date", "SiteCode", "PM2.5", "State")] <- 
-    site_date[c("Date", "SiteCode", "PM25", "State")]
+    site_date[c("Date", "SiteCode", "PM2.5", "State")]
   base_ts_all$species.sum = rowSums(base_ts_all[, 2:(factor.No+1)])
   sapply(base_ts_all, class)
   cor_PM_sumSpecies = cor(base_ts_all$PM2.5, 

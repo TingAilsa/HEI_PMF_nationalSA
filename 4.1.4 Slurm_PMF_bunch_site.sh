@@ -83,7 +83,8 @@ export CONTAINER=${SINGULARITY_BASE}/wine/wine.sif
 
 # Set up singularity run
 # SINGULARITY_RUN="singularity exec  -B ${BASE_SCRIPT_DIR}:/host_pwd --pwd /host_pwd"
-export SINGULARITY_RUN="singularity exec --pwd=/scratch/aneil2/CSN_25TimesMean_site/${BASE_SCRIPT_DIR}"
+#export SINGULARITY_RUN="singularity exec --pwd=/scratch/aneil2/CSN_25TimesMean_site/${BASE_SCRIPT_DIR}"
+export SINGULARITY_RUN="singularity exec --pwd=${BASE_SCRIPT_DIR}"
 export SCRIPT=PMF_bs_6f8xx_sealed_GUI_MOD.ini
 
 # Define the DOS command to be used
