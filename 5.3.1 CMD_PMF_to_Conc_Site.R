@@ -146,6 +146,7 @@ for (cluster.site in cluster_sites) { # 1:25
       base_info = base_results(base_output, 
                                lowest_Qm_taskNo, 
                                site.data.row)
+      
       # base_G_cor = base_info$base_G_cor
       base_ts = base_info$base_ts
       base_contri = base_info$base_contri
