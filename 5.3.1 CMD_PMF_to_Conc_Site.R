@@ -116,6 +116,11 @@ for (cluster.site in cluster_sites) { # 1:25
                                    cluster.site.factor.pre,
                                    "BS_.txt"))
       
+      # Bootstrap mapping rate
+      bs_map_fra = bs_map(bs_output, 50, factor.No, 0.6) # 0.6 is the threshold or r
+      bs_map_fraction = bs_map_fra$percent_less_than_0_6
+      bs_overall_map = bs_map_fra$BS_overall
+      
       # Find the number of task when the value of Qm is the lowest
       lowest_Qm_taskNo = lowest_Qm_task(base_output)$lowest_Qm_task
       lowest_Qm = round(lowest_Qm_task(base_output)$lowest_Qm, 0)
@@ -276,6 +281,12 @@ for (cluster.site in cluster_sites) { # 1:25
       base_ts_conc_all$SerialNumber = NULL
       # colnames(base_ts_conc_all)[ncol(base_ts_conc_all)] = "PM2.5"
       
+      # estimate the PMF explained PM2.5 and the observations
+      ts_conc_2PM = base_ts_conc_all
+      ts_conc_2PM$PMF_PM2.5 = rowSums(ts_conc_2PM[, Factor.serial], na.rm = TRUE)
+      median_PMF_PM2.5 = median(ts_conc_2PM$PMF_PM2.5)
+      median_obs_PM2.5 = median(ts_conc_2PM$PM2.5)
+      cor.PMF.obs.PM = cor(ts_conc_2PM$PMF_PM2.5, ts_conc_2PM$PM2.5)
       
       #### time-series concentration contribution estimation
       
@@ -471,15 +482,24 @@ for (cluster.site in cluster_sites) { # 1:25
             middle_positions$middle[1]]
       
       middle_positions$Species = middle_species[1]
-      # for mark on figure
+      
+      ### add BS results
+      bs_map_fraction_source = 
+        merge(bs_map_fraction, 
+              select(lm_beta_plot, 
+                     Factor, Factor_source))
+      middle_positions = merge(middle_positions, bs_map_fraction_source)
+      
+      ### Mark on figure
       # middle_positions$Factor_source_contr = 
       #   paste0(middle_positions$Factor_source, ", ", 
       #          "nm_contri ", middle_positions$Factor_nm_contr, ", ",
       #          "conc_fr ", middle_positions$Factor_conc_fr)
       middle_positions$Factor_source_contr = 
         paste0(middle_positions$Factor_source, ", ", 
-               "conc_fr ", middle_positions$Factor_conc_fr)
-      
+               "conc_fr ", middle_positions$Factor_conc_fr,
+               ", BS_map ", middle_positions$BS_map_fra)
+
       # Set the breaks
       y_breaks = c(1e-10, 10, 20, 50, 100)
       trans_y_breaks = trans_log(y_breaks, log(1e-05))
@@ -499,12 +519,13 @@ for (cluster.site in cluster_sites) { # 1:25
                           ymax = exp(Trans.Percent.up)), 
                       width = 0.4) +
         facet_grid(Factor_source ~ ., switch = "y") +
-        ggtitle(paste0(paste0(disp.prefix, cluster.site.factor.pre), # "\n",
+        ggtitle(paste0(paste0(disp.prefix, cluster.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
-                       ", DISP.Qdrop = ", disp.qdrop, "\n",
+                       ", DISP.Qdrop = ", disp.qdrop, 
+                       ", BS.map = ", paste0(BS_overall*100, "%"), "\n",
                        "Estimated Q.true = ", Q.true,
                        ", Q.robust = ", Q.robust,
-                       ", GUI Qmin = ", lowest_Qm)) + 
+                       ", nonGUI.Qmin = ", lowest_Qm)) + 
         # scale_y_log10(
         # name = format_variable("Concentration µg/m3"),
         # limits = c(1e-05, max(conc_percent_bsDisp$Concentration)),
@@ -742,11 +763,17 @@ for (cluster.site in cluster_sites) { # 1:25
       correl_r_p_summary = rbind(correl_r_p_summary, correl_r_p)
       
       base_oneFactor = data.frame(Dataset = disp.prefix, Cluster = cluster.site, Factor = factor.No, 
+                                  median_PMF_PM2.5 = median_PMF_PM2.5, 
+                                  median_obs_PM2.5 = median_obs_PM2.5, 
+                                  cor_PMF.obs_PM = cor.PMF.obs.PM,
+                                  Correlation.lm.conc.fraction = cor.two.fraction.contri,
                                   Qmin = lowest_Qm, Qmin_task_No = lowest_Qm_taskNo, 
                                   Q.exp = Q.exp, Q.true = Q.true, Q.robust = Q.robust,
-                                  count.strong.species = strong.species.count, count.all.species = species.weak.strong.count,
+                                  count.strong.species = strong.species.count, 
+                                  count.all.species = species.weak.strong.count,
                                   day.count = site.data.row,
                                   DISP_error.code = disp.error.code, DISP_qdrop = disp.qdrop, 
+                                  bs.map = bs_overall_map, 
                                   Correlation.between.factors.Min = correl_r_percentile[1],
                                   Correlation.between.factors.10th = correl_r_percentile[2],
                                   Correlation.between.factors.25th = correl_r_percentile[3],
@@ -754,10 +781,9 @@ for (cluster.site in cluster_sites) { # 1:25
                                   Correlation.between.factors.75th = correl_r_percentile[5],
                                   Correlation.between.factors.90th = correl_r_percentile[6],
                                   Correlation.between.factors.Max = correl_r_percentile[7],
-                                  With.multiple.factors.assigned.to.one.source = length(unique(source_2more_factor)), 
-                                  Name.of.source.with.multiple.factors. = source_2more_factor,
-                                  Number.of.factors.not.intepretated.Before.screening = count_not_intepretate,
-                                  Correlation.lm.conc.fraction = cor.two.fraction.contri)
+                                  Multiple.factors.assigned.to.one.source = length(unique(source_2more_factor)), 
+                                  Source.with.multiple.factors. = source_2more_factor,
+                                  Number.of.factors.not.intepretated.Before.screening = count_not_intepretate)
       
       summary_base = rbind(summary_base, base_oneFactor[1, ])
       

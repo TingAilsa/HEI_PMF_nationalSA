@@ -714,6 +714,48 @@ disp_analysis = function(disp_output){
               disp_up = disp_up_df))
 }
 
+#### BS mapping fraction #### 
+
+bs_map <- function(bs_output, bs.number, factor.No, r.threshold) {
+  
+  ## Determine the number of lines to read
+  # correlations was quoted with "correlations", use slash "\" to write a double quote character
+  "factor \"correlations\" with Best-fit factors"
+  line.start = line_number(bs_output, 
+                           "factor \"correlations\" with Best-fit factors")
+  
+  end.line = line.start + bs.number 
+  start.line = line.start + 1 
+  
+  # Extract the lines including Q values and task numbers
+  corr_Q_lines <- bs_output[start.line:end.line]
+  
+  # Convert the selected lines (with Q values & task number) into a data frame
+  corr_lines <- read.table(text = corr_Q_lines, 
+                           header = F, 
+                           quote = "\"'")[, 5:(5+factor.No-1)]
+  
+  
+  # Estimate the fraction of BS-r above the threshold 
+  percent_less_than_0_6 <- 
+    sapply(corr_lines, 
+           function(column) {
+             mean(column > r.threshold) 
+           })
+  
+  # percent_less_than_0_6 = data.frame(matrix(percent_less_than_0_6, 1))
+  percent_less_than_0_6 = data.frame(percent_less_than_0_6)
+  colnames(percent_less_than_0_6) = "BS_map"
+  percent_less_than_0_6$Factor = paste0("Factor", 1:factor.No)
+  percent_less_than_0_6$BS_map_fra = 
+    paste0(round(percent_less_than_0_6$BS_map * 100, 0), "%")
+
+  BS_overall = mean(percent_less_than_0_6$BS_map)
+  
+  return(list(
+    percent_less_than_0_6 = percent_less_than_0_6,
+    BS_overall = BS_overall))
+}
 
 #### N main species #### 
 
