@@ -146,7 +146,9 @@ for (cluster.No in 1:25) { # 1:25
       col_comp_all = col_comp(cluster_info, "Al", "PM2.5")
       
       ## Select weak & strong variables by the value
-      cluster.weak.strong = strong_weak(cluster_info, "Al", "PM2.5")
+      strong_weak_assign = strong_weak(cluster_info, "Al", "PM2.5")
+      strong_weak_df = strong_weak_assign$strong_weak_col
+      cluster.weak.strong = strong_weak_assign$strong_weak_species
       species.weak.strong.count = length(cluster.weak.strong)
       
       Q.exp = 
@@ -558,8 +560,10 @@ for (cluster.No in 1:25) { # 1:25
         scale_y_continuous(
           name = format_variable("Concentration µg/m3"),
           # limits = c(1e-05, max(conc_percent_bsDisp$Concentration)),
-          breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
-          labels = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
+          breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01, 1e-00),
+          labels = c(expression(10^"-5"), expression(10^"-4"), 
+                     expression(10^"-3"), expression(10^"-2"), 
+                     expression(10^"-1"), expression(10^"0")), # label_scientific(),
           sec.axis = sec_axis(
             trans = ~ log(. + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05),
             name = "% of Species",
@@ -887,18 +891,29 @@ for (cluster.No in 1:25) { # 1:25
           values_to = "Scaled_residuals"
         )
       
+      # merge & show the setting of strong_weak classification
+      daily_species_scale_residual_long =
+        merge(daily_species_scale_residual_long, strong_weak_df)
+      daily_species_scale_residual_long$Species_sw = 
+        paste0(daily_species_scale_residual_long$Species, "-",
+               daily_species_scale_residual_long$strong_weak)
+      
+      # library(ggh4x), change strip color
+      # strip <- strip_themed(background_x = elem_list_rect(fill = c("gold", "tomato")
+      # facet_wrap2()
+      
       ### histogram for all species
       all_species_residual <-
         ggplot(daily_species_scale_residual_long, 
                aes(x = Scaled_residuals)) +
         geom_histogram(binwidth = 0.5, alpha = 0.8) +
-        facet_wrap(~ Species, ncol = 4) + # labeller = as_labeller(format_variable)
+        facet_wrap(~ Species_sw, ncol = 4) + # labeller = as_labeller(format_variable)
         geom_vline(xintercept = c(-3, 3), color = "cyan3", linewidth = 0.5) +
         scale_x_continuous(breaks = function(x) unique(c(-3, 3, pretty(x)))) +
         ggtitle("Original Scale") +
         # theme(strip.text = element_text(family = "Arial Unicode MS")) +
         theme_bw()
-      
+
       all_species_residual_zoom <-
         all_species_residual +
         ylim(0, 50) +
@@ -954,7 +969,7 @@ for (cluster.No in 1:25) { # 1:25
       ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_oneSite_conc, width = 6, height = 7.5)
       ggsave(paste0(name.prefix, "month.pdf"), plot = month_conc_plot, width = 6, height = 7.5)
       ggsave(paste0(name.prefix, "annual.pdf"), plot = annual_conc_plot, width = 6, height = 7.5)
-      ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri, width = 12, height = 9)
+      ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri, width = 9, height = 5)
       ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
       ggsave(paste0(name.prefix, "Q_Qexp.pdf"), plot = Q_Qexp_plot, width = 6, height = 7.5)
       ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 6, height = 8, 

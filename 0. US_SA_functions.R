@@ -221,11 +221,21 @@ strong_weak = function(cluster_info, start.species, end.species) {
   col_comp_all = col_comp(cluster_info, start.species, end.species)
   col_selected = colnames(cluster_info)[col_comp_all]
   
-  strong_weak = 
+  strong_weak_species = 
     col_selected[which(
     !is.na(cluster_info[1, col_comp_all]))]
   
-  return(strong_weak)
+  strong_weak_col = 
+    data.frame(
+      Species = strong_weak_species,
+      strong_weak_set = matrix(cluster_info[, strong_weak_species]))
+  strong_weak_col$strong_weak = 
+    ifelse(strong_weak_col$strong_weak_set == 1,
+           "Strong", "Weak")
+  
+  return(list(
+    strong_weak_species = strong_weak_species,
+    strong_weak_col = strong_weak_col))
 }
 
 strong_species = function(cluster_info, start.species, end.species) {
