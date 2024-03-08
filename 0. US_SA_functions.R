@@ -189,6 +189,22 @@ quantile_col <- function(col_range, dataset) {
             na.rm = T )
 }
 
+#### Identify seasons based on date column ####
+season_date <- function(dates) {
+  # ensure the input is of Date type
+  dates = as.Date(dates)
+  
+  months <- month(dates)
+  
+  seasons <- ifelse(months %in% c(12, 1, 2), "Winter",
+                    ifelse(months %in% c(3, 4, 5), "Spring",
+                           ifelse(months %in% c(6, 7, 8), "Summer", 
+                                  "Autumn")))
+  
+  return(seasons)
+}
+
+
 #### detect the percent of missing concentration values for column #### 
 p_miss_with_neg <- function(dataset){
   (p_miss_with_neg <- 
@@ -818,8 +834,8 @@ Nmain_Species_with_Contribution <- function(percent_contribution, N) {
       percent_contribution, 
       2, 
       function(x) 
-        rownames(percent_contribution)
-      [order(x, decreasing = T)[1:N]]
+        rownames(percent_contribution)[
+          order(x, decreasing = T)[1:N]]
     ))
   
   N_main_Contribution = data.frame(
@@ -827,8 +843,8 @@ Nmain_Species_with_Contribution <- function(percent_contribution, N) {
       percent_contribution, 
       2, 
       function(x) 
-        x
-      [order(x, decreasing = T)[1:N]]
+        x[
+          order(x, decreasing = T)[1:N]]
     ))
   
   colnames(N_main_Species)[1] = paste0("Main_Species")
@@ -1193,7 +1209,42 @@ get_slope <- function(df, x, y) {
   return(slope)
 }
 
+#### Reorder columns for datasets with PM2.5 and species  ####
 
+species_col_reorder = function(species_df) {
+  
+  species_df = plyr::rename(species_df, 
+                            c("PM2.5" = "PM25", 
+                              "Cl-" = "ClIon",
+                              "NO3" = "NO3Ion",
+                              "SO4" = "SO4Ion",
+                              "NH4" = "NH4Ion",
+                              "K+" = "KIon",
+                              "Na+" = "NaIon",
+                              "NH4." = "NH4Ion",
+                              "K." = "KIon",
+                              "Na." = "NaIon"))
+  
+  # rearrange the sequence of columns
+  OC.EC = c("EC", "EC1", "EC2", "EC3", 
+            "OC", "OC1", "OC2", "OC3", "OC4",
+            "OP")
+  
+  ions = c("ClIon", "NaIon", "KIon", "NH4Ion", "NO3", "SO4")
+  
+  species_df = species_df %>%
+    select(!(matches(OC.EC)), 
+           everything())
+  
+  species_df = species_df %>%
+    select(!(matches(ions)), 
+           everything())
+  
+  # Place PM2.5 at the end
+  species_df = species_df %>% relocate(PM25, .after = SO4Ion)
+  
+  return(species_df)
+}
 
 
 
