@@ -541,7 +541,7 @@ for (cluster.No in 1:25) { # 1:25
         ggtitle(paste0(paste0(disp.prefix, cluster.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
                        ", DISP.Qdrop = ", disp.qdrop, 
-                       ", BS.map = ", paste0(BS_overall*100, "%"), "\n",
+                       ", BS.map = ", paste0(bs_overall_map*100, "%"), "\n",
                        "Estimated Q.true = ", Q.true,
                        ", Q.robust = ", Q.robust,
                        ", nonGUI.Qmin = ", lowest_Qm)) + 
