@@ -663,19 +663,6 @@ OOB_final_plot$Species[OOB_final_plot$Species == "NH4."] = "NH4Ion"
 OOB_final_plot$Species[OOB_final_plot$Species == "NO3"] = "NO3Ion"
 OOB_final_plot$Species[OOB_final_plot$Species == "SO4"] = "SO4Ion"
 
-# Here name the ions with "Ion" instead of adding symbols inside cause this cause confusion for gsub
-format_variable <- function(variable) {
-  variable <- gsub("ClIon", "Cl\u207B", variable)
-  variable <- gsub("NO3Ion", "NO\u2083\u207B", variable)
-  variable <- gsub("SO4Ion", "SO\u2084\u00B2\u207B", variable)
-  variable <- gsub("CO3Ion", "CO\u2083\u00B2\u207B", variable)
-  variable <- gsub("NH4Ion", "NH\u2084\u207A", variable)
-  variable <- gsub("NaIon", "Na\u207A", variable)
-  variable <- gsub("KIon", "K\u207A", variable)
-  variable <- gsub("PM25", "PM\u2082.\u2085", variable)
-  variable <- gsub("m3", "µm\u00B3", variable)
-  return(variable)
-}
 
 ggplot(OOB_final_plot, 
   aes(Species, OOB_error)) +
