@@ -59,19 +59,19 @@ source_cluster = paste0("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_f
 
 ########## single site list defination
 ### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
-site_info_all$cluster_site = 
-  paste0(site_info_all$Finaly.Decision, 
-         "_", 
-         site_info_all$SiteCode)
-
-cluster_sites <- c("1_10732003", "1_391510017", "10_421010055", "11_270530963", 
-                   "12_450790007", "12_540390020", "13_540511002", "14_160010010", 
-                   "15_180890022", "16_420450109", "17_360551007", "18_371190041", 
-                   "19_550090005", "2_420950025", "20_201730010", "21_220330009", 
-                   "22_500070012", "23_360050110", "24_460990008", "24_490050007", 
-                   "25_420030064", "3_320030540", "4_320310031", "5_130210007", 
-                   "6_60731022", "7_120110034", "7_60670006", "8_380171004", 
-                   "9_530530031", "9_550790010")
+# site_info_all$cluster_site = 
+#   paste0(site_info_all$Finaly.Decision, 
+#          "_", 
+#          site_info_all$SiteCode)
+# 
+# cluster_sites <- c("1_10732003", "1_391510017", "10_421010055", "11_270530963", 
+#                    "12_450790007", "12_540390020", "13_540511002", "14_160010010", 
+#                    "15_180890022", "16_420450109", "17_360551007", "18_371190041", 
+#                    "19_550090005", "2_420950025", "20_201730010", "21_220330009", 
+#                    "22_500070012", "23_360050110", "24_460990008", "24_490050007", 
+#                    "25_420030064", "3_320030540", "4_320310031", "5_130210007", 
+#                    "6_60731022", "7_120110034", "7_60670006", "8_380171004", 
+#                    "9_530530031", "9_550790010")
 ### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
 
 
@@ -521,10 +521,10 @@ for (cluster.site in cluster_sites) { # 1:25
                           ymax = exp(Trans.Percent.up)), 
                       width = 0.4) +
         facet_grid(Factor_source ~ ., switch = "y") +
-        ggtitle(paste0(paste0(disp.prefix, cluster.factor.pre), # "\n",
+        ggtitle(paste0(paste0(disp.prefix, cluster.site.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
                        ", DISP.Qdrop = ", disp.qdrop, 
-                       ", BS.map = ", paste0(BS_overall*100, "%"), "\n",
+                       ", BS.map = ", paste0(bs_overall_map*100, "%"), "\n",
                        "Estimated Q.true = ", Q.true,
                        ", Q.robust = ", Q.robust,
                        ", nonGUI.Qmin = ", lowest_Qm)) + 
@@ -543,7 +543,7 @@ for (cluster.site in cluster_sites) { # 1:25
       scale_y_continuous(
         name = format_variable("Concentration µg/m3"),
         # limits = c(1e-05, max(conc_percent_bsDisp$Concentration)),
-        breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01),
+        breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01, 1e-00),
         labels = c(expression(10^"-5"), expression(10^"-4"), 
                    expression(10^"-3"), expression(10^"-2"), 
                    expression(10^"-1"), expression(10^"0")), # label_scientific(),
@@ -766,6 +766,20 @@ for (cluster.site in cluster_sites) { # 1:25
       
       correl_r_p_summary = rbind(correl_r_p_summary, correl_r_p)
       
+      # Pair plotting
+      pdf(paste0(name.prefix, "factor_pairs.pdf"))
+      
+      # par(oma = c(4, 4, 6, 10), mar = c(4, 4, 2, 2)) 
+      pairs(base_ts_nmContri_spread[, 1:factor.No], 
+            upper.panel = panel.scatter,
+            lower.panel = panel.corr,
+            main = name.prefix)
+      
+      dev.off()
+      
+      
+      ####### output data summary #######
+      
       base_oneFactor = data.frame(Dataset = disp.prefix, Cluster = cluster.site, Factor = factor.No, 
                                   median_PMF_PM2.5 = median_PMF_PM2.5, 
                                   median_obs_PM2.5 = median_obs_PM2.5, 
@@ -793,18 +807,6 @@ for (cluster.site in cluster_sites) { # 1:25
       
       write.csv(summary_base, paste0(disp.prefix, "base_DISP_summary.csv"))
       write.csv(correl_r_p_summary, paste0(disp.prefix, "base_factor_correlation.csv"))
-      
-      # Pair plotting
-      pdf(paste0(name.prefix, "factor_pairs.pdf"))
-      
-      # par(oma = c(4, 4, 6, 10), mar = c(4, 4, 2, 2)) 
-      pairs(base_ts_nmContri_spread[, 1:factor.No], 
-            upper.panel = panel.scatter,
-            lower.panel = panel.corr,
-            main = name.prefix)
-      
-      dev.off()
-      
       
       ####### Daily source-specific contribution vs. PM2.5 #######
       
