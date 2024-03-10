@@ -16,8 +16,9 @@ library(plyr)
 library(stringr)
 # library(file.copy)
 
-#### A. create cluster & sub-factor folders for sites, DONE!!!  ####
+#### A. create cluster & sub-factor folders for sites  ####
 
+# midfix = "15tMean"
 # midfix = "25TimesMean"
 # midfix = "noSeason99"
 
@@ -25,9 +26,10 @@ dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting
 dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
 
 # create folder to hold the site-specific subfolders
-# new_cluster_folder = paste0(data.dir, "/", "CSN_CMD_noCsub_", midfix, "_Site")
-# dir.create(file.path(new_cluster_folder), showWarnings = FALSE)
+new_cluster_folder = paste0(data.dir, "/", "CSN_CMD_noCsub_", midfix, "_Site")
+dir.create(file.path(new_cluster_folder), showWarnings = FALSE)
 
+###### post-process script updates, no longer needed
 # dropbox_sitedate = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site_SiteDate")
 # dir.create(file.path(dropbox_sitedate), showWarnings = FALSE)
 
@@ -35,69 +37,79 @@ dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
 # site_files <- list.files(path = dropbox_site, pattern = ".*_C_.*_.*\\.csv", full.names = TRUE)
 site_files <- list.files(path = dropbox_site, pattern = ".*_S_.*\\.csv", full.names = TRUE)
 
-########### ONLY used when selecting the some Cluster_Site groups for sensitivity analyses in 2024.01
-# extract the pattern (ClusterNo_SiteCode) "_.*_.*" between "C_" and ".csv"
-ClusterNo_SiteCode_pattern <- 
-  sapply(site_files, function(file) {
-  matches <- regmatches(file, regexpr("(?<=_C_).*(?=\\.csv)", file, perl = TRUE))
-  if(length(matches) > 0) return(matches)
-  return(NA)
-})
+########### ONLY used when selecting the some site_serial groups for sensitivity analyses in 2024.01
+# # extract the pattern (ClusterNo_SiteCode) "_.*_.*" between "C_" and ".csv"
+# ClusterNo_SiteCode_pattern <- 
+#   sapply(site_files, function(file) {
+#   matches <- regmatches(file, regexpr("(?<=_C_).*(?=\\.csv)", file, perl = TRUE))
+#   if(length(matches) > 0) return(matches)
+#   return(NA)
+# })
+# 
+# # Format as B_AAAAAs=("B_12345" "B_67890" "B_ABCDE" ...)
+# site_serials <- paste('site_serials=("', 
+#                        paste(ClusterNo_SiteCode_pattern, collapse='" "'), 
+#                        '")', 
+#                        sep='')
+# print(site_serials)
+# # output ignoring "\" and use for Slurm scripts
+# cat(site_serials)
+########### ONLY used when selecting the some site_serial groups for sensitivity analyses in 2024.01
 
-# Format as B_AAAAAs=("B_12345" "B_67890" "B_ABCDE" ...)
-cluster_sites <- paste('cluster_sites=("', 
-                       paste(ClusterNo_SiteCode_pattern, collapse='" "'), 
-                       '")', 
-                       sep='')
-print(cluster_sites)
-# output ignoring "\" and use for Slurm scripts
-cat(cluster_sites)
-########### ONLY used when selecting the some Cluster_Site groups for sensitivity analyses in 2024.01
-
-# Process each file
+# create folder to save iniparams.txt files and copy csv files for non-GUI
 for (site_file in site_files) {
-  # Extract cluster_site number from the file name
-  #cluster_site <- str_extract(basename(site_file), "C_.*(?=\\.csv)")
-  cluster_site <- str_extract(basename(site_file), "S_.*(?=\\.csv)")
+  # Extract site_cmd number from the file name
+  #site_cmd <- str_extract(basename(site_file), "C_.*(?=\\.csv)")
+  # site_cmd <- str_extract(basename(site_file), "S_.*(?=\\.csv)")
+  site_cmd <- sub(".*_(S[_-]\\d+)_.*", "\\1", basename(site_file))
   
-  # Create a new folder for cluster_site 
-  cluster_site_folder <- file.path(new_cluster_folder, cluster_site)
+  # Create a new folder for site_cmd 
+  site_cmd_folder <- file.path(new_cluster_folder, site_cmd)
   
-  if (!dir.exists(cluster_site_folder)) {
-    dir.create(cluster_site_folder, recursive = TRUE)
+  if (!dir.exists(site_cmd_folder)) {
+    dir.create(site_cmd_folder, recursive = TRUE)
   }
   
-  # create subfolders Factor_6 to Factor_11 under cluster_site
-  for (i in 5:11) {
-    subfolder <- file.path(cluster_site_folder, paste0("Factor_", i))
+  # create subfolders Factor_6 to Factor_11 under site_cmd
+  for (i in 3:11) {
+    subfolder <- file.path(site_cmd_folder, paste0("Factor_", i))
     if (!dir.exists(subfolder)) {
       dir.create(subfolder, recursive = TRUE)
     }
   }
   
-  # prepare files for non-GUI PMF & site-date-PM2.5 info for later analysis 
+  ##### not working! There shall be no "date" format info in the input csv
+  # file.copy(from = paste0(dropbox_site, "/", basename(site_file)),
+  #           to = paste0(site_cmd_folder, "/", basename(site_file)))
+  
+  
+  # prepare files for non-GUI PMF & site-date-PM2.5 info for later analysis
   site_file_nonGUI = read.csv(site_file)
-  
+
   colnames(site_file_nonGUI)[1] = "SerialNumber"
-  site_PM_date = select(site_file_nonGUI, 
-                        SerialNumber, SiteCode, Date, State, conc_PM25)
-  colnames(site_PM_date)[ncol(site_PM_date)] = "PM25"
-  
-  site_file_nonGUI$SiteCode = site_file_nonGUI$Date = site_file_nonGUI$State = NULL
-  
+  site_file_nonGUI$SerialNumber = 1:nrow(site_file_nonGUI)
+  # site_PM_date = select(site_file_nonGUI,
+  #                       SerialNumber, SiteCode, Date, State, conc_PM25)
+  # colnames(site_PM_date)[ncol(site_PM_date)] = "PM25"
+  # 
+  # site_file_nonGUI$SiteCode = site_file_nonGUI$Date = site_file_nonGUI$State = NULL
+
   # create the output file paths
-  path_PM_date <- file.path(dropbox_sitedate, 
-                            paste0("CSN_noCsub_", midfix, "_", cluster_site, "_PM_Date.csv"))
-  path_nonGUI <- file.path(cluster_site_folder, 
-                           paste0("CSN_noCsub_", midfix, "_", cluster_site, ".csv"))
-  
+  # path_PM_date <- file.path(dropbox_sitedate,
+  #                           paste0("CSN_noCsub_", midfix, "_", site_cmd, "_PM_Date.csv"))
+  path_nonGUI <- file.path(site_cmd_folder,
+                           paste0("CSN_noCsub_", midfix, "_", site_cmd, ".csv"))
+
   # Save site_PM_date to dropbox_sitedate folder
-  write.csv(site_PM_date, path_PM_date, row.names = FALSE)
-  
-  # Save site_file_nonGUI to cluster_site_folder
+  # write.csv(site_PM_date, path_PM_date, row.names = FALSE)
+
+  # Save site_file_nonGUI to site_cmd_folder
   write.csv(site_file_nonGUI, path_nonGUI, row.names = FALSE)
 }
 
+
+# files_to_remove <- list.files(path = new_cluster_folder, pattern = "_CMD\\.csv$", recursive = TRUE, full.names = TRUE)
+# file.remove(files_to_remove)
 
 #### B1 start. read iniparams files  ####
 base_par_org = readLines("iniparams_base_1.txt")
@@ -106,19 +118,24 @@ DISP_par_org = readLines("iniparams_DISP_3.txt")
 before_BS_DISP_par_org = readLines("iniparams_BS_PHASE_of_BSDISP_4.txt")
 BS_DISP_par_org = readLines("iniparams_BS-DISP_5.txt")
 
-factor.number = c(5:11)
+factor.number = c(3:11)
 
 #### B2. edit and output new iniparams.txt ####
 
-### 25TimesMean, CSN
-site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
-site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_25TimesMean_Site")
-name.prefix = "CSN_noCsub_25TimesMean_" # prefix in names for input/output files
+### 15TimesMean, CSN
+site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWD_site.csv")
+site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15TimesMean_Site")
+name.prefix = "CSN_noCsub_15TimesMean_" # prefix in names for input/output files
 
-### 99thSeasonal, CSN
-site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_99season_Site/CSN_noCsub_noSeason99_PMF_CMD_StrongWeakBad_Site.csv")
-site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_noSeason99_Site")
-name.prefix = "CSN_noCsub_noSeason99_" # prefix in names for input/output files
+# ### 25TimesMean, CSN
+# site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_25TimesMean_Site")
+# name.prefix = "CSN_noCsub_25TimesMean_" # prefix in names for input/output files
+# 
+# ### 99thSeasonal, CSN
+# site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_99season_Site/CSN_noCsub_noSeason99_PMF_CMD_StrongWeakBad_Site.csv")
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_noSeason99_Site")
+# name.prefix = "CSN_noCsub_noSeason99_" # prefix in names for input/output files
 
 site_sum$X = NULL
 site_sum$serial.No =
@@ -130,19 +147,19 @@ site_sum_serial = select(site_sum, serial.No, SiteCode)
 site_sum_serial = site_sum_serial[with(site_sum_serial, order(serial.No)), ]
 
 site_folder <- list.dirs(site_folder_pathway, recursive = FALSE, full.names = TRUE)
-cluster_site_select <- basename(site_folder)
+site_folder_use <- basename(site_folder)
 
-for(cluster_site in cluster_site_select){
+for(site_serial in site_folder_use){
   
-  ######### sensitivity analysis of individual site selection 
+  ######### 1. sensitivity analysis of individual site selection 
   ## data of selected cluster
-  cluster.No = str_extract(cluster_site, "(?<=C_)[A-Za-z0-9]+(?=_)")
-  site.code <- sub(".*_", "", cluster_site)
-  site_info = subset(site_sum, 
-                     Finaly.Decision == cluster.No & SiteCode == site.code)
+  # cluster.No = str_extract(site_serial, "(?<=C_)[A-Za-z0-9]+(?=_)")
+  # site.code <- sub(".*_", "", site_serial)
+  # site_info = subset(site_sum, 
+  #                    Finaly.Decision == cluster.No & SiteCode == site.code)
   
-  ######### all single site analysis
-  site.code = sub(".*_", "", cluster_site)
+  ######### 2. all single site analysis
+  site.code = sub(".*_", "", site_serial)
   site_info = subset(site_sum, 
                      serial.No == site.code)
   
@@ -171,8 +188,8 @@ for(cluster_site in cluster_site_select){
     BS_DISP_par = BS_DISP_par_org
     
     # output path
-    # path.CF = paste0(site_folder_pathway, cluster_site, "/Factor_", j, "/")
-    path.CF = paste0(site_folder_pathway, "/", cluster_site, "/Factor_", j, "/")
+    # path.CF = paste0(site_folder_pathway, site_serial, "/Factor_", j, "/")
+    path.CF = paste0(site_folder_pathway, "/", site_serial, "/Factor_", j, "/")
     
     # replace with the row, variable, & factor number 
     base_par = row_var_factor(base_par, site.row, variable.NO, j)
@@ -184,8 +201,8 @@ for(cluster_site in cluster_site_select){
     ##### B1: iniparams for Base run #####
     # create and replace the names for base run input & output files
     
-    base.input = paste0(name.prefix, cluster_site, ".csv")
-    output.pre = paste0(name.prefix, cluster_site, "_F_", j)
+    base.input = paste0(name.prefix, site_serial, ".csv")
+    output.pre = paste0(name.prefix, site_serial, "_F_", j)
     
     base.output = paste0(output.pre, "_")
     
@@ -193,7 +210,7 @@ for(cluster_site in cluster_site_select){
     
     write.table(base_par, 
                 file = paste0(path.CF, "iniparams_base_", 
-                              cluster_site,
+                              site_serial,
                               "_F_", j, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
@@ -236,7 +253,7 @@ for(cluster_site in cluster_site_select){
     ##### B3: output BS (bootstrap) & DISP files #####
     write.table(BS_par, 
                 file = paste0(path.CF,"iniparams_BS_", 
-                              cluster_site,
+                              site_serial,
                               "_F_", j, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
@@ -245,7 +262,7 @@ for(cluster_site in cluster_site_select){
     
     write.table(DISP_par, 
                 file = paste0(path.CF, "iniparams_DISP_", 
-                              cluster_site,
+                              site_serial,
                               "_F_", j, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
@@ -254,7 +271,7 @@ for(cluster_site in cluster_site_select){
     
     write.table(before_BS_DISP_par, 
                 file = paste0(path.CF, "iniparams_BS_DISP_before_", 
-                              cluster_site,
+                              site_serial,
                               "_F_", j, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
@@ -263,7 +280,7 @@ for(cluster_site in cluster_site_select){
     
     write.table(BS_DISP_par, 
                 file = paste0(path.CF, "iniparams_BS_DISP_", 
-                              cluster_site,
+                              site_serial,
                               "_F_", j, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
