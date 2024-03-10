@@ -2318,7 +2318,7 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   write.csv(cmd_species_class_site, 
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
-              paste0(prefix_swb, "PMF_SWD_site.csv")),
+              paste0(prefix_swb, "PMF_SWB_site.csv")),
             row.names = FALSE)
   
   write.csv(extreme_events_remove, 

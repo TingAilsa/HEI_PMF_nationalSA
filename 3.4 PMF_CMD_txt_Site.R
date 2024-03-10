@@ -123,7 +123,7 @@ factor.number = c(3:11)
 #### B2. edit and output new iniparams.txt ####
 
 ### 15TimesMean, CSN
-site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWD_site.csv")
+site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
 site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15TimesMean_Site")
 name.prefix = "CSN_noCsub_15TimesMean_" # prefix in names for input/output files
 
