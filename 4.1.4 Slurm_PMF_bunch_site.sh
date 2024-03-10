@@ -37,9 +37,6 @@ module load singularity
 # set the LANG environment variable
 export LANG=C.UTF-8
 
-# script to exit immediately if a command exits with a non-zero status
-set -x
-
 #### 0. Basic setup ####
 
 #dataset="IMPROVE"
@@ -68,6 +65,9 @@ done
 mapped_value=${SLURM_MAP[$SLURM_ARRAY_TASK_ID]}
 Site_serial=${mapped_value%:*}
 Factor_number=${mapped_value#*:}
+
+# script to exit immediately if a command exits with a non-zero status
+set -x
 
 echo ${Site_serial}
 echo ${Factor_number}
