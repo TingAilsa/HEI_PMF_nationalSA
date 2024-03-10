@@ -150,8 +150,8 @@ calculate_corr_label <- function(data, variable1, variable2) {
   var2 <- data[[variable2]]
   corr_test <- cor.test(var1, var2, method = "pearson")
   
-  paste("R =", round(corr_test$estimate, 2), 
-        "\np =", signif(corr_test$p.value, 2))
+  paste("R =", signif(corr_test$estimate, 2), 
+        "\np =", round(corr_test$p.value, 3))
 }
 
 
@@ -617,22 +617,25 @@ time_series = function(base_ts, site_date){
   base_ts_all = base_ts_date = base_ts
   
   # match "Date", "SiteCode", "PM2.5", "State" info
-  base_ts_all[c("Date", "SiteCode", "PM2.5", "State")] <- 
-    site_date[c("Date", "SiteCode", "PM2.5", "State")]
+  # base_ts_all[c("Date", "SiteCode", "PM2.5", "State")] <- 
+  #   site_date[c("Date", "SiteCode", "PM2.5", "State")]
+  base_ts_all[c("Date", "PM2.5")] <- 
+    site_date[c("Date", "PM2.5")]
   base_ts_all$species.sum = rowSums(base_ts_all[, 2:(factor.No+1)])
   sapply(base_ts_all, class)
   cor_PM_sumSpecies = cor(base_ts_all$PM2.5, 
                           base_ts_all$species.sum)
   
-  base_ts_date[c("Date", "SiteCode")] <- 
-    site_date[c("Date", "SiteCode")]
+  # base_ts_date[c("Date", "SiteCode")] <- 
+  #   site_date[c("Date", "SiteCode")]
+  base_ts_date$Date = site_date$Date
   base_ts_date$Serial.No = NULL
   
   #### 1. Gather the data for time series plotting
   base_ts_gather = gather(base_ts_date, 
                           "Factor", 
                           "Normalize_contri", 
-                          -Date, -SiteCode)
+                          -Date) # , -SiteCode
   
   #### 2. Linear regression resutls - contributions 
   # OLS multiple regression model without an intercept using all other columns
@@ -1192,14 +1195,16 @@ read_and_combine_files <- function(combination, patternPre, patternPost, file_pa
 
 
 #### Source profile figure, Transfer data (percent contribution) to logged value, and match the scale used in logged normalized contribution #### 
-trans_log <- function(value, log_min) {
+# assuming the value is in percentage (0-100) and needs to be scaled between log_min (log(1e-05)) to log_max (e.g., log(1e-01))
+trans_log <- function(value, log_max, log_min) {
   log_trans = log(value + 1) / 
-    log(100) * 
-    (log(1e-01) - log_min) + 
+    log(101) * 
+    (log_max - log_min) + 
     log_min
   
   return(log_trans)
 }
+
 
 ####  Perform linear regression and return the slope #### 
 get_slope <- function(df, x, y) {
