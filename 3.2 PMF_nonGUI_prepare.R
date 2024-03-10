@@ -1148,7 +1148,7 @@ for( i in 1:25){
 #### Non-GUI-2 - NO EXTREMES - Origin_MDL ####
 ################################################################################
 
-#### read data files & create dataframes to store results ####
+#### Read data files ####
 
 ###### data - whether the conc is above the unc
 #### CSN
@@ -1175,9 +1175,12 @@ for( i in 1:25){
 ###### OOB & Missing rate
 # OOB_comb_avg = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_OOBerror_random-forest_for_PMF.csv")
 # miss_comb_avg = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_Missing_Qualifier_interpolation_for_PMF.csv")
-OOB_comb_avg = read.csv("CSN_OOBerror_random-forest_for_PMF.csv")
-miss_comb_avg = read.csv("CSN_Missing_Qualifier_interpolation_for_PMF.csv")
-OOB_comb_avg$X = miss_comb_avg$X = NULL
+OOB_comb_avg = fread("CSN_OOBerror_random-forest_for_PMF.csv")
+miss_comb_avg = fread("CSN_Missing_Qualifier_interpolation_for_PMF.csv")
+OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
+
+OOB_comb_avg = species_col_reorder(OOB_comb_avg)
+miss_comb_avg = species_col_reorder(miss_comb_avg)
 
 ###### data - conc & unc
 # uncertainties would be re-estimated after removing and replacing the extreme data points
@@ -1253,7 +1256,6 @@ dn_vc_use =
 # site_code_serial = unique(site_code_serial)
 # site_code_serial$serial.No = 1:nrow(site_code_serial)
 # 
-# # add 0 to force the serial.No being three digits
 # site_code_serial$serial.No =
 #   ifelse(site_code_serial$serial.No < 100,
 #          sprintf("%03d", site_code_serial$serial.No),
@@ -1261,6 +1263,12 @@ dn_vc_use =
 # write.csv(site_code_serial, "CSN_IMPROVE_site.serial.csv")
 
 site_code_serial = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial$V1 = NULL
+
+# add 0 to force the serial.No being three digits
+site_code_serial$serial.No =
+  ifelse(site_code_serial$serial.No < 100,
+         sprintf("%03d", site_code_serial$serial.No),
+         as.character(site_code_serial$serial.No))
 
 ## CSN
 site_code_serial = subset(site_code_serial, Dataset == "EPACSN") 
@@ -1270,35 +1278,10 @@ site_code_serial = subset(site_code_serial, Dataset == "IMPAER")
 
 # exclude sites that only include in conc_pmf
 all_sites = unique(conc_pmf$SiteCode)
-site_list = subset(site_list,
+site_list = subset(site_code_serial,
                    SiteCode %in% all_sites)
 
-###### create a dataframe to save the decision of weak, bad, or strong 
-species.name = 
-  setdiff(names(conc_pmf),
-          c("SiteCode", "Date", "X", "V1", 
-            "State", "Final.Decision"))
-# Finaly.Decision = 1:25
 length(all_sites)
-
-cmd_species_class_site = 
-  data.frame(
-  matrix(ncol = length(species.name), 
-         nrow = length(all_sites)))
-names(cmd_species_class_site) = species.name
-
-# add PM2.5 and other variables
-cmd_species_class_site = 
-  data.frame(SiteCode = NA, serial.No = NA, 
-             cmd_species_class_site, 
-             sum.weak.good = NA, style.weak.good = NA, site.row = NA)
-
-head(cmd_species_class_site)
-
-# extreme_K = NULL
-# thresholds_Seasonal99th = NULL
-thresholds_TimesMean = NULL
-extreme_events_remove = extreme_events_keep = extreme_events_replace = NULL
 
 #### estimate whether the conc is above monthly MDL  #### 
 
@@ -1330,7 +1313,6 @@ OOB_comb_avg[ , species_exclude] <- list(NULL)
 miss_comb_avg[ , species_exclude] <- list(NULL)
 # comp_error_fraction[ , species_exclude] <- list(NULL)
 species_mdl_use[ , species_exclude] <- list(NULL)
-cmd_species_class_site[, species_exclude] <- list(NULL)
 # cluster_snr[ , OC.EC.sub] <- list(NULL) 
 # species_conc_mdl_cluster[ , OC.EC.sub] <- list(NULL)
 
@@ -1405,7 +1387,7 @@ species_conc_above_mdl_use =
 # dim(species_mdl_full)
 # dim(species_conc_above_mdl)
 
-#### pre-process the marked interpolated points #### 
+#### pre-process the marked Interpolated points #### 
 
 # for those using refilling (NA or unacceptable Flag), add the uncertainty *1.5 
 
@@ -1462,7 +1444,7 @@ species_source_groups =
   )
 
 
-#### choose the folder #### 
+#### choose the Folder #### 
 # ONLY apply this to SITEs, and combine site data if running the cluster analyses
 
 ###### define the subfolder to save cluster files
@@ -1479,8 +1461,8 @@ dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting
 # prefix = "CSN_noCsub_25timesMean_C_"
 
 #### CSN, extreme, mean*15 as threshold of outlier, remove those with high K, and replace those with single species high by median
-nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15tMean_site" ## if no OC EC subgroups, no extreme values 
-GUI.site.folder <- "CSN_GUI_NoCsub_15tMean_site"
+nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15TimesMean_site" ## if no OC EC subgroups, no extreme values 
+GUI.site.folder <- "CSN_GUI_NoCsub_15TimesMean_site"
 prefix = "CSN_noCsub_15timesMean_S_"
 
 # #### CSN, extreme, season 99th as threshold of outlier
@@ -1495,17 +1477,60 @@ prefix = "CSN_noCsub_15timesMean_S_"
 
 # prefix_swb = sub("C_$", "", str_extract(prefix,  "^(.*?)C_"))
 
-#### start the loop #### 
+#### create Dataset to save results #### 
 
+###### a dataframe to save the decision of weak, bad, or strong 
+
+species.name = 
+  setdiff(names(conc_pmf),
+          c("SiteCode", "Date", "X", "V1", 
+            "State", "Final.Decision"))
+
+cmd_species_class_site = 
+  data.frame(
+    matrix(ncol = length(species.name), 
+           nrow = length(all_sites)))
+names(cmd_species_class_site) = species.name
+
+# add PM2.5 and other variables
+cmd_species_class_site = 
+  data.frame(site_list, 
+             cmd_species_class_site, 
+             sum.weak.good = NA, style.weak.good = NA, 
+             site.row = NA, extreme_rowNo_remain = NA, 
+             extreme_rowNo_replace = NA, extreme_rowNo_remove = NA, 
+             row_count_org = NA, original_PM_weak = NA)
+
+
+# dataset = "CSN"
+# dataset = "IMPROVE"
+cmd_species_class_site$Dataset = dataset
+
+cmd_species_class_site[, species_exclude] <- list(NULL)
+head(cmd_species_class_site)
+
+### Others
+# extreme_K = NULL
+# thresholds_Seasonal99th = NULL
+thresholds_TimesMean = NULL
+extreme_events_remove = extreme_events_remain = extreme_events_replace = NULL
+
+#### START the loop #### 
+
+# all_sites[!(all_sites %in% OOB_comb_avg$SiteCode)]
 prefix_swb = sub("S_$", "", str_extract(prefix,  "^(.*?)S_"))
 
-# extract concentration & uncertainty of single cluster for PMF
-for( site.serial in unique(site_list$serial.No)){
-  
-  # generate SiteCode and corresponding datasets
-  site_code = site_list$SiteCode[site_list$serial.No == site.serial]
-  conc_site = subset(conc_pmf, SiteCode == site_code)
+# avoid saving numeric as txt in csv files, if ending "options(scipen=0)"
+options(scipen=999)
 
+# extract concentration & uncertainty of single cluster for PMF
+for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[2]
+  
+  # generate site.serial and corresponding datasets
+  site.serial = site_list$serial.No[site_list$SiteCode == site_code]
+  conc_site = subset(conc_pmf, SiteCode == site_code)
+  row_count_org = nrow(conc_site)
+  
   species_NA_intp_site = 
     subset(species_NA_intp, SiteCode == site_code)
   conc_above_mdl_site = 
@@ -1520,7 +1545,7 @@ for( site.serial in unique(site_list$serial.No)){
   dim(conc_site)
   dim(species_NA_intp_site)
   
-  ##### determine the extremes 1.1 - N*mean #####
+  ##### determine Extremes 1.1 - N*mean #####
   conc_site_forExe = conc_site
   # summary(conc_site_forExe)
   cols_comp = col_comp(conc_site_forExe, "Al", "PM25")
@@ -1558,7 +1583,7 @@ for( site.serial in unique(site_list$serial.No)){
 
 
 
-  ###### determine the extremes 1.2 - seasonal 99th STOP Using #####
+  ###### determine Extremes 1.2 - seasonal 99th STOP Using #####
   # already decide using the N times mean as threshold
   # conc_site_forExe = conc_site
   # conc_site_forExe$Season = season_date(conc_site_forExe$Date)
@@ -1599,7 +1624,7 @@ for( site.serial in unique(site_list$serial.No)){
   # conc_site_extreme_daily = conc_site_season99_daily
   
   
-  ##### determine the extremes 2 - decisions on how to deal with extremes #####
+  ##### determine Extremes 2 - decisions on how to deal with extremes #####
 
   # identify rows in conc_site with values higher than the extreme values
   conc_site_forExe_species = conc_site_forExe[, ..species_columns]
@@ -1766,14 +1791,14 @@ for( site.serial in unique(site_list$serial.No)){
         SiteCode, serial.No, 
         day_extreme_rows, Date, extreme_species, co_detected_species_high))
   
-  extreme_day_keep =
+  extreme_day_remain =
     subset(extreme_site_use, 
            !(Date %in% extreme_day_replace$Date |
                Date %in% extreme_day_remove$Date))
-  extreme_day_keep = 
+  extreme_day_remain = 
     unique(
       select(
-        extreme_day_keep,
+        extreme_day_remain,
         SiteCode, serial.No, 
         day_extreme_rows, Date, extreme_species, co_detected_species_high))
   
@@ -1781,27 +1806,27 @@ for( site.serial in unique(site_list$serial.No)){
   rows_to_remove = 
     unique(extreme_day_remove$day_extreme_rows)
   # extreme days to keep (days with other source detected) 
-  rows_to_keep = 
-    unique(extreme_day_keep$day_extreme_rows)
+  rows_to_remain = 
+    unique(extreme_day_remain$day_extreme_rows)
   # extreme days to replace (no source detected)
   rows_to_replace = 
     unique(extreme_day_replace$day_extreme_rows)
   
-  rowNo_to_replace = length(rows_to_replace)
-  rowNo_to_remove = length(rows_to_remove)
-  rowNo_to_keep = length(rows_to_keep)
-  rowNo_after_remove = nrow(conc_site) - rowNo_to_remove
+  rowNo_replace = length(rows_to_replace)
+  rowNo_remove = length(rows_to_remove)
+  rowNo_remain = length(rows_to_remain)
+  rowNo_after_remove = nrow(conc_site) - rowNo_remove
   
   # check if all rows with extreme(s) are classified
-  # rowNo_to_replace + rowNo_to_remove + rowNo_to_keep == nrow(day_extreme)
-  # length(unique(append(append(rows_to_remove, rows_to_keep), rows_to_replace))) == nrow(day_extreme)
+  # rowNo_replace + rowNo_remove + rowNo_remain == nrow(day_extreme)
+  # length(unique(append(append(rows_to_remove, rows_to_remain), rows_to_replace))) == nrow(day_extreme)
 
   # combine for later check if the handling with extremes looks fine or not
   extreme_events_remove = rbind(extreme_events_remove, extreme_day_remove)
-  extreme_events_keep = rbind(extreme_events_keep, extreme_day_keep)
+  extreme_events_remain = rbind(extreme_events_remain, extreme_day_remain)
   extreme_events_replace = rbind(extreme_events_replace, extreme_day_replace)
   
-  ##### determine the extremes 3 - use random-forest to interpolate extremes to be replaced #####
+  ##### determine Extremes 3 - use random-forest to interpolate extremes to be replaced #####
 
   day_extreme_replace = 
     subset(day_extreme,
@@ -1834,16 +1859,16 @@ for( site.serial in unique(site_list$serial.No)){
                variablewise = T)
   site_rf_conc = 
     cbind(site_log[, 1:3], 
-          exp(site_rf_conc_mf$ximp))
+          exp(site_intp_rf_mf$ximp))
   
-  ##### determine the extremes 4 - remove rows that needs to be removed #####
+  ##### determine Extremes 4 - remove rows that needs to be removed #####
   species_NA_site = species_NA_intp_site[!as.integer(rows_to_remove), ]
   species_fullMDL_site = species_fullMDL_site[!as.integer(rows_to_remove), ]
   
   summary(site_rf_conc$Date == species_NA_site$Date &
             species_fullMDL_site$SiteCode == species_NA_site$SiteCode)
   
-  ###### Uncertainty estimation ######
+  ##### Uncertainty estimation  ##### 
   
   conc_above_mdl_site <- conc_above_mdl_site[!as.integer(rows_to_remove), ]
 
@@ -1890,7 +1915,7 @@ for( site.serial in unique(site_list$serial.No)){
   conc_rf_pmf <- cbind(site_rf_conc[, 1:3], conc_rf_pmf) # site_rf_conc[, 1:4]
   unc_rf_pmf <- cbind(site_rf_conc[, 1:3], unc_rf_pmf) # site_rf_conc[, 1:4]
 
-  ###### Re-estimate signal-to-noise SNR after removing extremes ######
+  ##### Re-estimate signal-to-noise SNR after removing extremes #####
   conc.col = ncol(conc_rf_pmf)
 
   # according to EPA PMF 5.0 User Guide.pdf, function 5-3 & 5-4 from page 23
@@ -1909,8 +1934,10 @@ for( site.serial in unique(site_list$serial.No)){
   # convert the result to a one-row data.frame for later match
   snr_selected_site = data.frame(t(snr_selected_site))  
 
-  ###### Classify-bad&weak 1. Strict SNR & Strict MDL - selected ######
-
+  ##### Classify-bad&weak 1. Strict SNR & Strict MDL - selected #####
+  
+  # SWB, Strong, Weak, or Bad classification
+  
   # estimate the percent of species-specific fration of above MDL
   conc_rf_pmf_aboveMDL = data.frame(colSums(conc_above_mdl_species))
   conc_rf_pmf_aboveMDL$CompName = row.names(conc_rf_pmf_aboveMDL)
@@ -2025,13 +2052,13 @@ for( site.serial in unique(site_list$serial.No)){
   site.species.weak = site.species.weak[! (
     site.species.weak %in% c("S", "Na", "K"))]
   
-  ##### For IMPROVE
-  # add "S into bad to exclude co-linear effects with SO4, Na+, K+
-  site.species.bad = append(c("S"), 
-                               site.species.bad) 
-  # in case "S  is in weak, if so, remove
-  site.species.weak = site.species.weak[! (
-    site.species.weak %in% c("S"))]
+  # ##### For IMPROVE
+  # # add "S into bad to exclude co-linear effects with SO4, Na+, K+
+  # site.species.bad = append(c("S"), 
+  #                              site.species.bad) 
+  # # in case "S  is in weak, if so, remove
+  # site.species.weak = site.species.weak[! (
+  #   site.species.weak %in% c("S"))]
   
   
   # add Al, Mg, Na into weak, if there are not in bad, due to the lower reliability in XRF test
@@ -2140,9 +2167,17 @@ for( site.serial in unique(site_list$serial.No)){
     site.species.weak[
       !is.na(site.species.weak)]
   
+  # mark sites where PM25 is already "Weak" according to above criteria
+  original_PM_weak = "No"
+  if (sum(grepl("PM25", site.species.weak)) == 1)  {
+    site.species.weak = site.species.weak[! site.species.weak %in% "PM25"]
+    original_PM_weak = "Yes"
+  }
+  
   # arrange in alphabetic order 
   site.species.bad = sort(site.species.bad)
   site.species.weak = sort(site.species.weak)
+  
   site.species.weak = append(site.species.weak, "PM25")
   site.species.strong = unique(
     subset(conc_rf_pmf_aboveMDL, 
@@ -2151,7 +2186,7 @@ for( site.serial in unique(site_list$serial.No)){
   site.species.strong = site.species.strong[! site.species.strong %in% "PM25"]
   site.species.strong = as.character(site.species.strong)
   
-  ######### output 1:  GUI #########
+  ##### Output 1:  GUI #####
   # remove species marked as bad
   conc_rf_pmf_gui <- conc_rf_pmf[, !site.species.bad, with=FALSE]
   unc_rf_pmf_gui <- unc_rf_pmf[, !site.species.bad, with=FALSE]
@@ -2164,7 +2199,7 @@ for( site.serial in unique(site_list$serial.No)){
               paste0(prefix, 
                      site.serial, "_conc.csv")),
             row.names = FALSE)
-  write.csv(conc_rf_pmf_gui,
+  write.csv(unc_rf_pmf_gui,
             file = file.path(
               dropbox_path, GUI.site.folder, 
               paste0(prefix, 
@@ -2196,7 +2231,7 @@ for( site.serial in unique(site_list$serial.No)){
                   .SDcols = site.species.weak]
   
   # for PM2.5, set the uncertainty 3*3 times as much
-  unc_rf_pmf_cmd$PM25 = 3 * conc_rf_pmf_cmd$PM25
+  # unc_rf_pmf_cmd$PM25 = 3 * unc_rf_pmf_cmd$PM25, done earlier
   
   # unc_rf_pmf_cmd[1:5, 1:10]; conc_rf_pmf_cmd[1:5, 1:10]
 
@@ -2236,7 +2271,7 @@ for( site.serial in unique(site_list$serial.No)){
   write.csv(cmd_input_interleave, 
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
-              paste0(prefix, site.serial, "_PMF_CMD.csv")),
+              paste0(prefix, site.serial, "_CMD.csv")),
             row.names = FALSE)
   
   ###### output 2.2: non-GUI, weak, bad or strong ######
@@ -2256,7 +2291,13 @@ for( site.serial in unique(site_list$serial.No)){
     length(site.species.weak) +
     length(site.species.strong) 
   
-  cmd_species_class_site$site.row[cmd_class_rowNo] = nrow(conc_rf_pmf)
+  cmd_species_class_site$site.row[cmd_class_rowNo] = rowNo_after_remove
+  cmd_species_class_site$extreme_rowNo_remain[cmd_class_rowNo] = rowNo_remain
+  cmd_species_class_site$extreme_rowNo_replace[cmd_class_rowNo] = rowNo_replace
+  cmd_species_class_site$extreme_rowNo_remove[cmd_class_rowNo] = rowNo_remove
+  cmd_species_class_site$row_count_org[cmd_class_rowNo] = row_count_org
+  cmd_species_class_site$original_PM_weak[cmd_class_rowNo] = original_PM_weak
+  
   # detect the species for None-GUI PMF, thus, weak and strong species
   nonGUI_disp_species <- 
     cmd_species_class_site[
@@ -2278,6 +2319,24 @@ for( site.serial in unique(site_list$serial.No)){
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
               paste0(prefix_swb, "PMF_SWD_site.csv")),
+            row.names = FALSE)
+  
+  write.csv(extreme_events_remove, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "extreme_remove.csv")),
+            row.names = FALSE)
+  
+  write.csv(extreme_events_remain, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "extreme_remain.csv")),
+            row.names = FALSE)
+  
+  write.csv(extreme_events_replace, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "extreme_replace.csv")),
             row.names = FALSE)
 }
 
