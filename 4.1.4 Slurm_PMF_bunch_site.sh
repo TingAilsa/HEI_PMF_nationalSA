@@ -113,10 +113,14 @@ use_txt=$(find ${BASE_SCRIPT_DIR} -type f -name "*_use.txt" | wc -l)
 BS_txt=$(find ${BASE_SCRIPT_DIR} -type f -name "*_BS_.txt" | wc -l)
 DISP_txt=$(find ${BASE_SCRIPT_DIR} -type f -name "*_DISP_.txt" | wc -l)
 DISPres1=$(find ${BASE_SCRIPT_DIR} -type f -name "*_DISPres1.txt" | wc -l)
+
 BS_size=$(find ${BASE_SCRIPT_DIR} -type f -name "*_BS_.txt" -exec du -b {} + | awk '{s+=$1} END {print s}')
 BS_size=${BS_size:-0} # BS_size is set to 0 when no files are found
 DISP_size=$(find ${BASE_SCRIPT_DIR} -type f -name "*_DISP_.txt" -exec du -b {} + | awk '{s+=$1} END {print s}')
 DISP_size=${DISP_size:-0}
+DISPres1_size=$(find ${BASE_SCRIPT_DIR} -type f -name "*_DISPres1.txt" -exec du -b {} + | awk '{s+=$1} END {print s}')
+DISPres1_size=${DISPres1_size:-0}
+
 
 # Check if the number of tasks included in the base result if it exits
 if [ -n "$base_txt_file" ]; then
@@ -189,22 +193,23 @@ function part3_BS_DISP {
 
 #### 1. Having all correct results ####
 
-if [ "$DISPres1" -eq 1 ] && [ "$use_txt" -eq 2 ] && [ "$BS_size" -gt 10000 ] && [ "$DISP_size" -gt 10000 ]; then
+if [ "$use_txt" -eq 2 ] && [ "$BS_size" -gt 10000 ] && [ "$DISPres1_size" -gt 1 ] && [[ "$DISP_size" -gt 10000 ]]; then
     part1_NoRun
 fi
 
-#### 2. Partially Missing results (no BS/DISP) ####
+#### B. Partially Missing results (no BS/DISP) ####
 ##### Run BS, DISP, and BS-DISP analyses if there are base results 
 
-if [ "$base_txt" -eq 1 ] && [ "$DISPres1" -eq 0 ] && [ "$DISP_txt" -eq 0 ]; then
+if [ "$base_txt" -eq 1 ] && [[ "$base_task_count" -eq 20 ]] && [ "$DISPres1_size" -lt 1 ] && [ "$BS_size" -lt 10000 ]; then
     part3_BS_DISP
 fi
 
-#### 3. No results OR BS/DISP not match base reuslts ####
+#### C. No results OR BS/DISP not match base reuslts ####
 
-if [[ "$base_txt" -eq 0 ]] || [[ "$base_task_count" -lt 20 ]] || [[ "$DISPres1" -eq 0 ]] || [[ "$BS_size" -lt 10000 ]] || [[ "$DISP_size" -lt 10000 ]]; then
+if [[ "$base_txt" -eq 0 ]] || [[ "$base_task_count" -lt 20 ]] || [[ "$DISPres1_size" -lt 1 ]] || [[ "$BS_size" -lt 10000 ]] || [[ "$DISP_size" -lt 10000 ]]; then
     part2_Base
     part3_BS_DISP
 fi
+
 
 exit 0 #terminates the script execution
