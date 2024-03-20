@@ -1,19 +1,17 @@
 #!/bin/bash
 
 #SBATCH --partition=normal
-#SBATCH --job-name=C_site25times
+#SBATCH --job-name=C_15times_5unc
 
 ## Specify the needed settings from the server
 #SBATCH --nodes=1  # number of nodes
-## SBATCH --tasks-per-node=1  # tasks per node # up to 128;
+#SBATCH --tasks-per-node=1  # tasks per node # up to 128;
 #SBATCH --mem-per-cpu=20G  # amount of memory the job requires, default is 2G  # memory per CORE
 
 ## Assign the name of job, output & error files
 ## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID
-#SBATCH --output=/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_25TimesMean_site_all/err_out/%x_%A_%a.out # output file
-#SBATCH --error=/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_25TimesMean_site_all/err_out/%x_%A_%a.err # error file
-##SBATCH --output=/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_noSeason99_site_all/err_out/%x_%A_%a.out # output file
-##SBATCH --error=/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_noSeason99_site_all/err_out/%x_%A_%a.err # error file
+#SBATCH --output=/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_15TimesMean_site/err_out/%x_%A_%a.out # output file
+#SBATCH --error=/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_15TimesMean_site/err_out/%x_%A_%a.err # error file
 
 ## Email info for updates from Slurm
 #SBATCH --mail-type=BEGIN,END,FAIL # ALL,NONE,BEGIN,END,FAIL,REQUEUE,..
@@ -42,8 +40,8 @@ export LANG=C.UTF-8
 #dataset="IMPROVE"
 dataset="CSN"
 
-extremeMethod="25TimesMean"
-#extremeMethod="noSeason99"
+extremeMethod="15TimesMean"
+#extremeMethod="15tMean_0unc"
 
 # Create an associative array
 declare -A SLURM_MAP
@@ -160,6 +158,7 @@ function part2_Base {
 
     ### Analyze the output .txt file, generate the new value for numoldsol, and replace it in other iniparams.txt series using R
     mv ${dataset}_noCsub_${extremeMethod}_S_${Site_serial}_F_${Factor_number}_.txt ${dataset}_noCsub_${extremeMethod}_S_${Site_serial}_F_${Factor_number}_base.txt
+    cp PMFreport.txt ${dataset}_noCsub_${extremeMethod}_S_${Site_serial}_F_${Factor_number}_base_PMFreport.txt
     if [ $? -ne 0 ]; then echo "Error in Part Base"; return; fi
 
     echo "Base run finished!"
@@ -171,7 +170,7 @@ function part2_Base {
 function part3_BS_DISP {
   echo "Execute BS & DISP"
     
-    Rscript ${ShR_SCRIPT_DIR}/minQ_Task_numoldsol_site.R ${dataset}_noCsub_${extremeMethod}_S_${Site_serial}_F_${Factor_number}_base.txt ${Site_serial} ${Factor_number} ${BASE_SCRIPT_DIR}
+    Rscript ${ShR_SCRIPT_DIR}/minQ_Task_numoldsol_site.R ${dataset}_noCsub_${extremeMethod}_S_${Site_serial}_F_${Factor_number}_base_PMFreport.txt ${Site_serial} ${Factor_number} ${BASE_SCRIPT_DIR}
     if [ $? -ne 0 ]; then echo "Error in Part 1"; return; fi
     echo "minQ changed"
 
@@ -191,25 +190,50 @@ function part3_BS_DISP {
     echo "All runs executed!"
 }
 
-#### 1. Having all correct results ####
+#### function_4. from R, then run BS, DISP, and BS-DISP ####
+##### Run DISP, and BS-DISP analyses if there are base & BS results 
 
-if [ "$use_txt" -eq 2 ] && [ "$BS_size" -gt 10000 ] && [ "$DISPres1_size" -gt 1 ] && [[ "$DISP_size" -gt 10000 ]]; then
+function part4_from_DISP {
+  echo "Execute from DISP"
+    
+    # Run DOS command for BS, DISP, and BS-DISP analyses in turn
+    for param_file in iniparams_DISP_S_${Site_serial}_F_${Factor_number}_use.txt
+    do
+      cp ${param_file} iniparams.txt
+      if [ $? -ne 0 ]; then echo "Error in /DISP run"; return; fi
+      $DOS_COMMAND
+      if [ $? -ne 0 ]; then echo "Error in /DISP run"; return; fi
+      rm iniparams.txt
+    done
+
+    # Rename the output from DISP
+    mv DISPres1.txt ${dataset}_S_${Site_serial}_F_${Factor_number}_DISPres1.txt
+
+    echo "DISP runs executed!"
+}
+
+#### A. Having all correct results ####
+
+if [ "$use_txt" -eq 2 ] && [ "$BS_size" -gt 10000 ] && [ "$DISPres1_size" -gt 1 ] && [ "$DISP_size" -gt 10000 ]; then
     part1_NoRun
 fi
 
-#### B. Partially Missing results (no BS/DISP) ####
-##### Run BS, DISP, and BS-DISP analyses if there are base results 
+#### B. BS finished, but suspension in DISP ####
+if [ "$DISPres1" -eq 1 ] && [ "$DISPres1_size" -eq 0 ]; then
+    part4_from_DISP
+fi
 
-if [ "$base_txt" -eq 1 ] && [[ "$base_task_count" -eq 20 ]] && [ "$DISPres1_size" -lt 1 ] && [ "$BS_size" -lt 10000 ]; then
+#### C. Partially Missing results (no BS/DISP) ####
+
+if [ "$base_txt" -eq 1 ] && [ "$base_task_count" -eq 20 ] && { [ "$BS_size" -lt 10000 ] || [ "$DISP_size" -lt 10000 ]; }; then
     part3_BS_DISP
 fi
 
-#### C. No results OR BS/DISP not match base reuslts ####
+#### D. No results OR BS/DISP not match base reuslts ####
 
-if [[ "$base_txt" -eq 0 ]] || [[ "$base_task_count" -lt 20 ]] || [[ "$DISPres1_size" -lt 1 ]] || [[ "$BS_size" -lt 10000 ]] || [[ "$DISP_size" -lt 10000 ]]; then
+if [ "$base_txt" -eq 0 ] || [ "$base_task_count" -lt 20 ] || [ "$DISPres1_size" -lt 1 ] || [ "$BS_size" -lt 10000 ] || [ "$DISP_size" -lt 10000 ]; then
     part2_Base
     part3_BS_DISP
 fi
-
 
 exit 0 #terminates the script execution
