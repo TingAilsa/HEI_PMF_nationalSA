@@ -112,13 +112,14 @@ for(i in 1:length(cluster.NO)){
     
     # output path
     path.CF = paste0(pathway, "Cluster_", i, "/Factor_", j, "/")
+    overall.unc = 0.05 # default setting
     
     # replace with the row, variable, & factor number 
-    base_par = row_var_factor(base_par, cluster.row, variable.NO, j)
-    BS_par = row_var_factor(BS_par, cluster.row, variable.NO, j)
-    DISP_par = row_var_factor(DISP_par, cluster.row, variable.NO, j)
-    before_BS_DISP_par = row_var_factor(before_BS_DISP_par, cluster.row, variable.NO, j)
-    BS_DISP_par = row_var_factor(BS_DISP_par, cluster.row, variable.NO, j)
+    base_par = row_var_factor(base_par, cluster.row, variable.NO, j, overall.unc)
+    BS_par = row_var_factor(BS_par, cluster.row, variable.NO, j, overall.unc)
+    DISP_par = row_var_factor(DISP_par, cluster.row, variable.NO, j, overall.unc)
+    before_BS_DISP_par = row_var_factor(before_BS_DISP_par, cluster.row, variable.NO, j, overall.unc)
+    BS_DISP_par = row_var_factor(BS_DISP_par, cluster.row, variable.NO, j, overall.unc)
 
     ##### B1: iniparams for Base run #####
     # create and replace the names for base run input & output files
