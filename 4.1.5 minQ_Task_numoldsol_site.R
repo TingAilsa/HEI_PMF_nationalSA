@@ -1,12 +1,3 @@
-# Install package(s) if not existing
-# if (!requireNamespace("dplyr", quietly = TRUE)) {
-#  install.packages("dplyr")
-#}
-
-# Load required libraries
-# library(dplyr)
-# library(readr)
-
 #### 0. functions to use ####
 # Determine the line number in txt file including given string  
 line_number <- function(lines, string) {
@@ -21,17 +12,18 @@ line_number <- function(lines, string) {
 
 # Determine the task number of the lowest Qm from base PMF runs
 # base_file = readLines("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_PMF_noGUI_noCsub_AllData/CSN_C_6_F_9_2011-17_base_result.txt")
+# base_file = readLines("/Users/TingZhang/Downloads/PMFreport.txt")
 
 lowest_Qm_task <- function(base_file) {
   
   ## Determine the number of lines to read
-  # correlations was quoted with "correlations", use slash "\" to write a double quote character
-  "factor \"correlations\" with Best-fit factors"
+  # when generating from **base.txt, correlations was quoted with "correlations", use slash "\" to write a double quote character
+  # "factor \"correlations\" with Best-fit factors"
   line.start = line_number(base_file, 
-                           "factor \"correlations\" with Best-fit factors")
+                           "Qmtrue, gradnorm, #posoutl, #negoutl, endcode")
   
-  end.line = line.start + 20 
-  start.line = line.start + 1 
+  end.line = line.start + 21 
+  start.line = line.start + 2 
   
   # Extract the lines including Q values and task numbers
   Q_lines <- base_file[start.line:end.line]
@@ -39,11 +31,14 @@ lowest_Qm_task <- function(base_file) {
   # Convert the selected lines (with Q values & task number) into a data frame
   Q_task <- read.table(text = Q_lines, 
                        header = F, 
-                       quote = "\"'")[, 1:4]
-  colnames(Q_task) = c("TaskNum", "Qmain", "Qaux", "Q.XX")
+                       quote = "\"'")
+  # colnames(Q_task) = c("TaskNum", "Qmain", "Qaux", "Q.XX")
+  colnames(Q_task) = c("TaskNum", "iterNum", "Q", "Qmain", "Qaux", "Qmtrue",
+                       "gradnorm", "posoutlNum", "negoutlNum", "endcode")
   
+  Q_task_converge = subset(Q_task, endcode == 4)
   # Find the number of task when the value of Qm is the lowest
-  lowest_Qm_task <- Q_task$TaskNum[which.min(Q_task$Qmain)]
+  lowest_Qm_task <- Q_task_converge$TaskNum[which.min(Q_task_converge$Qmain)]
   
   return(lowest_Qm_task)
 }
