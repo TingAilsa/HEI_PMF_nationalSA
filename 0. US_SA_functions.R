@@ -322,37 +322,36 @@ source_ref = function(base_percent, N){
 
 #### Convert the dataset in PMF_bunch_plotting  ####
 
-# Create a function to dynamically generate new column names
+# create a function to dynamically generate new column names
 create_new_column_names <- function(prefix, n) {
   paste0(prefix, "_", seq_len(n))
 }
 
-# Function to transform each group with variable base names
+# function to transform each group with variable base names
 transform_group <- function(data, ...) {
-  max_rows <- nrow(data)
   base_names <- list(...)
+  max_rows <- nrow(data)
   
-  # Create a list to store all column names
-  all_col_names <- list()
+  # initialize an empty list to store column data
+  dynamic_data <- list()
   
-  # Generate column names for each base name
+  # loop through each base name, create dynamic column names, and assign data
   for (base_name in base_names) {
     cols <- create_new_column_names(base_name, max_rows)
-    all_col_names[[base_name]] <- cols
-  }
-  
-  # Create a new data frame with dynamic columns
-  all_cols <- unlist(all_col_names)
-  new_data <- data.frame(matrix(ncol = length(all_cols), nrow = 1))
-  names(new_data) <- all_cols
-  
-  # Assign values to new columns
-  for (base_name in base_names) {
-    cols <- all_col_names[[base_name]]
-    for (i in 1:max_rows) {
-      new_data[1, cols[i]] <- data[[base_name]][i]
+    
+    for (i in seq_along(cols)) {
+      
+      # ensure the index does not exceed the length of data[[base_name]]
+      if (i <= length(data[[base_name]])) {
+        dynamic_data[[cols[i]]] <- data[[base_name]][i]
+      } else {
+        dynamic_data[[cols[i]]] <- NA  
+      }
     }
   }
+  
+  # convert the list to a dataframe
+  new_data <- as.data.frame(dynamic_data, stringsAsFactors = FALSE)
   
   return(new_data)
 }
@@ -435,37 +434,39 @@ non_space_segments <- function(line_to_replace) {
 #### Determine the task number of the lowest Qm from base PMF runs  ####
 # base_file = readLines("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_PMF_noGUI_noCsub_AllData/CSN_C_6_F_9_2011-17_base_result.txt")
 
-lowest_Qm_task <- function(base_file) {
-
+lowest_Qm_task <- function(base_report_file) {
+  
   ## Determine the number of lines to read
   # correlations was quoted with "correlations", use slash "\" to write a double quote character
   "factor \"correlations\" with Best-fit factors"
-  line.start = line_number(base_file, 
-                           "factor \"correlations\" with Best-fit factors")
+  line.start = line_number(base_report_file,
+                           "Qmtrue, gradnorm, #posoutl, #negoutl, endcode")
   
-  end.line = line.start + 20 
-  start.line = line.start + 1 
+  end.line = line.start + 21
+  start.line = line.start + 2
   
   # Extract the lines including Q values and task numbers
-  Q_lines <- base_file[start.line:end.line]
+  Q_lines <- base_report_file[start.line:end.line]
   
   # Convert the selected lines (with Q values & task number) into a data frame
-  Q_task <- read.table(text = Q_lines, 
-                       header = F, 
-                       quote = "\"'")[, 1:4]
-  colnames(Q_task) = c("TaskNum", "Qmain", "Qaux", "Q.XX")
+  Q_task <- read.table(text = Q_lines,
+                       header = F,
+                       quote = "\"'")
+  # colnames(Q_task) = c("TaskNum", "Qmain", "Qaux", "Q.XX")
+  colnames(Q_task) = c("TaskNum", "iterNum", "Q", "Qmain", "Qaux", "Qmtrue",
+                       "gradnorm", "posoutlNum", "negoutlNum", "endcode")
+  
+  Q_task_converge = subset(Q_task, endcode == 4)
   
   # Find the number of task when the value of Qm is the lowest
-  lowest_Qm_task <- 
-    Q_task %>% 
-    filter(Qmain == min(Qmain)) %>% 
-    select(TaskNum) %>% 
-    pull()
+  lowest_Qm_task <- Q_task_converge$TaskNum[which.min(Q_task_converge$Qmain)]
   
-  lowest_Qm = Q_task$Qmain[Q_task$TaskNum == lowest_Qm_task]
+  lowest_Qm = Q_task_converge$Qmain[Q_task_converge$TaskNum == lowest_Qm_task]
+  converge_percent = nrow(Q_task_converge)/nrow(Q_task)
   
   return(list(lowest_Qm_task = lowest_Qm_task, 
-              lowest_Qm = lowest_Qm))
+              lowest_Qm = lowest_Qm,
+              converge_percent = converge_percent))
 }
 
 #### Extract data in Base Model results for selected task number ####
@@ -613,7 +614,7 @@ base_results <- function(base_output, task, input.row) {
 
 #### Match site & date, preparing for base model result plotting  #### 
 
-time_series = function(base_ts, site_date){
+time_series = function(base_ts, site_date, factor.No){
   base_ts_all = base_ts_date = base_ts
   
   # match "Date", "SiteCode", "PM2.5", "State" info
@@ -982,15 +983,16 @@ num_factor <- function(params_file, factor.number) {
 }
 
 # Function to replace the row number, variable number, and factor number
-row_var_factor <- function(params_file, row.number, var.number, factor.number) {
+row_var_factor <- function(params_file, row.number, var.number, factor.number, unc.level) {
   line.detect <- line_number(params_file, "n1,")
   line_to_replace <- params_file[line.detect + 1]
   
   line_replaced_n1 <- replace_nth_segment(line_to_replace, 1, row.number) # n1
   line_replaced_n12 <- replace_nth_segment(line_replaced_n1, 2, var.number) # n2
   line_replaced_n12p <- replace_nth_segment(line_replaced_n12, 3, factor.number) # np
+  line_replaced_n12pu <- replace_nth_segment(line_replaced_n12p, 5, unc.level) # np
   
-  params_file[line.detect + 1] <- line_replaced_n12p
+  params_file[line.detect + 1] <- line_replaced_n12pu
   return(params_file)
 }
 
