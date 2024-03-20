@@ -33,18 +33,19 @@ for site_serialNo in "${site_serial[@]}"; do
   S_site_serialNo="S_${site_serialNo}"
   
   # Loop through each Factor subfolder inside the Cluster folder
-  for factor_number in {5..11}; do
+  for factor_number in {3..11}; do
     factor="Factor_${factor_number}"
+    original_folder_path="${original_path}/${S_site_serialNo}/${factor}"
     
     # Create the corresponding folders in the new directory
     new_folder_path="${new_path}/${S_site_serialNo}/${factor}"
     mkdir -p "${new_folder_path}"
 
     # Copy the *base.txt and *DISPres1.txt files to the new folder
-    cp "${original_path}/${S_site_serialNo}/${factor}"/*base.txt "${new_folder_path}/"
-    cp "${original_path}/${S_site_serialNo}/${factor}"/*DISPres1.txt "${new_folder_path}/"
-    cp "${original_path}/${S_site_serialNo}/${factor}"/*BS_.txt "${new_folder_path}/"
-    # cp "${original_path}/${cluster}/${factor}"/*BS_.txt "${new_folder_path}/"
+    cp "${original_folder_path}"/*base.txt "${new_folder_path}/"
+    cp "${original_folder_path}"/*DISPres1.txt "${new_folder_path}/"
+    cp "${original_folder_path}"/*BS_.txt "${new_folder_path}/"
+    cp "${original_folder_path}"/*_PMFreport.txt "${new_folder_path}/"
   done
 done
 
