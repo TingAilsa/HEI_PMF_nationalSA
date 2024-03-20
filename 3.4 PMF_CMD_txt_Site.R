@@ -18,12 +18,14 @@ library(stringr)
 
 #### A. create cluster & sub-factor folders for sites  ####
 
+# midfix = "15tMean_0unc"
 # midfix = "15tMean"
 # midfix = "25TimesMean"
 # midfix = "noSeason99"
 
 dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
+# dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", "15TimesMean", "_Site")
 
 # create folder to hold the site-specific subfolders
 new_cluster_folder = paste0(data.dir, "/", "CSN_CMD_noCsub_", midfix, "_Site")
@@ -118,14 +120,17 @@ DISP_par_org = readLines("iniparams_DISP_3.txt")
 before_BS_DISP_par_org = readLines("iniparams_BS_PHASE_of_BSDISP_4.txt")
 BS_DISP_par_org = readLines("iniparams_BS-DISP_5.txt")
 
-factor.number = c(3:11)
+factor.number.series = c(3:11)
 
 #### B2. edit and output new iniparams.txt ####
 
 ### 15TimesMean, CSN
 site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15TimesMean_Site")
-name.prefix = "CSN_noCsub_15TimesMean_" # prefix in names for input/output files
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15TimesMean_Site")
+# name.prefix = "CSN_noCsub_15TimesMean_" # prefix in names for input/output files
+site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15tMean_0unc_Site")
+name.prefix = "CSN_noCsub_15tMean_0unc_"
+name.prefix.csv = "CSN_noCsub_15TimesMean_"
 
 # ### 25TimesMean, CSN
 # site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
@@ -150,6 +155,7 @@ site_folder <- list.dirs(site_folder_pathway, recursive = FALSE, full.names = TR
 site_folder_use <- basename(site_folder)
 
 for(site_serial in site_folder_use){
+  # site_serial = site_folder_use[1]
   
   ######### 1. sensitivity analysis of individual site selection 
   ## data of selected cluster
@@ -167,7 +173,7 @@ for(site_serial in site_folder_use){
   site.row = site_info$site.row
   variable.NO = site_info$sum.weak.good
   ## weak0 or strong1 for PM2.5 species 
-  wead.strong.assign = site_info$style.weak.good
+  weak.strong.assign = site_info$style.weak.good
   
   species_col = col_comp(site_info, "Al", "PM25")
   rowSums(site_info[, species_col], na.rm = T)
@@ -176,11 +182,11 @@ for(site_serial in site_folder_use){
   
   # change to the style used for txt
   # remove the first "/", and change the rest to "\t"
-  wead.strong.assign = gsub("/", "\\\t", 
-                            sub("^/", "", wead.strong.assign))
+  weak.strong.assign = gsub("/", "\\\t", 
+                            sub("^/", "", weak.strong.assign))
   
   # replace the number of factors to use and name of output files
-  for (j in factor.number){
+  for (factor.No in factor.number.series){
     base_par = base_par_org
     BS_par = BS_par_org
     DISP_par = DISP_par_org
@@ -188,21 +194,22 @@ for(site_serial in site_folder_use){
     BS_DISP_par = BS_DISP_par_org
     
     # output path
-    # path.CF = paste0(site_folder_pathway, site_serial, "/Factor_", j, "/")
-    path.CF = paste0(site_folder_pathway, "/", site_serial, "/Factor_", j, "/")
+    # path.CF = paste0(site_folder_pathway, site_serial, "/Factor_", factor.No, "/")
+    path.CF = paste0(site_folder_pathway, "/", site_serial, "/Factor_", factor.No, "/")
+    overall.unc = 0 # default, overall.unc = 0.05
     
     # replace with the row, variable, & factor number 
-    base_par = row_var_factor(base_par, site.row, variable.NO, j)
-    BS_par = row_var_factor(BS_par, site.row, variable.NO, j)
-    DISP_par = row_var_factor(DISP_par, site.row, variable.NO, j)
-    before_BS_DISP_par = row_var_factor(before_BS_DISP_par, site.row, variable.NO, j)
-    BS_DISP_par = row_var_factor(BS_DISP_par, site.row, variable.NO, j)
+    base_par = row_var_factor(base_par, site.row, variable.NO, factor.No, overall.unc)
+    BS_par = row_var_factor(BS_par, site.row, variable.NO, factor.No, overall.unc)
+    DISP_par = row_var_factor(DISP_par, site.row, variable.NO, factor.No, overall.unc)
+    before_BS_DISP_par = row_var_factor(before_BS_DISP_par, site.row, variable.NO, factor.No, overall.unc)
+    BS_DISP_par = row_var_factor(BS_DISP_par, site.row, variable.NO, factor.No, overall.unc)
     
     ##### B1: iniparams for Base run #####
     # create and replace the names for base run input & output files
     
-    base.input = paste0(name.prefix, site_serial, ".csv")
-    output.pre = paste0(name.prefix, site_serial, "_F_", j)
+    base.input = paste0(name.prefix.csv, site_serial, ".csv")
+    output.pre = paste0(name.prefix, site_serial, "_F_", factor.No)
     
     base.output = paste0(output.pre, "_")
     
@@ -211,7 +218,7 @@ for(site_serial in site_folder_use){
     write.table(base_par, 
                 file = paste0(path.CF, "iniparams_base_", 
                               site_serial,
-                              "_F_", j, ".txt"), 
+                              "_F_", factor.No, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
                 row.names = FALSE,
@@ -237,8 +244,8 @@ for(site_serial in site_folder_use){
                                     BS.DISP.input.2, 
                                     DISP.output)
     DISP_par = dispbcmask_rp(DISP_par, 
-                             wead.strong.assign, 
-                             j)
+                             weak.strong.assign, 
+                             factor.No)
     
     before_BS_DISP_par = bs_disp_input_output(before_BS_DISP_par, 
                                               BS.DISP.input.1, 
@@ -250,11 +257,13 @@ for(site_serial in site_folder_use){
                                        BS.DISP.input.2, 
                                        BS_DISP.output)
     
+    # BS_par[29:40]; DISP_par[29:40]; before_BS_DISP_par[29:40]; BS_DISP_par[29:40]; 
+    
     ##### B3: output BS (bootstrap) & DISP files #####
     write.table(BS_par, 
                 file = paste0(path.CF,"iniparams_BS_", 
                               site_serial,
-                              "_F_", j, ".txt"), 
+                              "_F_", factor.No, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
                 row.names = FALSE,
@@ -263,7 +272,7 @@ for(site_serial in site_folder_use){
     write.table(DISP_par, 
                 file = paste0(path.CF, "iniparams_DISP_", 
                               site_serial,
-                              "_F_", j, ".txt"), 
+                              "_F_", factor.No, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
                 row.names = FALSE,
@@ -272,7 +281,7 @@ for(site_serial in site_folder_use){
     write.table(before_BS_DISP_par, 
                 file = paste0(path.CF, "iniparams_BS_DISP_before_", 
                               site_serial,
-                              "_F_", j, ".txt"), 
+                              "_F_", factor.No, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
                 row.names = FALSE,
@@ -281,7 +290,7 @@ for(site_serial in site_folder_use){
     write.table(BS_DISP_par, 
                 file = paste0(path.CF, "iniparams_BS_DISP_", 
                               site_serial,
-                              "_F_", j, ".txt"), 
+                              "_F_", factor.No, ".txt"), 
                 sep = "\t",
                 quote = FALSE,
                 row.names = FALSE,
