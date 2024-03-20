@@ -16,7 +16,169 @@ library(insight)
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/")
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
 
-#####  0. Source assignment results ######
+
+#### 1. Prepare & merge info for manual source assignment ####
+
+data_use = "CSN_Site_15TimesMean"
+# data_use = "CSN_Site_15tMean_0unc"
+time = Sys.Date()
+
+pdf.series <- c("factor_pairs.pdf", "source_profile.pdf", "overall.pdf", "daily.pdf")
+csv.series <- c("source_profile.csv", "overall.csv", "daily.csv", "annual.csv", "month.csv")
+
+###### 1.1. overall contribution, merge & transform, FINISHED ######
+
+dir_path <- paste0("PMF_NonGUI/", data_use, "/base_DISPres1")
+
+csv_overall_list <- list.files(dir_path, pattern = ".*overall\\.csv$", full.names = TRUE)
+csv_overall <- 
+  do.call(
+    rbind, 
+    (lapply(
+      csv_overall_list, 
+      read.csv)))
+csv_overall$Dataset = "CSN"
+csv_overall$X = NULL
+
+# reoder the columns
+# get the rest of the column names, excluding those already in desired_order
+adjusted_columns <- c("Dataset", "site.serial", "Factor.No", "Factor")
+remaining_columns <- 
+  setdiff(
+  names(csv_overall), 
+  adjusted_columns)
+
+csv_overall <- 
+  csv_overall[, c(adjusted_columns, remaining_columns)]
+
+write.csv(csv_overall, paste0(data_use, "_overall.csv"))
+
+# transform the Assigned source data, results into one line for each Dataset-site.serial-Factor.No group
+overall_sourceAssigned = subset(csv_overall, Source.No != "F")
+overall_sourceAssigned = 
+  select(overall_sourceAssigned,
+         Dataset, site.serial, Factor.No, Factor, 
+         Source_reference, Main_Species, Faraction_conc_contri)
+
+names(overall_sourceAssigned)[5:7] = 
+  c("assigned_Source", "assigned_Species", "assigned_Fraction")
+tans_sourceAssigned <- 
+  overall_sourceAssigned %>%
+  group_by(Dataset, site.serial, Factor.No) %>%
+  group_modify(~ transform_group(.x, "assigned_Source", "assigned_Species", "assigned_Fraction")) %>%
+  ungroup()
+head(tans_sourceAssigned)
+
+# transform the To-be-assigned source data, results into one line for each Dataset-site.serial-Factor.No group
+overall_toAssign = subset(csv_overall, Source.No == "F")
+overall_toAssign = 
+  select(overall_toAssign,
+         Dataset, site.serial, Factor.No, 
+         Factor_source, Main_Species, Faraction_conc_contri)
+colnames(overall_toAssign)[4] = "Source_reference"
+
+names(overall_toAssign)[4:6] = 
+  c("to_assign_Source", "to_assign_Species", "to_assign_Fraction")
+tans_toAssign <- 
+  overall_toAssign %>%
+  group_by(Dataset, site.serial, Factor.No) %>%
+  group_modify(~ transform_group(.x, "to_assign_Source", "to_assign_Species", "to_assign_Fraction")) %>%
+  ungroup()
+head(tans_toAssign)
+
+# determine if there is Zero-contribution
+names(tans_sourceAssigned)[2] = names(tans_toAssign)[2] = "serial.No"
+tans_sourceAssigned$assigned_Zero =
+  apply(
+    tans_sourceAssigned[, grepl("Fraction", names(tans_sourceAssigned))], 
+    1, 
+    function(x) 
+      ifelse(any(x == "0%" & !is.na(x)), 1, 0))
+
+tans_toAssign$toAssign_Zero =
+  apply(
+    tans_toAssign[, grepl("Fraction", names(tans_toAssign))], 
+    1, 
+    function(x) 
+      ifelse(any(x == "0%" & !is.na(x)), 1, 0))
+
+# determine if all contributions are 0
+tans_sourceAssigned$assigned_all_Zero =
+  apply(
+    tans_sourceAssigned[, grepl("Fraction", names(tans_sourceAssigned))], 
+    1, 
+    function(x) ifelse(all(x == "0%" & !is.na(x)), 1, 0))
+
+tans_toAssign$toAssign_all_Zero =
+  apply(
+    tans_toAssign[, grepl("Fraction", names(tans_toAssign))], 
+    1, 
+    function(x) ifelse(all(x == "0%" & !is.na(x)), 1, 0))
+
+
+## reorder the columns & rows
+tans_sourceAssigned <- tans_sourceAssigned[, reorder_col_number(tans_sourceAssigned)]
+tans_toAssign <- tans_toAssign[, reorder_col_number(tans_toAssign)]
+
+tans_sourceAssigned = 
+  tans_sourceAssigned[with(tans_sourceAssigned, order(serial.No, Factor.No)), ]
+tans_toAssign = 
+  tans_toAssign[with(tans_toAssign, order(serial.No, Factor.No)), ]
+
+
+write.csv(overall_sourceAssigned, paste0(data_use, "Source_assigned.csv"))
+write.csv(overall_toAssign, paste0(data_use, "Source_to_assign.csv"))
+
+write.csv(tans_sourceAssigned, paste0(data_use, "Source_assigned_reorder.csv"))
+write.csv(tans_toAssign, paste0(data_use, "Source_to_assign_reorder.csv"))
+
+###### 1.2 other source-related info ######
+
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
+
+site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_CMD_SWB_Site.csv"))
+site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
+site_geoid = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv"))
+
+cty_cluster_traffic = read.csv("results_R_data/County_cluster_traffic_info.csv")
+PMF_base_summary = read.csv("PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
+
+tans_sourceAssigned = read.csv(paste0(data_use, "Source_assigned_reorder.csv"))
+tans_toAssign = read.csv(paste0(data_use, "Source_to_assign_reorder.csv"))
+
+site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X = 
+  PMF_base_summary$X = tans_sourceAssigned$X = tans_toAssign$X = NULL
+
+# edit before merge
+names(PMF_base_summary)[3] = "Factor.No"
+PMF_base_summary$Dataset = gsub("^(.*)_.*$", "\\1", PMF_base_summary$Dataset)
+
+site_serial = select(site_info_all, SiteCode, serial.No)
+site_geoid = select(site_geoid, SiteCode, geoid)
+
+col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
+                   "countyns", "namelsad", "county_name", "geoid")
+site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
+
+# merge all listed files, all.x = TRUE
+list_site_census_source_assign = 
+  list(site_serial, site_geo, site_geoid, site_cluster_traffic, 
+       PMF_base_summary, tans_toAssign, tans_sourceAssigned)
+
+site_census_source_assign =
+  Reduce(function(x, y) 
+    merge(x, y, all.x = TRUE), 
+    list_site_census_source_assign)
+
+site_census_source_assign = 
+  relocate(site_census_source_assign, Dataset, .before = serial.No)
+site_census_source_assign = 
+  relocate(site_census_source_assign, SiteCode, .before = serial.No)
+
+write.csv(site_census_source_assign, paste0(data_use, "_PMF_source_census_", time, ".csv"))
+# "CSN_Site_15TimesMean_PMF_source_census_2024-03-15.csv"
+
+####  0. Source assignment results ####
 
 overall_Assigned = read.csv("results_R_data/Decided_SA.csv")
 org_assigned = read.csv("results_R_data/Source_assigned.csv")
@@ -178,7 +340,8 @@ source_1c_contri = ddply(month_source_assign_1c,
                          Contribution = mean(Contribution, na.rm = T))
 summary(source_1c_contri)
 
-#### 1.1 plotting - data preparation ####
+#### 4. plotting - data preparation ####
+
 library(USAboundaries)
 library(ggsci)
 library(gganimate)
@@ -241,9 +404,9 @@ write.csv(Year_aggregated, "Annual_site_source_contribuion_CSN_2024.01.csv")
 write.csv(year_month_aggregated, "Year-month_site_source_contribuion_CSN_2024.01.csv")
 write.csv(month_aggregated, "Month_site_source_contribuion_CSN_2024.01.csv")
 
-#### 1.2 mapping - annual & map ####
+#### 4.2 mapping - annual & map ####
 
-###### 1.2.0. data selection, choose one from data-1 & data-2 ######
+###### 4.2.0. data selection, choose one from data-1 & data-2 ######
 
 color_npg = pal_npg("nrc")(10)
 
@@ -312,7 +475,7 @@ site_no_source <-
   group_by(Source_use) %>%
   dplyr::summarise(Unique_SiteCode_No = n_distinct(SiteCode))
 
-###### 1.2.1. annual, month, box & trend plot ######
+###### 4.2.1. annual, month, box & trend plot ######
 
 ########### Overall, only for data-2 for now
 
@@ -554,7 +717,7 @@ ggplot(Month_aggregated_summary,
         axis.text.y = element_text(color="grey25", size = 18, angle = 0, hjust = 0.5))
 
 
-###### 1.2.2. Spatial distribution of Changes between 2011 & 2020 - Absolute difference ######
+###### 4.2.2. Spatial distribution of Changes between 2011 & 2020 - Absolute difference ######
 
 # Load the dplyr package
 library(dplyr)
@@ -601,7 +764,7 @@ ggplot() +
         strip.text = element_text(color = "black", size = 16))
 
 
-###### 1.2.3. Spatial distribution of Changes between 2011 & 2020 - Slope ######
+###### 4.2.3. Spatial distribution of Changes between 2011 & 2020 - Slope ######
 
 # detect those with <2 data groups, a regression needs at least 2 groups of data.
 Year_aggregated_use_unique = data.frame(table(Year_aggregated_use$SiteCode, 
@@ -713,7 +876,7 @@ ggplot() +
         strip.text = element_text(color = "black", size = 16))
 
 
-#### 1.3 Spatial & temporal (annual) ####
+#### 4.3 Spatial & temporal (annual) ####
 
 cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_rural_urban$X = cty_rural_urban$Longitude = cty_rural_urban$Latitude = NULL
@@ -729,7 +892,7 @@ annual_contri_gps$geoid = ifelse(annual_contri_gps$geoid < 10000,
                                  paste0("0", annual_contri_gps$geoid), 
                                  annual_contri_gps$geoid)
 
-###### 1.3.1 Temporal trends & Map - common setting for regions ###### 
+###### 4.3.1 Temporal trends & Map - common setting for regions ###### 
 
 # generate the US county boundary data
 us_cty_bdr = USAboundaries::us_counties()
@@ -832,7 +995,7 @@ layout_matrix <- rbind(
   c(NA, NA, NA, NA, NA, NA, NA, NA,  NA, NA, NA, NA,  NA, NA, NA, NA, NA)
 )
 
-###### 1.3.2 Temporal trends & Map - basic source data ###### 
+###### 4.3.2 Temporal trends & Map - basic source data ###### 
 
 # continuous-material.R in ggsci{}, https://github.com/nanxstats/ggsci/blob/master/R/continuous-material.R
 show_col(pal_material("indigo")(10))
@@ -885,7 +1048,7 @@ annual_singleSource =
 col_singleSource = "brown"
 
 
-###### 1.3.3 Temporal trends & Map - specific source ######
+###### 4.3.3 Temporal trends & Map - specific source ######
 
 annual_singleSource_region = merge(annual_singleSource, state_regions)
 
@@ -928,7 +1091,7 @@ annual_singleSource_region_split = split(annual_singleSource_region_plot,
                                          annual_singleSource_region_plot$region)
 max.contri.singleSource = max(annual_singleSource_region_plot$up.contri)
 
-###### 1.3.4 arrange with grid.arrange ######
+###### 4.3.4 arrange with grid.arrange ######
 
 # center map
 singleSource_map_center <- 
@@ -1021,7 +1184,7 @@ grid_layout <- grid.arrange(
 
 grid_layout
 
-#### 1.4 year-month time series ####
+#### 4.4 year-month time series ####
 `
 year_month_aggregated = read.csv("Year-month_site_source_contribuion_CSN_2024.01.csv")
 year_month_aggregated$X = NULL
@@ -1032,7 +1195,7 @@ year_month_aggregated$Date =
 as.Date(year_month_aggregated$Date[1], format = "%Y-%m")
 
 
-#### 1.5 annimation ####
+#### 4.5 annimation ####
 
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/CSN_base_DISPres1/")
 pathway = "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/CSN_base_DISPres1/"
