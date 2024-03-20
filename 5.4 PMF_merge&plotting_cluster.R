@@ -81,6 +81,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/")
 #### combine the overall csv ####
 # Combine all same-pattern csv into one 
 dir_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/CSN_base_DISPres1"
+dir_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1"
 csn_overall_list <- list.files(dir_path, pattern = ".*overall\\.csv$", full.names = TRUE)
 csn_overall <- 
   do.call(
@@ -89,6 +90,7 @@ csn_overall <-
       csn_overall_list, 
       read.csv)))
 csn_overall$Dataset = "CSN"
+write.csv(csn_overall, "CSN_Site_15TimesMean_overall.csv")
 
 dir_path <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI_Cluster/IMPROVE_base_DISPres1"
 improve_overall_list <- list.files(dir_path, pattern = ".*overall\\.csv$", full.names = TRUE)
