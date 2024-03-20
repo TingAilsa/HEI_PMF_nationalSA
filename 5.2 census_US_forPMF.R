@@ -11,7 +11,7 @@ library(readr)
 
 ##### Combine & get the industry txt #######
 # Define the path to your industry_folder containing txt files
-industry_industry_folder <- "/Users/TingZhang/Documents/HEI HAQ PMF/US_census/county_industry"
+industry_folder <- "/Users/TingZhang/Documents/HEI HAQ PMF/US_census/county_industry"
 
 # Define the year range
 years <- 2011:2020
