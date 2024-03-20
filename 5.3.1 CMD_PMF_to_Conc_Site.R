@@ -19,6 +19,7 @@ library(scales)
 library(extrafont) 
 library(purrr)
 library(patchwork)
+library(Metrics)
 
 ####### 1. Read & process other files to use ####### 
 
@@ -37,9 +38,10 @@ site_info_all$X = species_class$X = NULL
 
 noCsub_noExtreme = "CSN_NoGUI_NoCsub_25TimesMean_Site"
 data.prefix = "CSN_noCsub_25TimesMean_"
+pm.prefix = "CSN_noCsub_25TimesMean_"
 disp.prefix = "CSN_"
 
-#### 1.2 CSN 15TimesMean noCsub #### 
+#### 1.2 CSN 15TimesMean noCsub, overall uncertainty = 5% #### 
 
 ##set working directory
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/")
@@ -53,8 +55,26 @@ site_info_all$X = species_class$X = NULL
 
 noCsub_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
 data.prefix = "CSN_noCsub_15TimesMean_"
+pm.prefix = "CSN_noCsub_15TimesMean_"
 disp.prefix = "CSN_"
 
+
+#### 1.3 CSN 15TimesMean noCsub, overall uncertainty = 0% #### 
+
+##set working directory
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISPres1/")
+data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISP_BS_sum/"
+
+site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+noCsub_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
+data.prefix = "CSN_noCsub_15tMean_0unc_"
+pm.prefix = "CSN_noCsub_15TimesMean_"
+disp.prefix = "CSN_"
 
 #### 1.N shared process #### 
 
@@ -67,7 +87,7 @@ site_info_all = plyr::rename(
     "SO4" = "SO4Ion",
     "PM25" = "PM2.5"))
 
-source_cluster = paste0("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
+source_cmd_pm = paste0("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
                         noCsub_noExtreme)
 
 ########## single site list defination
@@ -104,9 +124,10 @@ site_serial_Nos = unique(site_info_all$serial.No)
 
 correl_r_p_summary = NULL
 summary_base = NULL
+pred_obs_compare_summary = NULL
 
 for (site.serial in site_serial_Nos) { # 1:25
-  for (factor.No in 3:11) { # 6:11, 6:6
+  for (factor.No in 3:11) { # 5:11
     
     # site.serial.factor.pre = paste0("C_", site.serial, "_F_", factor.No, "_")
     site.serial.factor.pre = paste0("S_", site.serial, "_F_", factor.No, "_")
@@ -128,6 +149,10 @@ for (site.serial in site_serial_Nos) { # 1:25
                                    data.prefix, 
                                    site.serial.factor.pre,
                                    "BS_.txt"))
+      base_report = readLines(paste0(folder_path, 
+                                     data.prefix, 
+                                     site.serial.factor.pre,
+                                     "base_PMFreport.txt"))
       
       # Bootstrap mapping rate
       bs_map_fra = bs_map(bs_output, 50, factor.No, 0.6) # 0.6 is the threshold or r
@@ -135,8 +160,10 @@ for (site.serial in site_serial_Nos) { # 1:25
       bs_overall_map = bs_map_fra$BS_overall
       
       # Find the number of task when the value of Qm is the lowest
-      lowest_Qm_taskNo = lowest_Qm_task(base_output)$lowest_Qm_task
-      lowest_Qm = round(lowest_Qm_task(base_output)$lowest_Qm, 0)
+      lowest_Qm_taskNo = lowest_Qm_task(base_report)$lowest_Qm_task
+      lowest_Qm = round(lowest_Qm_task(base_report)$lowest_Qm, 0)
+      # converge condition in the 20 base runs
+      converge_percent = lowest_Qm_task(base_report)$converge_percent
       
       Factor.serial = paste0("Factor", 1:factor.No)
       
@@ -203,14 +230,14 @@ for (site.serial in site_serial_Nos) { # 1:25
       # Extract site & date info
       # site_date_PM = read.csv(
       #   file.path(
-      #     paste0(source_cluster, "_SiteDate"), # "_SiteDate_2024.01"
-      #     paste0(data.prefix, "S_", site.serial, "_PM_Date.csv")), #"C_"
+      #     paste0(source_cmd_pm, "_SiteDate"), # "_SiteDate_2024.01"
+      #     paste0(pm.prefix, "S_", site.serial, "_PM_Date.csv")), 
       #   header = T)
 
       site_date_PM_species = read.csv(
         file.path(
-          source_cluster,
-          paste0(data.prefix, "S_", site.serial, "_CMD.csv")), #"C_"
+          source_cmd_pm,
+          paste0(pm.prefix, "S_", site.serial, "_CMD.csv")), #"_CMD.csv", ".csv"
         header = T)
       site_date_PM_species$X = NULL
       
@@ -285,7 +312,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       # normalized and overall contributions based on OLS MLR
       site_date_PM = select(site_date_PM_species_conc,
                             Date, PM2.5) # SiteCode, State, 
-      time_series_analyses = time_series(base_ts, site_date_PM)
+      time_series_analyses = time_series(base_ts, site_date_PM, factor.No)
       # base_ts_nmContri_gather = time_series_analyses$base_ts_nmContri_gather
       base_ts_nmContri_spread = time_series_analyses$base_ts_nmContri_spread
       ts_PM_lm_beta = time_series_analyses$ts_PM_lm_beta
@@ -486,13 +513,14 @@ for (site.serial in site_serial_Nos) { # 1:25
       # find the middle position of the factor/source names on x-axis
       middle_positions <- 
         conc_percent_bsDisp_use %>%
-        dplyr::group_by(Factor_source) %>%
-        dplyr::summarize(middle = custom_median(as.numeric(sequence)),
+        dplyr::group_by(Factor) %>%
+        dplyr::summarize(Factor_source = Factor_source[1],
+                         middle = custom_median(as.numeric(sequence)),
                          Factor_nm_contr = paste(unique(Factor.contr), 
                                                  collapse = ", "),
                          Factor_conc_fr = paste(unique(Faraction_conc_contri), 
                                                 collapse = ", ")) %>%
-        dplyr::arrange(Factor_source)
+        dplyr::arrange(Factor)
       
       middle_species = 
         conc_percent_bsDisp_use$Species[
@@ -536,7 +564,7 @@ for (site.serial in site_serial_Nos) { # 1:25
         geom_errorbar(aes(ymin = exp(Trans.Percent.down), 
                           ymax = exp(Trans.Percent.up)), 
                       width = 0.4, color = "grey25") +
-        facet_grid(Factor_source ~ ., switch = "y") +
+        facet_grid(Factor ~ ., switch = "y") +
         ggtitle(paste0(paste0(disp.prefix, site.serial.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
                        ", DISP.Qdrop = ", disp.qdrop, 
@@ -600,9 +628,9 @@ for (site.serial in site_serial_Nos) { # 1:25
       
       text_y_position =
         ddply(daily_plot_use, 
-              .(Factor_source),
+              .(Factor),
               summarise,
-              text_y_day = quantile(Concentration, 0.998),
+              text_y_day = quantile(Concentration, 0.997),
               text_y_mon = quantile(Concentration, 0.55),
               text_y_yr = quantile(Concentration, 0.55))
       
@@ -616,7 +644,7 @@ for (site.serial in site_serial_Nos) { # 1:25
         geom_line(aes(group = group), linewidth = 0.3, alpha = 0.8) +
         geom_point(size = 1.2) +
         labs(x = "Date", y = format_variable("Concentration µg/m3")) +
-        facet_grid(Factor_source ~., scales = "free_y") +
+        facet_grid(Factor ~., scales = "free_y") +
         scale_y_continuous(limits = c(0, NA), 
                            breaks = function(x) pretty(x, n = 3)) + # y start from 0, and number of breaks, pretty function
         scale_color_npg() +
@@ -644,7 +672,7 @@ for (site.serial in site_serial_Nos) { # 1:25
                aes(x = Year, y = Concentration, 
                    group = Factor_source, color = Factor_source)) +
         labs(x = "Year", y = format_variable("Concentration µg/m3")) +
-        facet_grid(Factor_source ~., scales = "free_y") +
+        facet_grid(Factor ~., scales = "free_y") +
         geom_line(linewidth = 0.3, alpha = 0.4)+
         geom_point(size = 1.5, alpha = 0.8) +
         scale_x_continuous(breaks = 
@@ -683,7 +711,7 @@ for (site.serial in site_serial_Nos) { # 1:25
                aes(x = Month, y = Concentration, 
                    group = Factor_source, color = Factor_source)) +
         labs(x = "Month", y = format_variable("Concentration µg/m3")) +
-        facet_grid(Factor_source ~., scales = "free_y") +
+        facet_grid(Factor ~., scales = "free_y") +
         geom_line(linewidth = 0.3, alpha = 0.4)+
         geom_point(size = 1.5, alpha = 0.8) +
         scale_x_continuous(breaks = 
@@ -756,7 +784,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       overall_contri <-
         ggplot(lm_beta_plot_use, 
                aes(x = Factor, y = Fractrion_conc_based)) +
-        geom_bar_pattern(aes(fill = Factor),
+        geom_bar_pattern(aes(fill = Factor_source),
                          stat = "identity",
                          pattern_color = "white",
                          pattern_fill = "white",
@@ -830,36 +858,6 @@ for (site.serial in site_serial_Nos) { # 1:25
       dev.off()
       
       
-      ####### output data summary #######
-      
-      base_oneFactor = data.frame(Dataset = disp.prefix, Cluster = site.serial, Factor = factor.No, 
-                                  median_PMF_PM2.5 = median_PMF_PM2.5, 
-                                  median_obs_PM2.5 = median_obs_PM2.5, 
-                                  cor_PMF.obs_PM = cor.PMF.obs.PM,
-                                  Correlation.lm.conc.fraction = cor.two.fraction.contri,
-                                  Qmin = lowest_Qm, Qmin_task_No = lowest_Qm_taskNo, 
-                                  Q.exp = Q.exp, Q.true = Q.true, Q.robust = Q.robust,
-                                  count.strong.species = strong.species.count, 
-                                  count.all.species = species.weak.strong.count,
-                                  day.count = site.data.row,
-                                  DISP_error.code = disp.error.code, DISP_qdrop = disp.qdrop, 
-                                  bs.map = bs_overall_map, 
-                                  Correlation.between.factors.Min = correl_r_percentile[1],
-                                  Correlation.between.factors.10th = correl_r_percentile[2],
-                                  Correlation.between.factors.25th = correl_r_percentile[3],
-                                  Correlation.between.factors.50th = correl_r_percentile[4],
-                                  Correlation.between.factors.75th = correl_r_percentile[5],
-                                  Correlation.between.factors.90th = correl_r_percentile[6],
-                                  Correlation.between.factors.Max = correl_r_percentile[7],
-                                  Multiple.factors.assigned.to.one.source = length(unique(source_2more_factor)), 
-                                  Source.with.multiple.factors. = source_2more_factor,
-                                  Number.of.factors.not.intepretated.Before.screening = count_not_intepretate)
-      
-      summary_base = rbind(summary_base, base_oneFactor[1, ])
-      
-      write.csv(summary_base, paste0(disp.prefix, "base_DISP_summary.csv"))
-      write.csv(correl_r_p_summary, paste0(disp.prefix, "base_factor_correlation.csv"))
-      
       ####### Daily Specific-specific concentration - prediction vs. observation #######
       
       predict_daily_species_conc$Date = site_date_PM_species_conc$Date
@@ -886,16 +884,47 @@ for (site.serial in site_serial_Nos) { # 1:25
         )
       obs_daily_species_long$Data = "Observations"
       
+      obs_daily_species_long$SiteCode = obs_daily_species_long$State = NULL
+      # summary(predict_daily_species_long$Date == obs_daily_species_long$Date) 
+      # summary(predict_daily_species_long$Species == obs_daily_species_long$Species)
+      
+      ### RMSE estimation
+      
+      rmse <- function(actual, predicted) {
+        sqrt(mean((predicted - actual) ^ 2))
+      }
+      
+      pred_obs_species_wide =
+        cbind(select(predict_daily_species_long, -Data), 
+              select(obs_daily_species_long, -c("Data", "Date", "Species")))
+      names(pred_obs_species_wide)[3:4] = 
+        c("conc_predict", "conc_obs")
+      
+      pred_obs_compare  =
+        pred_obs_species_wide %>%
+        dplyr::group_by(Species) %>%
+        dplyr::summarise(
+          RMSE = rmse(conc_predict, conc_obs),
+          R2 = 1 - sum((conc_obs - conc_predict)^2) / 
+            sum((conc_obs - mean(conc_obs))^2),
+          cor_pearson = cor(conc_obs, conc_predict, method = "pearson"),
+          cor_spearman = cor(conc_obs, conc_predict, method = "spearman"),
+          mean_obs = mean(conc_obs), 
+          sd_obs = sd(conc_obs), 
+          mean_pmf = mean(conc_predict), 
+          sd_pmf = sd(conc_predict))
+      
+      ### time-series plotting
       pred_obs_species_conc = 
         rbind(predict_daily_species_long, obs_daily_species_long)
       pred_obs_species_conc$Date = as.Date(pred_obs_species_conc$Date)
       
       ### time-series
-      # set gap in figure if no data for >15 days
+      # set gap in figure if no data for >7 days
       pred_obs_species_conc <- 
         pred_obs_species_conc %>%
         arrange(Date) %>%
-        mutate(gap = c(0, diff(as.numeric(Date))) > 15, # calculate gaps, convert Date to numeric for diff
+        mutate(gap = c(0, diff(as.numeric(Date))) > 7, # calculate gaps, convert Date to numeric for diff
                group = cumsum(gap)) # Cumulative sum to create a new group after each gap
 
       pred_obs_species_position <-
@@ -911,10 +940,13 @@ for (site.serial in site_serial_Nos) { # 1:25
               summarise,
               median_conc = signif(median(Concentration), 2),
               mean_conc = signif(mean(Concentration), 2))
+      pred_obs_species_med = 
+        merge(pred_obs_species_med, pred_obs_compare)
       pred_obs_species_med$Species_conc =
         paste0(pred_obs_species_med$Species,
-               " Obs: median-", pred_obs_species_med$median_conc,
-               ", mean-", pred_obs_species_med$mean_conc)
+               ": Obs-median=", pred_obs_species_med$median_conc,
+               ", RMSE=", signif(pred_obs_species_med$RMSE, 2),
+               ", R^2=", signif(pred_obs_species_med$R2, 2))
       
       pred_obs_species_position = 
         join(pred_obs_species_position, pred_obs_species_med)
@@ -922,15 +954,15 @@ for (site.serial in site_serial_Nos) { # 1:25
       pred_obs_species_conc_plot <-
         ggplot(pred_obs_species_conc, 
                aes(x = Date, y = Concentration, 
-                   group = Data, color = Data)) + # group = 1
+                   group = group, color = Data)) + # group = 1
         geom_line(linewidth = 0.2, alpha = 0.6) +
-        geom_point(size = 0.9) +
+        geom_point(size = 0.7) +
         labs(x = "Date", y = format_variable("Concentration µg/m3")) +
         facet_wrap(Species ~., scales = "free_y", ncol = 3) + # ncol, only for facet_wrap, not facet_grid
         scale_y_continuous(limits = c(0, NA), 
                            breaks = function(x) pretty(x, n = 3)) +  # reduce the number of breaks
         scale_color_manual(values = c("#377eb8", "#ff7f00")) + # c("steelblue", "brown2"), c("#377eb8", "#ff7f00")
-        geom_text(data = pred_obs_species_position, size = 4,
+        geom_text(data = pred_obs_species_position, size = 3.8,
                   aes(x = x_position, y = y_position, label = Species_conc), 
                   inherit.aes = FALSE) + 
         theme_base() +
@@ -962,7 +994,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       ggplot(species_conc_pred_vs_obs,
              aes(x = Observations,
                  y = PMF_Predictions)) +
-      geom_point(size = 1, color = "grey25", alpha = 0.8) +
+      geom_point(size = 1, color = "grey35", alpha = 0.8) +
       geom_abline(slope=1, intercept=0, color = "red") +
       facet_wrap(~ Species, scales = "free", ncol = 5) +
       geom_text(data = species_pred_vs_obs_position, size = 4,
@@ -972,7 +1004,8 @@ for (site.serial in site_serial_Nos) { # 1:25
            y = format_variable("PMF_Predictions µg/m3")) +
       theme_base() +
       theme(strip.background = element_blank(), strip.text = element_blank(),
-            axis.text.x = element_text(angle = 90, hjust = 0.5))
+            axis.text.x = element_text(angle = 90, hjust = 0.5, size = 12),
+            axis.text.y = element_text(size = 12))
     # species_pred_vs_obs_plot
     
       ####### Daily Source-specific PM2.5 - prediction vs. observation #######
@@ -1107,7 +1140,51 @@ for (site.serial in site_serial_Nos) { # 1:25
                 axis.text.y = element_text(color="grey25", size = 12, family = "Arial Unicode MS"))
         
       Q_Qexp_plot = daily_Q_Qexp_plot / species_Q_Qexp_plot # patchwork{}
+      
+      pred_obs_compare_resd =
+        merge(pred_obs_compare, 
+              select(species_Q_Qexp, 
+                     Species, Q_Qexp_ratio, higher.3.scalRes.per))
 
+      pred_obs_compare_resd = 
+        data.frame(site.serial = site.serial, factor.No = factor.No, 
+                   pred_obs_compare_resd)
+      
+      pred_obs_compare_summary =
+        rbind(pred_obs_compare_summary, pred_obs_compare_resd)
+      
+      ####### output data summary #######
+      
+      base_oneFactor = data.frame(Dataset = disp.prefix, serial.No = site.serial, Factor = factor.No, 
+                                  median_PMF_PM2.5 = median_PMF_PM2.5, 
+                                  median_obs_PM2.5 = median_obs_PM2.5, 
+                                  cor_PMF.obs_PM = cor.PMF.obs.PM,
+                                  Correlation.lm.conc.fraction = cor.two.fraction.contri,
+                                  Qmin = lowest_Qm, Qmin_task_No = lowest_Qm_taskNo, 
+                                  Q.exp = Q.exp, Q.true = Q.true, Q.robust = Q.robust,
+                                  converge_percent = converge_percent,
+                                  count.strong.species = strong.species.count, 
+                                  count.all.species = species.weak.strong.count,
+                                  day.count = site.data.row,
+                                  DISP_error.code = disp.error.code, DISP_qdrop = disp.qdrop, 
+                                  bs.map = bs_overall_map, 
+                                  Correlation.between.factors.Min = correl_r_percentile[1],
+                                  Correlation.between.factors.10th = correl_r_percentile[2],
+                                  Correlation.between.factors.25th = correl_r_percentile[3],
+                                  Correlation.between.factors.50th = correl_r_percentile[4],
+                                  Correlation.between.factors.75th = correl_r_percentile[5],
+                                  Correlation.between.factors.90th = correl_r_percentile[6],
+                                  Correlation.between.factors.Max = correl_r_percentile[7],
+                                  Multiple.factors.assigned.to.one.source = length(unique(source_2more_factor)), 
+                                  Source.with.multiple.factors. = source_2more_factor,
+                                  Number.of.factors.not.intepretated.Before.screening = count_not_intepretate)
+      
+      summary_base = rbind(summary_base, base_oneFactor[1, ])
+      
+      write.csv(summary_base, paste0(data.prefix, "base_DISP_summary.csv"))
+      write.csv(correl_r_p_summary, paste0(data.prefix, "base_factor_correlation.csv"))
+      write.csv(pred_obs_compare_summary, paste0(data.prefix, "PMF_vs_obs.csv"))
+      
       ####### Output files #######
       
       ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_conc_plot, width = 6, height = 7.5)
@@ -1150,4 +1227,71 @@ for (site.serial in site_serial_Nos) { # 1:25
   }
 }
 
+#### summary the fraction of converged runs in base model ####
+
+converge_percent_summary = NULL
+
+for (site.serial in site_serial_Nos) { # 1:25
+  for (factor.No in 3:11) { # 5:11
+    
+    site.serial.factor.pre = paste0("S_", site.serial, "_F_", factor.No, "_")
+    name.prefix = paste0(data.prefix, site.serial.factor.pre)
+    folder_path <- paste0("S_", site.serial, "/Factor_", factor.No, "/") # "C_"
+    
+    tryCatch({
+      
+      base_report = readLines(paste0(folder_path, 
+                                     data.prefix, 
+                                     site.serial.factor.pre,
+                                     "base_PMFreport.txt"))
+      
+      # converge condition 
+      converge_percent = lowest_Qm_task(base_report)$converge_percent
+      
+      converge_percent_info = data.frame(
+        site.serial = site.serial, factor.No = factor.No, 
+        converge_percent = converge_percent)
+      converge_percent_summary = 
+        rbind(converge_percent_summary, converge_percent_info)
+      
+      write.csv(converge_percent_summary, paste0(data.prefix, "converge_percent.csv"))
+      
+    }, error = function(e) {
+      
+      print(paste("Error at iteration", site.serial, "factor", factor.No, ":", e$message))
+    })
+  }
+}
+
+
+
+
+
+#### merge with site geographic info ####
+
+setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/")
+getwd()
+
+site_info_all = read.csv("CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
+site_geo = read.csv("CSN_IMPROVE_ownPC/CSN_site_info.csv")
+site_geoid = read.csv("CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_cluster_traffic = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/County_cluster_traffic_info.csv")
+
+PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
+  
+site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X = PMF_base_summary$X = NULL
+
+site_serial = select(site_info_all, 
+                     SiteCode, serial.No)
+site_geoid = select(site_geoid,
+                    SiteCode, geoid)
+col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
+                   "countyns", "namelsad", "county_name", "geoid")
+site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
+
+site_census = merge(site_serial, site_geo)
+site_census = merge(site_census, site_geoid, all.x = TRUE)
+site_census = merge(site_census, site_cluster_traffic, all.x = TRUE)
+
+site_census_pmf = merge(summary_base, cty_cluster_traffic, all.x = TRUE)
 
