@@ -688,7 +688,6 @@ conc_percent_contri = function(conc_contribution){
 
 
 #### Extract info in Displacement results DISP and prepare for plotting #### 
-library(dplyr)
 
 disp_analysis = function(disp_output){
   # Extract lines with values

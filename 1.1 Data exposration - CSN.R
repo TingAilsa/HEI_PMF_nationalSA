@@ -276,32 +276,53 @@ theme.qualifier = theme(axis.title.y.right = element_blank(),
                         axis.text.y = element_text(color="grey25", size = 16, angle = 0, hjust = 0.5))
 
 # plot with number of data with INFORM flag 
-flag_inform_number = ggplot(Qualifier_freq_INFORM_use, aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
+flag_inform_number = 
+  ggplot(Qualifier_freq_INFORM_use, 
+         aes(x=Qualifier.Code, y=Frequency, 
+             fill = Freq_flag_counts)) +
   geom_bar(stat="identity") + 
   facet_grid(Freq_flag_counts ~ .) +  # facet_grid(.~Freq_flag_counts) +
-  geom_text(aes(label = Frequency), hjust = -0.1, vjust = 0.2, size = 5, angle = 90, colour = "grey25") + theme.qualifier
+  geom_text(aes(label = Frequency), 
+            hjust = -0.1, vjust = 0.2, size = 5, 
+            angle = 90, colour = "grey25") + 
+  theme.qualifier
 
 # plot without number of data with INFORM flag 
-flag_inform_none = ggplot(Qualifier_freq_INFORM_use, aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
-  geom_bar(stat="identity") + 
-  facet_grid(Freq_flag_counts ~ .) + theme.qualifier
-
-# plot with number of data with QA flag 
-flag_qa_number = ggplot(Qualifier_freq_QA_use, aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
-  geom_bar(stat="identity") + 
-  facet_grid(Freq_flag_counts ~ .) +  # facet_grid(.~Freq_flag_counts) +
-  geom_text(aes(label = Frequency), hjust = -0.1, vjust = 0.2, size = 5, angle = 90, colour = "grey25") + theme.qualifier
-
-# plot without number of data with QA flag 
-flag_qa_none = ggplot(Qualifier_freq_QA_use, aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
-  geom_bar(stat="identity") + 
-  facet_grid(Freq_flag_counts ~ .) + theme.qualifier
-
-# zoom in plot without number of data with QA flag 
-flag_qa_none_zoom = ggplot(Qualifier_freq_QA_use, aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
+flag_inform_none = 
+  ggplot(Qualifier_freq_INFORM_use, 
+         aes(x=Qualifier.Code, y=Frequency, 
+             fill = Freq_flag_counts)) +
   geom_bar(stat="identity") + 
   facet_grid(Freq_flag_counts ~ .) + 
-  ylim(0, 50000) + theme.qualifier
+  theme.qualifier
+
+# plot with number of data with QA flag 
+flag_qa_number = 
+  ggplot(Qualifier_freq_QA_use, 
+         aes(x=Qualifier.Code, y=Frequency, 
+             fill = Freq_flag_counts)) +
+  geom_bar(stat="identity") + 
+  facet_grid(Freq_flag_counts ~ .) +  # facet_grid(.~Freq_flag_counts) +
+  geom_text(aes(label = Frequency), hjust = -0.1, 
+            vjust = 0.2, size = 5, angle = 90, colour = "grey25") + 
+  theme.qualifier
+
+# plot without number of data with QA flag 
+flag_qa_none = 
+  ggplot(Qualifier_freq_QA_use, 
+         aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
+  geom_bar(stat="identity") + 
+  facet_grid(Freq_flag_counts ~ .) + 
+  theme.qualifier
+
+# zoom in plot without number of data with QA flag 
+flag_qa_none_zoom = 
+  ggplot(Qualifier_freq_QA_use, 
+         aes(x=Qualifier.Code, y=Frequency, fill = Freq_flag_counts)) +
+  geom_bar(stat="identity") + 
+  facet_grid(Freq_flag_counts ~ .) + 
+  ylim(0, 50000) + 
+  theme.qualifier
 
 pdf(file = paste("Number of data with one or multiple flags.pdf"), height = 10, width = 16)
 par(mfrow = c(2,1), mar = c(5, 5, 2, 2)) #mfrow, c(nr, nc); mar, c(bottom, left, top, right)
@@ -343,40 +364,53 @@ csn_no_flag_use = subset(csn_no_flag, class != "other.parameter")
 csn_no_flag_use = subset(csn_no_flag_use, CompName != "Accept.PM2.5" & CompName != "PM2.5RC") 
 
 
-flag_comp_summary = ddply(csn_flag_use, .(QA, CompName), summarise, 
-                          Val.mean = mean(Val, na.rm = T), Val.sd = sd(Val, na.rm = T),
-                          Val.median = median(Val, na.rm = T), Val.25 = quantile(Val, 0.25, na.rm = T), 
-                          Val.10 = quantile(Val, 0.1, na.rm = T))
+flag_comp_summary = 
+  ddply(csn_flag_use, .(QA, CompName), summarise, 
+        Val.mean = mean(Val, na.rm = T), 
+        Val.sd = sd(Val, na.rm = T),
+        Val.median = median(Val, na.rm = T), 
+        Val.25 = quantile(Val, 0.25, na.rm = T), 
+        Val.10 = quantile(Val, 0.1, na.rm = T))
 
-flag_No_comp_summary = ddply(csn_no_flag_use, .(CompName), summarise, 
-                             no.flag.Val.mean = mean(Val, na.rm = T), no.flag.Val.sd = sd(Val, na.rm = T),
-                             no.flag.Val.90 = quantile(Val, 0.9, na.rm = T), no.flag.Val.75 = quantile(Val, 0.75, na.rm = T), 
-                             no.flag.Val.median = median(Val, na.rm = T), no.flag.Val.25 = quantile(Val, 0.25, na.rm = T), 
-                             no.flag.Val.10 = quantile(Val, 0.1, na.rm = T))
+flag_No_comp_summary = 
+  ddply(csn_no_flag_use, .(CompName), summarise, 
+        no.flag.Val.mean = mean(Val, na.rm = T), 
+        no.flag.Val.sd = sd(Val, na.rm = T),
+        no.flag.Val.90 = quantile(Val, 0.9, na.rm = T), 
+        no.flag.Val.75 = quantile(Val, 0.75, na.rm = T), 
+        no.flag.Val.median = median(Val, na.rm = T), 
+        no.flag.Val.25 = quantile(Val, 0.25, na.rm = T), 
+        no.flag.Val.10 = quantile(Val, 0.1, na.rm = T))
+
 comp_summary = join(flag_comp_summary, flag_No_comp_summary)
 comp_summary$mean.flag.vs.no = comp_summary$Val.mean/comp_summary$no.flag.Val.mean  
 comp_summary$median.flag.vs.no = comp_summary$Val.median/comp_summary$no.flag.Val.median  
 
 #### Plot concentration of each components - Not flagged
 
-theme.conc.ratio = theme(axis.title.y.right = element_blank(),
-                         panel.spacing = unit(10, "mm"),   
-                         legend.background = element_blank(),
-                         strip.text = element_text(face="bold", size=rel(1.5)),
-                         strip.background = element_rect(fill="lightblue", colour="grey", size=16),
-                         axis.title.x = element_text(color="grey25", size = 16, vjust=0, margin=margin(0,0,0,300)), 
-                         axis.title.y = element_text(color="grey25", size = 16, vjust=1, margin=margin(0,2,0,0)),
-                         plot.title=element_text(size=rel(2)), 
-                         axis.text.x = element_text(color="grey25", size = 14, angle = 90, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-                         axis.text.y = element_text(color="grey25", size = 14, angle = 0, hjust = 0.5))
+theme.conc.ratio =
+  theme(axis.title.y.right = element_blank(),
+        panel.spacing = unit(10, "mm"),   
+        legend.background = element_blank(),
+        strip.text = element_text(face="bold", size=rel(1.5)),
+        strip.background = element_rect(fill="lightblue", colour="grey", size=16),
+        axis.title.x = element_text(color="grey25", size = 16, vjust=0), 
+        axis.title.y = element_text(color="grey25", size = 16, vjust=1),
+        plot.title=element_text(size=rel(2)), 
+        axis.text.x = element_text(color="grey25", size = 14,
+                                   angle = 90, hjust = 0, vjust = 0.3), 
+        plot.margin = unit(c(2,1,2, 2), "lines"),
+        axis.text.y = element_text(color="grey25", size = 14, angle = 0, hjust = 0.5))
 
 
-no_flag_conc = ggplot(csn_no_flag_use, aes(x = CompName, y = Val)) +
+no_flag_conc = 
+  ggplot(csn_no_flag_use, aes(x = CompName, y = Val)) +
   geom_boxplot() +
   ggtitle("Value of components with No Flags")  + 
   theme.conc.ratio
 
-no_flag_conc_zoom = ggplot(csn_no_flag_use, aes(x = CompName, y = Val)) +
+no_flag_conc_zoom = 
+  ggplot(csn_no_flag_use, aes(x = CompName, y = Val)) +
   geom_boxplot() +
   ylim(0, 1) +
   ggtitle("Value of components with No Flags - zoom in")  + 
@@ -390,7 +424,9 @@ qa_flag_3 = qa_flag[13:18]
 qa_flag_4 = qa_flag[19:23]
 
 # qa_flag_1
-qa_flag_1_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_1), aes(x = CompName, y = mean.flag.vs.no)) +
+qa_flag_1_ratio_mean = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_1), 
+         aes(x = CompName, y = mean.flag.vs.no)) +
   geom_point(color = "blue3") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -398,7 +434,9 @@ qa_flag_1_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_
   ggtitle("Flagged/None Ratio - Mean - Quality Assurance series 1")  + 
   theme.conc.ratio
 
-qa_flag_1_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_1), aes(x = CompName, y = median.flag.vs.no)) +
+qa_flag_1_ratio_median = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_1), 
+         aes(x = CompName, y = median.flag.vs.no)) +
   geom_point(color = "green4") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -407,7 +445,9 @@ qa_flag_1_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_fla
   theme.conc.ratio
 
 # qa_flag_2
-qa_flag_2_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_2), aes(x = CompName, y = mean.flag.vs.no)) +
+qa_flag_2_ratio_mean = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_2),
+         aes(x = CompName, y = mean.flag.vs.no)) +
   geom_point(color = "blue3") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -415,7 +455,9 @@ qa_flag_2_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_
   ggtitle("Flagged/None Ratio - Mean - Quality Assurance series 2")  + 
   theme.conc.ratio
 
-qa_flag_2_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_2), aes(x = CompName, y = median.flag.vs.no)) +
+qa_flag_2_ratio_median = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_2), 
+         aes(x = CompName, y = median.flag.vs.no)) +
   geom_point(color = "green4") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -424,7 +466,9 @@ qa_flag_2_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_fla
   theme.conc.ratio
 
 # qa_flag_3
-qa_flag_3_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_3), aes(x = CompName, y = mean.flag.vs.no)) +
+qa_flag_3_ratio_mean = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_3), 
+         aes(x = CompName, y = mean.flag.vs.no)) +
   geom_point(color = "blue3") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -432,7 +476,9 @@ qa_flag_3_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_
   ggtitle("Flagged/None Ratio - Mean - Quality Assurance series 3")  + 
   theme.conc.ratio
 
-qa_flag_3_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_3), aes(x = CompName, y = median.flag.vs.no)) +
+qa_flag_3_ratio_median = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_3), 
+         aes(x = CompName, y = median.flag.vs.no)) +
   geom_point(color = "green4") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -441,7 +487,9 @@ qa_flag_3_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_fla
   theme.conc.ratio
 
 # qa_flag_4
-qa_flag_4_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_4), aes(x = CompName, y = mean.flag.vs.no)) +
+qa_flag_4_ratio_mean = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_4), 
+         aes(x = CompName, y = mean.flag.vs.no)) +
   geom_point(color = "blue3") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -449,7 +497,9 @@ qa_flag_4_ratio_mean = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_
   ggtitle("Flagged/None Ratio - Mean - Quality Assurance series 4")  + 
   theme.conc.ratio
 
-qa_flag_4_ratio_median = ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_4), aes(x = CompName, y = median.flag.vs.no)) +
+qa_flag_4_ratio_median = 
+  ggplot(subset(comp_summary, comp_summary$QA %in% qa_flag_4), 
+         aes(x = CompName, y = median.flag.vs.no)) +
   geom_point(color = "green4") +
   facet_grid(QA ~ .) +  
   ylim(-5, 5) +
@@ -711,24 +761,58 @@ concern.a.med = as.character(concen_no_flag$CompName[16:34])
 concern.a.large = as.character(concen_no_flag$CompName[35:38])
 concern.b = as.character(concen_no_flag$CompName[39:71])
 
-state_b = ggplot(subset(concen_no_flag_state_mean, concen_no_flag_state_mean$CompName %in% concern.b), aes(State, CompName, fill= Val.mean)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "red")
-state_a_small = ggplot(subset(concen_no_flag_state_mean, concen_no_flag_state_mean$CompName %in% concern.a.small), aes(State, CompName, fill= Val.mean)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "green")
-state_a_med = ggplot(subset(concen_no_flag_state_mean, concen_no_flag_state_mean$CompName %in% concern.a.med), aes(State, CompName, fill= Val.mean)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "deepskyblue3")
-state_a_large = ggplot(subset(concen_no_flag_state_mean, concen_no_flag_state_mean$CompName %in% concern.a.large), aes(State, CompName, fill= Val.mean)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "purple")
+state_b = 
+  ggplot(subset(concen_no_flag_state_mean, 
+                concen_no_flag_state_mean$CompName %in% concern.b), 
+         aes(State, CompName, fill= Val.mean)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "red")
+state_a_small = 
+  ggplot(subset(concen_no_flag_state_mean, 
+                concen_no_flag_state_mean$CompName %in% concern.a.small), 
+         aes(State, CompName, fill= Val.mean)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "green")
+state_a_med = 
+  ggplot(subset(concen_no_flag_state_mean, 
+                concen_no_flag_state_mean$CompName %in% concern.a.med), 
+         aes(State, CompName, fill= Val.mean)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "deepskyblue3")
+state_a_large = 
+  ggplot(subset(concen_no_flag_state_mean, 
+                concen_no_flag_state_mean$CompName %in% concern.a.large), 
+         aes(State, CompName, fill= Val.mean)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "purple")
+
 multiplot(state_a_small, state_a_med, state_a_large, cols=1)
 
-state_b = ggplot(subset(concen_no_flag_state_median, concen_no_flag_state_median$CompName %in% concern.b), aes(State, CompName, fill= Val.median)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "red")
-state_a_small = ggplot(subset(concen_no_flag_state_median, concen_no_flag_state_median$CompName %in% concern.a.small), aes(State, CompName, fill= Val.median)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "green")
-state_a_med = ggplot(subset(concen_no_flag_state_median, concen_no_flag_state_median$CompName %in% concern.a.med), aes(State, CompName, fill= Val.median)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "deepskyblue3")
-state_a_large = ggplot(subset(concen_no_flag_state_median, concen_no_flag_state_median$CompName %in% concern.a.large), aes(State, CompName, fill= Val.median)) + 
-  geom_tile() + scale_fill_gradient(low = "white", high = "purple")
+state_b = 
+  ggplot(subset(concen_no_flag_state_median, 
+                concen_no_flag_state_median$CompName %in% concern.b), 
+         aes(State, CompName, fill= Val.median)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "red")
+state_a_small = 
+  ggplot(subset(concen_no_flag_state_median, 
+                concen_no_flag_state_median$CompName %in% concern.a.small), 
+         aes(State, CompName, fill= Val.median)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "green")
+state_a_med = 
+  ggplot(subset(concen_no_flag_state_median, 
+                concen_no_flag_state_median$CompName %in% concern.a.med), 
+         aes(State, CompName, fill= Val.median)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "deepskyblue3")
+state_a_large = 
+  ggplot(subset(concen_no_flag_state_median, 
+                concen_no_flag_state_median$CompName %in% concern.a.large), 
+         aes(State, CompName, fill= Val.median)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "purple")
+
 multiplot(state_a_small, state_a_med, state_a_large, cols=1)
 
 site_gps = read.csv("site GPS question or not.csv")
@@ -761,18 +845,24 @@ no_flag_SO4_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == 
 ggplot(no_flag_SO4_median, aes(Longitude, Latitude, color= Val.median)) + 
   geom_point() + scale_color_continuous(low = "white", high = "purple")
 
-SO4_median = ggplot(subset(no_flag_SO4_median, no_flag_SO4_median$Val.median < 0.2 & is.na(no_flag_SO4.median$start.year_use)), 
+theme_species_spatial =
+  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
+        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
+        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
+        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
+        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+
+SO4_median = 
+  ggplot(subset(no_flag_SO4_median, 
+                no_flag_SO4_median$Val.median < 0.2 & 
+                  is.na(no_flag_SO4.median$start.year_use)), 
                     aes(Longitude, Latitude, color= Val.median)) + 
   geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
                color="darkgrey", fill="lightblue", alpha = 0.4) +
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("SO4(2-)") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 # geom_text(aes(label = start.year_use), hjust = -0.1, vjust = 0.2, size = 2, angle = 90, colour = "black")
 # geom_text(data=csn_no_flag_1_plot, aes(x=state_long, y=state_lat, label = State))
@@ -789,18 +879,16 @@ no_flag_NO3_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == 
 ggplot(no_flag_NO3_median, aes(Longitude, Latitude, color= Val.median)) + 
   geom_point() + scale_color_continuous(low = "white", high = "purple")
 
-NO3_median = ggplot(subset(no_flag_NO3_median, no_flag_NO3_median$Val.median < 0.1 & is.na(no_flag_NO3.median$start.year_use)), 
+NO3_median = ggplot(subset(no_flag_NO3_median, 
+                           no_flag_NO3_median$Val.median < 0.1 & 
+                             is.na(no_flag_NO3.median$start.year_use)), 
                     aes(Longitude, Latitude, color= Val.median)) + 
   geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
                color="darkgrey", fill="lightblue", alpha = 0.4) +
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("NO3(-)") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 ## Na
 no_flag_Na_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "Na"), 
@@ -814,19 +902,17 @@ no_flag_Na_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "
 ggplot(no_flag_Na_median, aes(Longitude, Latitude, color= Val.median)) + 
   geom_point() + scale_color_continuous(low = "white", high = "purple")
 
-Na_median = ggplot(subset(no_flag_Na_median, no_flag_Na_median$Val.median < 0.2 & is.na(no_flag_Na.median$start.year_use)), 
+Na_median = 
+  ggplot(subset(no_flag_Na_median, 
+                no_flag_Na_median$Val.median < 0.2 & 
+                  is.na(no_flag_Na.median$start.year_use)), 
                    aes(Longitude, Latitude, color= Val.median)) + 
   geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
                color="darkgrey", fill="lightblue", alpha = 0.4) +
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("Na") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
-
+  theme_species_spatial
 
 ## Fe
 no_flag_Fe_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "Fe"), 
@@ -840,18 +926,16 @@ no_flag_Fe_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "
 ggplot(no_flag_Fe_median, aes(Longitude, Latitude, color= Val.median)) + 
   geom_point() + scale_color_continuous(low = "white", high = "purple")
 
-Fe.median =  ggplot(subset(no_flag_Fe_median, no_flag_Fe_median$Val.median < 0.2 & is.na(no_flag_Fe.median$start.year_use)), 
+Fe.median =  ggplot(subset(no_flag_Fe_median, 
+                           no_flag_Fe_median$Val.median < 0.2 & 
+                             is.na(no_flag_Fe.median$start.year_use)), 
                     aes(Longitude, Latitude, color= Val.median)) + 
   geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
                color="darkgrey", fill="lightblue", alpha = 0.4) +
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("Fe") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 ## Cd
 no_flag_Cd_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "Cd"), 
@@ -872,11 +956,7 @@ Cd_median = ggplot(subset(no_flag_Cd_median, no_flag_Cd_median$Val.median < 0.35
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("Cd") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 ## As
 no_flag_As_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "As"), 
@@ -897,11 +977,7 @@ As_median = ggplot(subset(no_flag_As_median, no_flag_As_median$Val.median < 0.3 
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("As") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 multiplot(SO4_median, NO3_median, Na_median, Fe_median, Cd_median, As_median, cols=2)
 
@@ -925,11 +1001,7 @@ EC88_median = ggplot(subset(no_flag_EC88_median, no_flag_EC88_median$Val.median 
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "yellow", high = "purple") +
   ggtitle("EC88") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 ## OC88
 no_flag_OC88_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName == "OC.88"), 
@@ -943,18 +1015,15 @@ no_flag_OC88_median = ddply(subset(csn_no_flag_1_plot, csn_no_flag_1$CompName ==
 ggplot(no_flag_OC88_median, aes(Longitude, Latitude, color= Val.median)) + 
   geom_point() + scale_color_continuous(low = "white", high = "purple")
 
-OC88_median = ggplot(subset(no_flag_OC88_median, no_flag_OC88_median$Val.median < 0.3 & is.na(no_flag_OC88.median$start.year_use)), 
+OC88_median = ggplot(subset(no_flag_OC88_median, 
+                            no_flag_OC88_median$Val.median < 0.3 & is.na(no_flag_OC88.median$start.year_use)), 
                      aes(Longitude, Latitude, color= Val.median)) + 
   geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
                color="darkgrey", fill="lightgrey", alpha = 0.6) +
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "yellow", high = "purple") +
   ggtitle("OC88") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+  theme_species_spatial
 
 multiplot(OC88_median, EC88_median, cols=2)
 
@@ -990,12 +1059,7 @@ ggplot(cmr_no_flag, aes(Longitude, Latitude, fill = State)) +
   geom_point(size = 2, alpha = 0.6) +
   scale_color_continuous(low = "blue", high = "red") +
   ggtitle("SO4(2-)") + 
-  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
-        axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-        axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
-
+  theme_species_spatial
 
 cmr_no_flag %>%
   ggplot(aes(Longitude, Latitude, group = State, fill = Soil)) +
@@ -1053,45 +1117,27 @@ for(l in 1:length(compo_plot)){
   no_flag_2_a_plot = subset(csn_no_flag_2_a, csn_no_flag_2_a$CompName == comp_name)
   p_unc_mdl = ggplot(no_flag_2_a_plot, aes(MDL, Unc, color = as.integer(year))) + 
     geom_point(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
-    theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 30),
-          axis.title.x = element_text(color="grey25", size = 24, vjust=0, margin=margin(0,0,0,300)), 
-          axis.title.y = element_text(color="grey25", size = 24, vjust=1, margin=margin(0,2,0,0)),
-          axis.text.x = element_text(color="grey25", size = 22, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-          axis.text.y = element_text(color="grey25", size = 22, angle = 0, hjust = 0.5))
+    theme_species_spatial
   
   p_val_mdl = ggplot(no_flag_2_a_plot, aes(Val, MDL, color = as.integer(year))) + 
     geom_point(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
-    theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 30),
-          axis.title.x = element_text(color="grey25", size = 24, vjust=0, margin=margin(0,0,0,300)), 
-          axis.title.y = element_text(color="grey25", size = 24, vjust=1, margin=margin(0,2,0,0)),
-          axis.text.x = element_text(color="grey25", size = 22, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-          axis.text.y = element_text(color="grey25", size = 22, angle = 0, hjust = 0.5))
+    theme_species_spatial
+  
   p_val_unc = ggplot(no_flag_2_a_plot, aes(Val, Unc, color = as.integer(year))) + 
     geom_point(alpha = 0.2,size = 3.5) +
-    theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 30),
-          axis.title.x = element_text(color="grey25", size = 24, vjust=0, margin=margin(0,0,0,300)), 
-          axis.title.y = element_text(color="grey25", size = 24, vjust=1, margin=margin(0,2,0,0)),
-          axis.text.x = element_text(color="grey25", size = 22, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-          axis.text.y = element_text(color="grey25", size = 22, angle = 0, hjust = 0.5),
-          legend.text = element_text(colour="grey25",  size = 10),
+    theme_species_spatial +
+    theme(legend.text = element_text(colour="grey25",  size = 10),
           legend.title = element_text(colour="grey25", size = 0))
   
   p_con_year = ggplot(ddply(no_flag_2_a_plot, .(year), summarize, Val = mean(Val, na.rm = T)), aes(year, Val)) + 
     geom_line(alpha = 0.8) + geom_point(alpha = 0.4,size = 5, shape = 5) + 
     scale_x_continuous(breaks=c(2010, 2012, 2014, 2016, 2018, 2020)) +
-    theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 30),
-          axis.title.x = element_text(color="grey25", size = 24, vjust=0, margin=margin(0,0,0,300)), 
-          axis.title.y = element_text(color="grey25", size = 24, vjust=1, margin=margin(0,2,0,0)),
-          axis.text.x = element_text(color="grey25", size = 22, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-          axis.text.y = element_text(color="grey25", size = 22, angle = 0, hjust = 0.5))
+    theme_species_spatial
+  
   p_con_month = ggplot(ddply(no_flag_2_a_plot, .(month), summarize, Val = mean(Val, na.rm = T)), aes(month, Val)) + 
     geom_line(color = "darkgrey") + geom_point(alpha = 0.6,size = 5, shape = 8)  + 
     scale_x_continuous(breaks=c(1, 3, 5, 7, 9, 11)) +
-    theme(plot.title = element_text(hjust = 0.05, vjust = -50, size = 30),
-          axis.title.x = element_text(color="grey25", size = 24, vjust=0, margin=margin(0,0,0,300)), 
-          axis.title.y = element_text(color="grey25", size = 24, vjust=1, margin=margin(0,2,0,0)),
-          axis.text.x = element_text(color="grey25", size = 22, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
-          axis.text.y = element_text(color="grey25", size = 22, angle = 0, hjust = 0.5))
+    theme_species_spatial
   
   grid.arrange(p_con_year, p_con_month, nrow = 1, 
                top = textGrob(paste("annual and month change of", comp_name), gp=gpar(fontsize=28)))
