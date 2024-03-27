@@ -19,8 +19,15 @@ data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
 
 #### 1. Prepare & merge info for manual source assignment ####
 
+# extra 5% uncertainty
 data_use = "CSN_Site_15TimesMean"
-# data_use = "CSN_Site_15tMean_0unc"
+data.pre = "CSN_noCsub_15TimesMean_"
+
+
+# 0 uncertainty
+data_use = "CSN_Site_15tMean_0unc"
+data.pre = "CSN_noCsub_15tMean_0unc_"
+
 time = Sys.Date()
 
 pdf.series <- c("factor_pairs.pdf", "source_profile.pdf", "overall.pdf", "daily.pdf")
@@ -47,6 +54,7 @@ remaining_columns <-
   setdiff(
   names(csv_overall), 
   adjusted_columns)
+
 
 csv_overall <- 
   csv_overall[, c(adjusted_columns, remaining_columns)]
@@ -75,7 +83,6 @@ overall_toAssign =
   select(overall_toAssign,
          Dataset, site.serial, Factor.No, 
          Factor_source, Main_Species, Faraction_conc_contri)
-colnames(overall_toAssign)[4] = "Source_reference"
 
 names(overall_toAssign)[4:6] = 
   c("to_assign_Source", "to_assign_Species", "to_assign_Fraction")
@@ -122,29 +129,33 @@ tans_toAssign <- tans_toAssign[, reorder_col_number(tans_toAssign)]
 
 tans_sourceAssigned = 
   tans_sourceAssigned[with(tans_sourceAssigned, order(serial.No, Factor.No)), ]
+
 tans_toAssign = 
   tans_toAssign[with(tans_toAssign, order(serial.No, Factor.No)), ]
 
 
-write.csv(overall_sourceAssigned, paste0(data_use, "Source_assigned.csv"))
-write.csv(overall_toAssign, paste0(data_use, "Source_to_assign.csv"))
+write.csv(overall_sourceAssigned, paste0(data_use, "_Source_assigned.csv"))
+write.csv(overall_toAssign, paste0(data_use, "_Source_to_assign.csv"))
 
-write.csv(tans_sourceAssigned, paste0(data_use, "Source_assigned_reorder.csv"))
-write.csv(tans_toAssign, paste0(data_use, "Source_to_assign_reorder.csv"))
+write.csv(tans_sourceAssigned, paste0(data_use, "_Source_assigned_reorder.csv"))
+write.csv(tans_toAssign, paste0(data_use, "_Source_to_assign_reorder.csv"))
 
 ###### 1.2 other source-related info ######
 
 dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 
-site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_CMD_SWB_Site.csv"))
+site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv"))
 site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
 site_geoid = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv"))
 
 cty_cluster_traffic = read.csv("results_R_data/County_cluster_traffic_info.csv")
-PMF_base_summary = read.csv("PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
 
-tans_sourceAssigned = read.csv(paste0(data_use, "Source_assigned_reorder.csv"))
-tans_toAssign = read.csv(paste0(data_use, "Source_to_assign_reorder.csv"))
+PMF_base_summary = read.csv(
+  paste0(dir_path, "/", data.pre, "base_DISP_summary.csv")
+)
+
+tans_sourceAssigned = read.csv(paste0(data_use, "_Source_assigned_reorder.csv"))
+tans_toAssign = read.csv(paste0(data_use, "_Source_to_assign_reorder.csv"))
 
 site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X = 
   PMF_base_summary$X = tans_sourceAssigned$X = tans_toAssign$X = NULL
@@ -153,8 +164,12 @@ site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X =
 names(PMF_base_summary)[3] = "Factor.No"
 PMF_base_summary$Dataset = gsub("^(.*)_.*$", "\\1", PMF_base_summary$Dataset)
 
-site_serial = select(site_info_all, SiteCode, serial.No)
 site_geoid = select(site_geoid, SiteCode, geoid)
+site_serial = select(site_info_all, SiteCode, serial.No)
+
+# repeat to match factor number
+site_serial_factor = site_serial[rep(1:nrow(site_serial), each = 9), ]
+site_serial_factor$Factor.No = 3:11
 
 col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
                    "countyns", "namelsad", "county_name", "geoid")
@@ -175,8 +190,189 @@ site_census_source_assign =
 site_census_source_assign = 
   relocate(site_census_source_assign, SiteCode, .before = serial.No)
 
-write.csv(site_census_source_assign, paste0(data_use, "_PMF_source_census_", time, ".csv"))
+# merge with converge results
+converge_all = read.csv(
+  paste0(dir_path, "/", data.pre, "converge_percent.csv")
+)
+
+converge_all$X = NULL
+names(converge_all)[1:2] = c("serial.No", "Factor.No")
+
+site_census_source_assign = 
+  merge(site_census_source_assign, converge_all, all.x = TRUE)
+
+# reorder the file
+site_census_source_assign = 
+  merge(site_serial_factor, site_census_source_assign, all.x = TRUE)
+site_census_source_assign = 
+  site_census_source_assign[with(site_census_source_assign, 
+                                 order(serial.No, Factor.No)), ]
+
+# in case of dup
+site_census_source_assign$DUP =
+  duplicated(site_census_source_assign[, 2:3])
+site_census_source_assign = 
+  relocate(site_census_source_assign, DUP, .before = "Dataset")
+site_census_source_assign =
+  subset(site_census_source_assign, !DUP)
+
+
+write.csv(site_census_source_assign, 
+          paste0(data_use, "_PMF_source_census_", time, ".csv"))
 # "CSN_Site_15TimesMean_PMF_source_census_2024-03-15.csv"
+
+# data_use = "CSN_Site_15TimesMean"
+# site_census_source_assign = site_census_source_assign_5unc
+
+# data_use = "CSN_Site_15tMean_0unc"
+# site_census_source_assign = site_census_source_assign_0unc
+
+
+###### 1.3 site-specific performance summary ######
+
+site_census_source_assign_5unc = read.csv("CSN_Site_15TimesMean_PMF_source_census_2024-03-22.csv")
+site_census_source_assign_0unc = read.csv("CSN_Site_15tMean_0unc_PMF_source_census_2024-03-22.csv")
+site_census_source_assign_5unc$X = site_census_source_assign_0unc$X = NULL
+
+site_source_5unc = 
+  select(site_census_source_assign_5unc, 
+         SiteCode, serial.No, Factor.No, State, 
+         Longitude, Latitude, geoid, RuralUrban, 
+         median_PMF_PM2.5, median_obs_PM2.5, cor_PMF.obs_PM, 
+         converge_percent, DISP_error.code, DISP_qdrop, bs.map, 
+         toAssign_Zero, toAssign_all_Zero, 
+         assigned_Zero, assigned_all_Zero)
+site_source_5unc$overall_unc = "Extra_overall_5%"
+
+site_source_0unc = 
+  select(site_census_source_assign_0unc, 
+         SiteCode, serial.No, Factor.No, State, 
+         Longitude, Latitude, geoid, RuralUrban, 
+         median_PMF_PM2.5, median_obs_PM2.5, cor_PMF.obs_PM, 
+         converge_percent, DISP_error.code, DISP_qdrop, bs.map, 
+         toAssign_Zero, toAssign_all_Zero, 
+         assigned_Zero, assigned_all_Zero)
+site_source_0unc$overall_unc = "No_extra_uncertainty"
+
+summary(site_source_0unc$SiteCode == site_source_5unc$SiteCode & 
+          site_source_0unc$Factor.No == site_source_5unc$Factor.No)
+summary(site_source_0unc$median_PMF_PM2.5 == site_source_5unc$median_PMF_PM2.5)
+
+source_perform = rbind(site_source_5unc, site_source_0unc)
+
+# PMF predicted PM2.5
+ggplot(source_perform, 
+       aes(x = median_obs_PM2.5, y = median_PMF_PM2.5)) +
+  geom_point() +
+  facet_grid(. ~ overall_unc) +
+  theme_bw(base_size = 16)
+
+plot(site_source_0unc$median_PMF_PM2.5, site_source_5unc$median_PMF_PM2.5)
+lm_pmf_0ucn_5unc = 
+  lm(site_source_0unc$median_PMF_PM2.5 ~ site_source_5unc$median_PMF_PM2.5)
+summary(lm_pmf_0ucn_5unc)
+
+# Zero-contributions
+ggplot(subset(source_perform,
+              assigned_Zero == 1), 
+       aes(x = Factor.No)) + 
+  geom_histogram(alpha = 0.6) +
+  facet_grid(. ~ overall_unc) +
+  scale_x_continuous(breaks = 3:11) +
+  theme_bw(base_size = 16)
+ggplot(subset(source_perform,
+              toAssign_Zero == 1), 
+       aes(x = Factor.No)) + 
+  geom_histogram(alpha = 0.6) +
+  facet_grid(. ~ overall_unc) +
+  scale_x_continuous(breaks = 3:11) +
+  theme_bw(base_size = 16)
+
+ddply(source_perform, .(overall_unc), summarise,
+      assigned_all0_row = sum(assigned_all_Zero, na.rm = TRUE), 
+      to_assign_all0_row = sum(toAssign_all_Zero, na.rm = TRUE))
+
+# Converged percent
+
+ggplot(source_perform, 
+       aes(x = converge_percent * 100)) + 
+  geom_histogram(alpha = 0.6) +
+  facet_grid(. ~ overall_unc) +
+  scale_x_continuous(breaks = 3:11) +
+  theme_bw(base_size = 16)
+
+source_perform_converge =
+source_perform %>%
+  group_by(overall_unc, converge_percent) %>%
+  dplyr::summarise(frequency = n()) %>%
+  ungroup()
+
+source_perform_converge =
+  source_perform_converge %>%
+  pivot_wider(
+    names_from = overall_unc,
+    values_from = frequency
+  )
+
+source_low_converge = 
+  subset(source_perform, converge_percent < 0.3)
+
+ggplot(source_low_converge, 
+       aes(x = median_obs_PM2.5, y = median_PMF_PM2.5)) +
+  geom_point() +
+  facet_grid(. ~ overall_unc) +
+  theme_bw(base_size = 16)
+
+source_low_PMF_pm = 
+  subset(source_perform, median_PMF_PM2.5 < 0.2 * median_obs_PM2.5)
+
+
+###### 1.4 species prediction performance ######
+species_perf_5 = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_noCsub_15TimesMean_PMF_vs_obs.csv")
+species_perf_0 = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISPres1/CSN_noCsub_15tMean_0unc_PMF_vs_obs.csv")
+species_perf_5$X = species_perf_0$X = NULL
+species_perf_0$higher.3.scalRes.per = 
+  as.numeric(sub("%$", "", 
+                 species_perf_0$higher.3.scalRes.per))
+species_perf_5$higher.3.scalRes.per = 
+  as.numeric(sub("%$", "", 
+                 species_perf_5$higher.3.scalRes.per))
+
+species_perf_5 =
+  species_perf_5 %>%
+  pivot_longer(
+    cols = RMSE:higher.3.scalRes.per,
+    names_to = "criteria",
+    values_to = "performance"
+  )
+species_perf_0 =
+  species_perf_0 %>%
+  pivot_longer(
+    cols = RMSE:higher.3.scalRes.per,
+    names_to = "criteria",
+    values_to = "performance"
+  )
+
+species_perf_5$overall_unc = "Extra_overall_5%"
+species_perf_0$overall_unc = "No_extra_uncertainty"
+
+species_perform = rbind(species_perf_5, species_perf_0)
+
+ggplot(species_perf_5, 
+       aes(x = Species, y = performance)) +
+  geom_boxplot() +
+  facet_grid(criteria ~ ., scales = "free") +
+  theme_bw(base_size = 12)
+
+ggplot(species_perf_0, 
+       aes(x = Species, y = performance)) +
+  geom_boxplot() +
+  facet_grid(criteria ~ ., scales = "free") +
+  theme_bw(base_size = 12)
+
+
+
+
 
 ####  0. Source assignment results ####
 

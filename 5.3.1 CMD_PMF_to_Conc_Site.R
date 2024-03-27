@@ -1227,7 +1227,7 @@ for (site.serial in site_serial_Nos) { # 1:25
   }
 }
 
-#### summary the fraction of converged runs in base model ####
+#### 3. summary the fraction of converged runs in base model ####
 
 converge_percent_summary = NULL
 
@@ -1262,9 +1262,6 @@ for (site.serial in site_serial_Nos) { # 1:25
     })
   }
 }
-
-
-
 
 
 #### merge with site geographic info ####
