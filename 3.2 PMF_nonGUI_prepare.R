@@ -550,10 +550,12 @@ unc_pmf_cluster = merge(unc_pmf, pm_cluster, all.x = T)
 conc_pmf_cluster = join(conc_pmf_cluster,
                          aqs_PM25)
 
-conc_pmf_cluster$PM25_Combine = ifelse((is.na(conc_pmf_cluster$PM25_AQS) |
-                                          conc_pmf_cluster$PM25_AQS <= 2), 
-                                       conc_pmf_cluster$PM25, 
-                                       conc_pmf_cluster$PM25_AQS)
+conc_pmf_cluster$PM25_Combine = 
+  ifelse((is.na(conc_pmf_cluster$PM25_AQS) |
+            conc_pmf_cluster$PM25_AQS <= 2), 
+         conc_pmf_cluster$PM25, 
+         conc_pmf_cluster$PM25_AQS)
+
 plot(conc_pmf_cluster$PM25, 
      conc_pmf_cluster$PM25_AQS)
 plot(conc_pmf_cluster$PM25, 
@@ -1240,15 +1242,15 @@ comp_error_fraction$OP = comp_error_fraction$EC
 
 ##### VC for dispersion normalization, based on ERA5 data 
 
-dn_vc = fread("Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
-dn_vc$V1 = NULL
-dn_vc$Date = as.Date(dn_vc$Date)
-dn_vc_use = select(dn_vc,
-                   Dataset, SiteCode, Date, VC_coef)
-dn_vc_use = 
-  dn_vc_use[
-    with(dn_vc_use,
-      order(Dataset, SiteCode, Date)), ]
+# dn_vc = fread("Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
+# dn_vc$V1 = NULL
+# dn_vc$Date = as.Date(dn_vc$Date)
+# dn_vc_use = select(dn_vc,
+#                    Dataset, SiteCode, Date, VC_coef)
+# dn_vc_use = 
+#   dn_vc_use[
+#     with(dn_vc_use,
+#       order(Dataset, SiteCode, Date)), ]
 
 #### get SiteCode & site.serial matching list for both CSN & IMPROVE datasets
 
@@ -1465,6 +1467,16 @@ nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15TimesMean_site" ## if no OC EC subgrou
 GUI.site.folder <- "CSN_GUI_NoCsub_15TimesMean_site"
 prefix = "CSN_noCsub_15timesMean_S_"
 
+#### CSN, extreme, mean*15, Median MDL, one MDL across whole period
+nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15Times1MDL_site" ## if no OC EC subgroups, no extreme values 
+GUI.site.folder <- "CSN_GUI_NoCsub_15Times1MDL_site"
+prefix = "CSN_noCsub_15times1MDL_S_"
+
+#### CSN, extreme, mean*15, uncertainty of the interpolated values, 4.5 times as high, earlier, 1.5 times
+nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15Times45unc_site" ## if no OC EC subgroups, no extreme values 
+GUI.site.folder <- "CSN_GUI_NoCsub_15Times45unc_site"
+prefix = "CSN_noCsub_15Times45unc_S_"
+
 # #### CSN, extreme, season 99th as threshold of outlier
 # Clusterfolder <- "CSN_NoGUI_NoCsub_99season_cluster"
 # GUI.cluster.folder <- "CSN_GUI_NoCsub_99season_cluster"
@@ -1477,7 +1489,17 @@ prefix = "CSN_noCsub_15timesMean_S_"
 
 # prefix_swb = sub("C_$", "", str_extract(prefix,  "^(.*?)C_"))
 
-#### create Dataset to save results #### 
+#### create Dataset/Folder to save results #### 
+
+###### create folder for out puts if not exist
+
+if (!dir.exists(file.path(dropbox_path, GUI.site.folder))) {
+  dir.create(file.path(dropbox_path, GUI.site.folder))
+}
+
+if (!dir.exists(file.path(dropbox_path, nonGUI.site.folder))) {
+  dir.create(file.path(dropbox_path, nonGUI.site.folder))
+}
 
 ###### a dataframe to save the decision of weak, bad, or strong 
 
@@ -1502,7 +1524,7 @@ cmd_species_class_site =
              row_count_org = NA, original_PM_weak = NA)
 
 
-# dataset = "CSN"
+dataset = "CSN"
 # dataset = "IMPROVE"
 cmd_species_class_site$Dataset = dataset
 
@@ -1524,7 +1546,7 @@ prefix_swb = sub("S_$", "", str_extract(prefix,  "^(.*?)S_"))
 options(scipen=999)
 
 # extract concentration & uncertainty of single cluster for PMF
-for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[2]
+for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[57]
   
   # generate site.serial and corresponding datasets
   site.serial = site_list$serial.No[site_list$SiteCode == site_code]
@@ -1541,7 +1563,9 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   # summary(species_NA_intp_site$Date == conc_site$Date)
   # summary(conc_above_mdl_site$Date == conc_site$Date)
   # summary(species_fullMDL_site$Date == conc_site$Date)
-
+  # summary(names(species_fullMDL_site) == names(conc_above_mdl_site))
+  # summary(names(species_fullMDL_site) == names(species_NA_intp_site))
+  
   dim(conc_site)
   dim(species_NA_intp_site)
   
@@ -1865,6 +1889,16 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   species_NA_site = species_NA_intp_site[!as.integer(rows_to_remove), ]
   species_fullMDL_site = species_fullMDL_site[!as.integer(rows_to_remove), ]
   
+  #### set the MDL as the median across whole period
+  # median_mdl = 
+  #   species_fullMDL_site[, 
+  #                        lapply(.SD, median), 
+  #                        .SDcols = 3:ncol(species_fullMDL_site)]
+  # species_fullMDL_site =
+  #   cbind(select(species_fullMDL_site, SiteCode, Date), 
+  #         median_mdl[rep(1:nrow(median_mdl), 
+  #                        nrow(species_fullMDL_site)), ])
+  # 
   summary(site_rf_conc$Date == species_NA_site$Date &
             species_fullMDL_site$SiteCode == species_NA_site$SiteCode)
   
@@ -1889,8 +1923,6 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   conc_rf_pmf = 
     conc_above_mdl_species * conc_rf_species +
     (!conc_above_mdl_species) * species_MDL_site * 0.5
-  # unc_pmf_1 = conc_above_mdl_species * (species_MDL_site / 3 + comp_ef * conc_rf_species) +
-  #   (!conc_above_mdl_species) * 5/6 * species_MDL_site
   unc_rf_pmf = 
     conc_above_mdl_species * (((species_MDL_site / 2)^2 + 
                                    (comp_ef * conc_rf_species)^2)^0.5) +
@@ -1899,12 +1931,14 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   # conc_above_mdl_species[1:5, 4:10]; conc_rf_species[1:5, 4:10]; species_MDL_site[1:5, 4:10]; comp_ef[1:5, 4:10]
   # conc_rf_pmf[1:5, 4:10]; unc_rf_pmf[1:5, 4:10]
   
+  # PM2.5 unc
   conc_rf_pmf$PM25 = site_rf_conc$PM25
   unc_rf_pmf$PM25 = 3 * site_rf_conc$PM25
 
   # extra uncertainty for the interpolated points
   species_NA_intp_unc = species_NA_site[, 3:ncol(species_NA_site)]
-  species_NA_intp_unc[species_NA_intp_unc == TRUE] <- 1.5
+  # species_NA_intp_unc[species_NA_intp_unc == TRUE] <- 1.5
+  species_NA_intp_unc[species_NA_intp_unc == TRUE] <- 4.5
   species_NA_intp_unc[species_NA_intp_unc == FALSE] <- 1
 
   summary(names(unc_rf_pmf) == names(species_NA_intp_unc))
@@ -2473,21 +2507,32 @@ write.csv(site_sensitivity, "CSN_Site_selected_sensitivity_analysis.csv")
 #### Copy files to Dropbox ####
 ################################################################################
 
-dropbox_path = "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
-cluster_folder = paste0(dropbox_path, "/", Clusterfolder)
+# #### CSN, extreme, mean*25 as threshold of outlier
+# Clusterfolder <- "CSN_NoGUI_NoCsub_25TimesMean_cluster" 
+# Sitefolder = "CSN_NoGUI_NoCsub_25TimesMean_Site"
+# prefix = "CSN_noCsub_25timesMean_C_"
+
+# #### CSN, extreme, mean*15 as threshold of outlier
+# Clusterfolder <- "CSN_NoGUI_NoCsub_15TimesMean_cluster" 
+Sitefolder = "CSN_NoGUI_NoCsub_15TimesMean_site"
+prefix = "CSN_noCsub_15timesMean_C_"
+
+# dropbox_path = "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
+# cluster_folder = paste0(dropbox_path, "/", Clusterfolder)
 site_folder = paste0(dropbox_path, "/", Sitefolder)
 
 ###### for cluster
 # create the destination folder if it does not exist
-if (!dir.exists(cluster_folder)) {
-  dir.create(cluster_folder, recursive = TRUE)
-}
-
-cluster_files <- list.files(paste0(data.dir, "/", Clusterfolder), full.names = TRUE)
-# copy each file to the destination folder
-for (cluster_file in cluster_files) {
-  file.copy(cluster_file, cluster_folder)
-}
+# if (!dir.exists(cluster_folder)) {
+#   dir.create(cluster_folder, recursive = TRUE)
+# }
+# 
+# cluster_files <- list.files(paste0(data.dir, "/", Clusterfolder), full.names = TRUE)
+# # copy each file to the destination folder
+# for (cluster_file in cluster_files) {
+#   file.copy(cluster_file, cluster_folder)
+# }
 
 ###### for site
 # create the destination folder if it does not exist
@@ -2500,5 +2545,96 @@ site_files <- list.files(paste0(data.dir, "/", Sitefolder), full.names = TRUE)
 for (site_file in site_files) {
   file.copy(site_file, site_folder)
 }
+
+
+#### Dispersion Normalization ####
+
+##### VC for dispersion normalization, based on ERA5 data 
+
+dn_site_folder = paste0(site_folder, "_DN")
+
+dn_vc = fread("Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
+site_code_serial = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial$V1 = NULL
+
+dn_vc$V1 = NULL
+dn_vc$Date = as.Date(dn_vc$Date)
+dn_vc_use = select(dn_vc,
+                   Dataset, SiteCode, Date, VC_coef)
+dn_vc_use = 
+  dn_vc_use[
+    with(dn_vc_use,
+         order(Dataset, SiteCode, Date)), ]
+
+dn_vc_use_site = join(dn_vc_use, site_code_serial)
+dn_vc_use_site$serial.No =  
+ifelse(dn_vc_use_site$serial.No < 100,
+       sprintf("%03d", dn_vc_use_site$serial.No),
+       as.character(dn_vc_use_site$serial.No))
+
+nongui_org_csvs <- 
+  list.files(site_folder, 
+             pattern = ".*CMD\\.csv$", full.names = TRUE)
+
+for (nongui_org_csv in nongui_org_csvs) {
+  site_serial = sub(".*_S_([0-9]+)_.*", "\\1", 
+                    basename(nongui_org_csv))
+  nongui_conc_unc = read.csv(nongui_org_csv)
+  nongui_conc_unc$Date = as.Date(nongui_conc_unc$Date)
+  
+  site_dn_vc = 
+    select(
+      subset(dn_vc_use_site, serial.No == site_serial), 
+      Date, VC_coef)
+  site_dn_vc$Date = as.Date(site_dn_vc$Date)
+  
+  site_vc_mean = mean(site_dn_vc$VC_coef, na.rm = TRUE)
+  
+  # exclude potential removed dates
+  site_dn_vc = 
+    subset(site_dn_vc, Date %in% nongui_conc_unc$Date)
+
+  nongui_conc_unc_dn = nongui_conc_unc
+  # DN for each cluster/site
+  for (col in names(nongui_conc_unc)) {
+    if (col != "Date") {
+      nongui_conc_unc_dn[[col]] =
+        nongui_conc_unc[[col]] * site_dn_vc[["VC_coef"]] / site_vc_mean
+    }
+  }
+}
+
+#### Explore the removed/replaced data ####
+extreme_remove = 
+  read.csv(file.path(
+  dropbox_path, nonGUI.site.folder, 
+  paste0(prefix_swb, "extreme_remove.csv")))
+
+extreme_replace = 
+  read.csv(file.path(
+    dropbox_path, nonGUI.site.folder, 
+    paste0(prefix_swb, "extreme_replace.csv")))
+freq_replace = data.frame(table(extreme_replace$extreme_species))
+names(freq_replace)[1] = "Species"
+
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+freq_replace = merge(freq_replace, species_class, all.x = TRUE)
+
+ggplot(freq_replace,
+       aes(x = reorder(Species, sequence))) +
+  geom_bar(aes(y = Freq), 
+           stat = "identity", width = 0.6, alpha = 0.8) +
+  scale_x_discrete(labels = function(x) format_variable(x)) +
+  xlab(format_variable("PM25 Species")) +
+  ylab(format_variable("Frequency")) + 
+  theme_bw() +
+  theme_text_speciesName
+  
+
+
+
+
+
 
 
