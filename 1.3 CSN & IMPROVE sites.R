@@ -2,29 +2,39 @@
 # rm(list=ls())
 
 ##set working directory
-setwd("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE")
-getwd()
-data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
+# setwd("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE")
+# getwd()
+# data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
  
+setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+getwd()
+data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
+
+
 ##packages in need
-require(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
-require(stats) # aggregate{stats}, VIP function
-require(ggplot2)
-require(scales) # percent{}
-require(stringr) # str_split_fixed, separate one column into multiple
-require(dplyr)
-require(plyr)
-require(lubridate)
-require(gridExtra) #grid.arrange{}
-require(grid) #textGrob{}
+library(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
+library(stats) # aggregate{stats}, VIP function
+library(ggplot2)
+library(scales) # percent{}
+library(stringr) # str_split_fixed, separate one column into multiple
+library(dplyr)
+library(plyr)
+library(lubridate)
+library(gridExtra) #grid.arrange{}
+library(grid) #textGrob{}
 library(data.table)
+library(FNN)
 
 library(maps) 
 library(usmap)
 library(ggrepel)
 
-imp_data = read.csv("IMPROVE component only 10092022.csv")
-imp_data$X = imp_data$X.1 = NULL
+##########################################################################################
+####### 111. Data Preparation ####### 
+##########################################################################################
+#### species concentrations ####
+imp_data = fread("IMPROVE component only 10092022.csv")
+imp_data$V1 = NULL
 head(imp_data)
 imp_data$Date = as.Date(imp_data$Date)
 # imp_data$CompName[is.na(imp_data$CompName)] = "Na"
@@ -35,17 +45,17 @@ imp_data$class[imp_data$Method == "B-IC"] = "Ion"
 imp_data$class[imp_data$Method == "C-TOR"] = "OC/EC subgroup"
 
 imp_data$Qualifier = imp_data$Status
-imp_data_compare = select(imp_data, Dataset, State, SiteCode, Date, Method, class, CompName, Val, Qualifier, 
-                                 Unc, MDL, year, month)
+imp_data_compare = select(imp_data, 
+                          Dataset, State, SiteCode, Date, Method, class, 
+                          CompName, Val, Qualifier, Unc, MDL, year, month)
 
 # csn_data = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN method collection analysis use 10032022.csv") ## with extracted collection, analysis methods
 # csn_data$Date = as.Date(csn_data$Date, format="%m/%d/%Y")
 # csn_data = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN data for analysis 10232022.csv") ## with extracted collection, analysis methods
-csn_data = read.csv("CSN data for analysis 12122022.csv") ## with extracted collection, analysis methods
-csn_data$X = NULL
+csn_data = fread("CSN data for analysis 12122022.csv") ## with extracted collection, analysis methods
+csn_data$V1 = NULL
 
 head(csn_data)
-setDT(csn_data)
 
 csn_data$Date = as.Date(csn_data$Date)
 csn_data = subset(csn_data, Date > as.Date("2010-12-31"))
@@ -57,7 +67,7 @@ excluded.variables.csn = c("FlowRate", "FlowRate.tf", "FlowRate.ny", "FlowRate.q
                            "Levoglucosan", "Mannosan", "Galactosan", 
                            "MinT", "MaxT", "avgT", "MinP", "MaxP", "avgP")
 csn_data = subset(csn_data, !(CompName %in% excluded.variables.csn))
-csn_data.1 = csn_data
+# csn_data.1 = csn_data
 
 # csn_ocec = subset(csn_data, grepl("OC1", CompName, fixed = T) | grepl("EC1", CompName, fixed = T))
 
@@ -65,13 +75,14 @@ csn_data$class[csn_data$class == "element.ion.PM"] = "Element"
 csn_data$class[csn_data$CompName %in% c("Accept.PM2.5", "PM2.5RC")] = 0
 csn_data$class[csn_data$CompName %in% c("Cl-", "K+", "NH4+", "Na+", "NO3", "SO4")] = "Ion"
 csn_data$class[csn_data$class == "OC.EC"] = "OC/EC subgroup"
-csn_data.2 = csn_data
+# csn_data.2 = csn_data
 
 csn_data$Method = csn_data$Analysis
 csn_data$Status = "V0"
 csn_data$Qualifier = paste(csn_data$Qualifier1, csn_data$Qualifier2, csn_data$Qualifier3)
-csn_data_compare = select(csn_data, Dataset, State, SiteCode, Date, Method, class, CompName, Val, Qualifier, 
-                                 Unc, MDL, year, month)
+csn_data_compare = select(csn_data, 
+                          Dataset, State, SiteCode, Date, Method, class, 
+                          CompName, Val, Qualifier, Unc, MDL, year, month)
 
 # exclude sites according to previous summary 
 # these sites a)not in mainland US, b)lack many species data, or c)short sampling duration
@@ -81,17 +92,18 @@ csn_data_compare = subset(csn_data_compare,
                           !(SiteCode %in% csn.exclude.site))
 dim(csn_data_compare)
 
-
 imp_csn_data = rbind(imp_data_compare, csn_data_compare)
 
+#### site info ####
 imp_meta_sites = read.csv("IMPROVE metadata 196 sample sites info 2010-20.csv")
 imp_meta_sites$StartDate = as.Date(imp_meta_sites$StartDate)
 imp_meta_sites$EndDate = as.Date(imp_meta_sites$EndDate)
 imp_sites_use = subset(imp_meta_sites, Longitude > -999)
 head(imp_sites_use)
-imp_sites_use = select(imp_sites_use, Dataset, State, SiteCode, Latitude, Longitude, StartDate, EndDate)
+imp_sites_use = select(imp_sites_use, 
+                       Dataset, State, SiteCode, Latitude, Longitude, StartDate, EndDate)
 
-csn_meta_sites = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
+csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
 csn_sites_use = subset(csn_meta_sites, 
                        !(SiteCode %in% 
                            c("800020014", "61072003", "20900034", 
@@ -100,31 +112,39 @@ csn_sites_use = subset(csn_meta_sites,
 csn_sites_use$StartDate = as.Date(csn_sites_use$StartDate, format = "%m/%d/%Y")
 csn_sites_use$EndDate = as.Date(csn_sites_use$EndDate, format = "%m/%d/%Y")
 head(csn_sites_use)
-csn_sites_use = select(csn_sites_use, Dataset, State, SiteCode, Latitude, Longitude, StartDate, EndDate)
+csn_sites_use = select(csn_sites_use, 
+                       Dataset, State, SiteCode, Latitude, Longitude, StartDate, EndDate)
 
 imp_csn_site = rbind(imp_sites_use, csn_sites_use)
 
 ##########################################################################################
-######## check the site distance between CSN & IMPROVE ########
+######## 222. site distance between CSN & IMPROVE ########
 ##########################################################################################
-library(FNN)
 
+#### KNN method, nearest site ####
 imp_gps = select(imp_sites_use, Latitude, Longitude)
 csn_gps = select(csn_sites_use, Latitude, Longitude)
 
+# k-nearest neighbor searching algorithms
 near_points = get.knnx(imp_gps, csn_gps, k=1)
+
+# nearest CSN sites for IMPROVE
 near_csn_in_imp = imp_gps[near_points$nn.index[,1], ]
 near_csn_in_imp$distance = near_points$nn.dist[,1]
 near_csn_in_imp$csn.site = csn_sites_use$SiteCode
 near_csn_in_imp$distance = round(near_csn_in_imp$distance, 3)
 colnames(near_csn_in_imp)[1:2] = c("imp.Latitude", "imp.Longitude")
+
+# nearest IMPROVE sites for CSN
 near_csn_in_imp$imp.site = imp_sites_use$SiteCode[near_points$nn.index[,1]]
 near_csn_in_imp$csn.Latitude = csn_sites_use$Latitude
 near_csn_in_imp$csn.Longitude = csn_sites_use$Longitude
 near_csn_in_imp$State = csn_sites_use$State
 near_csn_in_imp = near_csn_in_imp[with(near_csn_in_imp, order(distance)), ]
+
 write.csv(near_csn_in_imp, "The closest sampling points of CSN in IMPROVE.csv")
 
+# map CSN & IMPROVE sites (US mainland)
 MainStates <- map_data("state")
 theme.3 = theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
                 axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
@@ -141,7 +161,7 @@ ggplot(subset(imp_csn_site, Longitude > -140 & Latitude > 20),
   geom_point(size = 2, alpha = 0.6) +
   scale_color_manual(values = c("yellow", "purple")) +
   ggtitle("Distribution of IMPROVE & CSN sites") + 
-  theme.3
+  theme.3 
 
 ggplot(subset(imp_csn_site, Longitude > -140 & Latitude > 20 & Dataset == "IMPAER"), 
        aes(Longitude, Latitude, color= Dataset)) + 
@@ -161,12 +181,11 @@ ggplot(subset(imp_csn_site, Longitude > -140 & Latitude > 20 & Dataset == "EPACS
   ggtitle("Distribution of IMPROVE sites") + 
   theme.3
 
-##########################################################################################
-######## check component concentration relationship between CSN & IMPROVE for sites of identical GPS ########
-##########################################################################################
 #### extract data for the nearest sites ####
 near_csn_in_imp = read.csv( "The closest sampling points of CSN in IMPROVE.csv"); near_csn_in_imp$X = NULL
-nearest_csn_imp = near_csn_in_imp[1:7, ]
+
+# sites of idential locations
+nearest_csn_imp = subset(near_csn_in_imp, distance == 0)
 nearest_csn_imp_sites = select(nearest_csn_imp, csn.site, imp.site)
 nearest_csn_imp_sites$SameSite = 1:nrow(nearest_csn_imp_sites)
 # colnames(nearest_csn_imp_sites)[1] = "SiteCode"
@@ -182,12 +201,13 @@ nearest.csn.sites = as.character(unique(nearest_csn_imp$csn.site))
 nearest.imp.sites  = unique(nearest_csn_imp$imp.site)
 nearest.sites = c(nearest.csn.sites, nearest.imp.sites)
 
-# imp_csn_nearest_site_data = subset(imp_csn_data, SiteCode %in% nearest.sites)
+imp_csn_nearest_site_data = subset(imp_csn_data, SiteCode %in% nearest.sites)
 ## output component info for the side-by-side sampling in CSN & IMPROVE
 # write.csv(imp_csn_nearest_site_data, "IMPROVE_CSN_Nearest_site_comparison.csv") 
 
-#### overall component distribution check between nearest sites ####
-imp_csn_nearest_site_data = read.csv("IMPROVE_CSN_Nearest_site_comparison.csv") 
+#### component concentration distribution check between nearest sites ####
+imp_csn_nearest_site_data = fread("IMPROVE_CSN_Nearest_site_comparison.csv") 
+imp_csn_nearest_site_data$V1 = NULL
 
 element.group = unique(imp_data$CompName[imp_data$Method == "A-XRF"])
 ion.group = unique(imp_data$CompName[imp_data$Method == "B-IC"])
@@ -206,12 +226,18 @@ csn_date = data.frame(table(subset(imp_csn_nearest_site_data, Dataset == "EPACSN
 colnames(imp_date) = c("Date", "Freq.IMP")
 colnames(csn_date) = c("Date", "Freq.CSN")
 imp_csn_date = join(csn_date, imp_date)
+
+# some csn dates not included in improve
 csn_extra_date_check = subset(imp_csn_date, is.na(Freq.IMP))
-csn_extra_date = subset(select(imp_csn_nearest_site_data, Dataset, State, SiteCode, Date, CompName), 
-                        as.character(Date) %in% as.character(csn_extra_date_check$Date))
+csn_extra_date = 
+  subset(select(imp_csn_nearest_site_data, 
+                Dataset, State, SiteCode, Date, CompName),
+         as.character(Date) %in% as.character(csn_extra_date_check$Date))
 # write.csv(csn_extra_date, "Extra_date_only_in_CSN_data_during_nearest_site_comparison.csv")
 
-imp_csn_nearest_Val_data = select(imp_csn_nearest_site_data, Dataset, SiteCode, Date, CompName, Val, class, Method, Qualifier)
+imp_csn_nearest_Val_data = 
+  select(imp_csn_nearest_site_data, 
+         Dataset, SiteCode, Date, CompName, Val, class, Method, Qualifier)
 imp_nearest_data = subset(imp_csn_nearest_Val_data, Dataset == "IMPAER")
 csn_nearest_data = subset(imp_csn_nearest_Val_data, Dataset == "EPACSN")
 
@@ -220,20 +246,28 @@ colnames(nearest_csn_imp_sites_csn)[1] = "SiteCode"
 nearest_csn_imp_sites_imp = select(nearest_csn_imp_sites, imp.site, SameSite)
 colnames(nearest_csn_imp_sites_imp)[1] = "SiteCode"
 
+# set OC for comparison
 csn_nearest_data = join(csn_nearest_data, nearest_csn_imp_sites_csn)
 csn_nearest_data$CompName[csn_nearest_data$CompName == "OC.88" ] = "OC"
 csn_nearest_data$CompName[csn_nearest_data$CompName == "OC1.88" ] = "OC1"
 csn_nearest_data$CompName[csn_nearest_data$CompName == "OC2.88" ] = "OC2"
 csn_nearest_data$CompName[csn_nearest_data$CompName == "OC3.88" ] = "OC3"
 csn_nearest_data$CompName[csn_nearest_data$CompName == "OC4.88" ] = "OC4"
+
 imp_nearest_data = join(imp_nearest_data, nearest_csn_imp_sites_imp)
 imp_nearest_data$Dataset = csn_nearest_data$Dataset = NULL
-colnames(imp_nearest_data) = c("SiteCode.IMP", "Date", "CompName", "IMPROVE", "class", "Method.IMP", "Qualifier.IMP", "SameSite")
-colnames(csn_nearest_data) = c("SiteCode.CSN", "Date", "CompName", "CSN", "class", "Method.CSN", "Qualifier.CSN", "SameSite")
+colnames(imp_nearest_data) = 
+  c("SiteCode.IMP", "Date", "CompName", "IMPROVE", "class", 
+    "Method.IMP", "Qualifier.IMP", "SameSite")
+colnames(csn_nearest_data) = 
+  c("SiteCode.CSN", "Date", "CompName", "CSN", "class", 
+    "Method.CSN", "Qualifier.CSN", "SameSite")
+
+# data of identical gps, IMPROVE & CSN columnes are Val
 imp_csn_nearest_data = join(imp_nearest_data, csn_nearest_data)
 head(imp_csn_nearest_data)
-
 # write.csv(imp_csn_nearest_data, "IMPROVE_CSN_Nearest_side-by-side_comparison.csnv")
+
 imp_csn_nearest_low_S = subset(imp_csn_nearest_data, 
                                (CompName == "S" &
                                  CSN < 0.15 & 
@@ -245,9 +279,9 @@ write.csv(imp_csn_nearest_low_S, "S_SO4_low.CSN_high.IMPORVE.csv")
 
 theme.comp = theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
                    strip.text.x = element_text(size = 14, colour = "grey25", angle = 0),
-                   axis.title.x = element_text(color="grey25", size = 18, vjust=0, margin=margin(0,0,0,300)), 
-                   axis.title.y = element_text(color="grey25", size = 18, vjust=1, margin=margin(0,2,0,0)),
-                   axis.text.x = element_text(color="grey25", size = 16, angle = 90, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
+                   axis.title.x = element_text(color="grey25", size = 18, vjust=0), 
+                   axis.title.y = element_text(color="grey25", size = 18, vjust=1),
+                   axis.text.x = element_text(color="grey25", size = 16, angle = 90, hjust = 0, vjust = 0.3),
                    axis.text.y = element_text(color="grey25", size = 16, angle = 0, hjust = 0.5))
 
 ggplot(subset(imp_csn_nearest_data, class != 0), 
@@ -300,7 +334,8 @@ ggplot(subset(imp_csn_nearest_data, CompName %in% c("Br", "Ca", "K")),
   ggtitle("Elements test with XRF or more than EDXRF in CSN") +
   theme.comp
 
-ion.dis = ggplot(subset(imp_csn_nearest_data, CompName %in% c("Cl-", "NO3", "SO4")), 
+ion.dis = ggplot(subset(imp_csn_nearest_data, 
+                        CompName %in% c("Cl-", "NO3", "SO4")), 
        aes(IMPROVE, CSN, color = CompName)) + 
   geom_point(size = 1.5, alpha = 0.8) + 
   facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
@@ -321,6 +356,16 @@ oc.dis = ggplot(subset(imp_csn_nearest_data, CompName %in% c("OC1", "OC2", "OC3"
   geom_abline(slope=1, intercept=0, color = "black") +
   theme.comp
 
+sulfur.dis = ggplot(subset(imp_csn_nearest_data, 
+                           CompName %in% c("S", "SO4")), 
+                    aes(IMPROVE, CSN, color = CompName)) + 
+  geom_point(size = 1.5, alpha = 0.8) + 
+  facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
+  geom_abline(slope=1, intercept=0, color = "black") +
+  theme.comp
+
+#### EC/OC subgroups between nearest sites ####
+###### 0. consider theh protocol change in late 2017 ######
 imp_csn_nearest_2015on = subset(imp_csn_nearest_data, Date >= as.Date("2015-01-01"))
 imp_csn_nearest_2015on$Period[imp_csn_nearest_2015on$Date < as.Date("2018-01-01")] = "2015-18"
 imp_csn_nearest_2015on$Period[imp_csn_nearest_2015on$Date >= as.Date("2018-01-01")] = "2018-20"
@@ -341,36 +386,45 @@ ggplot(subset(imp_csn_nearest_2015on, CompName %in% c("OC1", "OC2", "OC3", "OC4"
   theme_bw() +
   theme.comp
 
-#### EC/OC subgroups between nearest sites ####
+###### 1. in CSN, EC-subgroup using STN-TOT & OC with IMPROVE_TOR ######
 imp_csn_nearest_C = subset(imp_csn_nearest_data, class == "OC/EC subgroup")
 imp_csn_nearest_C_noNA = subset(imp_csn_nearest_C, !is.na(Method.CSN))
 
-###### 1. in CSN, EC-subgroup using STN-TOT & OC with IMPROVE_TOR ######
 ## these OC/EC-subs in CSN was shown as OC1-4, EC1-3
 imp_csn_nearest_C_csnTOT = subset(imp_csn_nearest_C_noNA, Method.CSN == "STN-TOT")
 imp_csn_nearest_C_csnTOR = subset(imp_csn_nearest_C_noNA, Method.CSN == "IMPROVE_TOR")
 range(imp_csn_nearest_C_csnTOT$Date) # OC, from "2010-01-02" to "2010-04-29"
 range(imp_csn_nearest_C_csnTOR$Date) # EC, from "2015-11-20" to "2020-12-29"
 
-ggplot(subset(imp_csn_nearest_C_csnTOT, CompName %in% c("OC1", "OC2", "OC3", "OC4")), 
+ggplot(subset(imp_csn_nearest_C_csnTOT,
+              CompName %in% c("OC1", "OC2", "OC3", "OC4")), 
        aes(IMPROVE, CSN, color = CompName)) + 
   geom_point(size = 1.5, alpha = 0.8) + 
   facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
   geom_abline(slope=1, intercept=0, color = "black") +
-  ggtitle(paste("OC-Subgroup_CSN-TOT_vs._IMPROVE-TOR: ", min(imp_csn_nearest_C_csnTOT$Date), "~", max(imp_csn_nearest_C_csnTOT$Date))) +
+  ggtitle(paste("OC-Subgroup_CSN-TOT_vs._IMPROVE-TOR: ", 
+                min(imp_csn_nearest_C_csnTOT$Date), "~", 
+                max(imp_csn_nearest_C_csnTOT$Date))) +
   theme.comp
 
-ggplot(subset(imp_csn_nearest_C_csnTOR, CompName %in% c("EC1", "EC2", "EC3")), 
+ggplot(subset(imp_csn_nearest_C_csnTOR,
+              CompName %in% c("EC1", "EC2", "EC3")), 
        aes(IMPROVE, CSN, color = CompName)) + 
   geom_point(size = 1.5, alpha = 0.8) + 
   facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
   geom_abline(slope=1, intercept=0, color = "black") +
-  ggtitle(paste("EC-Subgroup_CSN-TOR_vs._IMPROVE-TOR: ", min(imp_csn_nearest_C_csnTOR$Date), "~", max(imp_csn_nearest_C_csnTOR$Date))) +
+  ggtitle(paste("EC-Subgroup_CSN-TOR_vs._IMPROVE-TOR: ",
+                min(imp_csn_nearest_C_csnTOR$Date), "~", 
+                max(imp_csn_nearest_C_csnTOR$Date))) +
   theme.comp
 
 ###### 2. in CSN, EC/OC-subgroup with other methods ######
-csn_near_C = subset(csn_data_compare, SiteCode %in% nearest.csn.sites & class == "OC/EC subgroup")
-csn_near_C_other = subset(csn_near_C, !(CompName %in% c("EC1", "EC2", "EC3", "OC1", "OC2", "OC3", "OC4")))
+csn_near_C = 
+  subset(csn_data_compare, 
+         SiteCode %in% nearest.csn.sites & class == "OC/EC subgroup")
+csn_near_C_other = 
+  subset(csn_near_C,
+         !(CompName %in% c("EC1", "EC2", "EC3", "OC1", "OC2", "OC3", "OC4")))
 unique(csn_near_C_other$CompName)
 
 csn_near_OC = subset(csn_near_C, grepl("OC1", CompName, fixed = T) | 
@@ -385,7 +439,7 @@ write.csv(csn_near_OC, "nearest_IMP_CSN_OC.csv")
 write.csv(csn_near_EC, "nearest_IMP_CSN_EC.csv")
 # to be continued 2022-11-05
 
-#### unmatched Elements between nearest sites ####
+#### Elements between nearest sites ####
 imp_csn_near_ele = subset(imp_csn_nearest_data, class == "Element")
 imp_csn_near_ele_noNA = subset(imp_csn_near_ele, !is.na(Method.CSN))
 imp_csn_near_ele_NA = subset(imp_csn_near_ele, is.na(Method.CSN))
@@ -483,7 +537,7 @@ ggplot(imp_csn_near_SO4,
   theme.comp
 
 ##########################################################################################
-########### Preparing data for PMF ###########
+###########  333. Preparing data for PMF ###########
 ##########################################################################################
 #### 1. IMPROVE data preparation ####
 head(imp_data_compare)
@@ -492,7 +546,9 @@ head(imp_data_compare)
 #imp_data_try_sp = imp_data_try %>% spread(CompName, Val)
 #head(imp_data_try_sp)
 
-imp_data_use = select(imp_data_compare, Dataset, State, SiteCode, Date, Qualifier, CompName, Val)
+imp_data_use = 
+  select(imp_data_compare, 
+         Dataset, State, SiteCode, Date, Qualifier, CompName, Val)
 nrow(imp_data_use)/length(unique(imp_data_use$CompName))
 
 imp_state_site = select(imp_data_use, State, SiteCode)
@@ -508,13 +564,18 @@ imp_site = unique(imp_data_use$SiteCode)
 imp_date_comp_site = data.frame(Date = rep(imp_date, each = length(imp_Comp) * length(imp_site)), 
                                 CompName = rep(imp_Comp, each = length(imp_site)), 
                                 SiteCode = rep(imp_site))
+setDT(imp_date_comp_site)
 
 # combine the full date-site-component list with the concentration values
-imp_date_comp_site_data = merge(imp_date_comp_site, imp_data_use, all.x = T)
+imp_date_comp_site_data =
+  merge(imp_date_comp_site, imp_data_use, all.x = T)
 
-##### detect the duplicated values from POC!!! Parameter Occurrence Code  ####
+##### 1.1 handle the duplicated records from the same site ####
+##### detect the duplicated values from POC!!! Parameter Occurrence Code
+
 # detect where the extracted duplicated date-site-component groups are from
-imp_date_comp_site_data$dup.date.site.comp = duplicated(select(imp_date_comp_site_data, SiteCode, Date, CompName))
+imp_date_comp_site_data$dup.date.site.comp = 
+  duplicated(select(imp_date_comp_site_data, SiteCode, Date, CompName))
 imp_date_comp_site_data_dup = subset(imp_date_comp_site_data, dup.date.site.comp)
 length(unique(imp_date_comp_site_data_dup$Date)); length(imp_date)
 length(unique(imp_date_comp_site_data_dup$SiteCode))
@@ -522,52 +583,64 @@ length(unique(imp_date_comp_site_data_dup$CompName))
 # imp_date_comp_site_data_dup = imp_date_comp_site_data_dup[with(imp_date_comp_site_data_dup, order(State, SiteCode, Date, CompName)), ]
 colnames(imp_date_comp_site_data_dup)[6:8] = c("Qualifier.dup", "Val.dup", "dup")
 
-imp_date_comp_site_data_NOdup = subset(imp_date_comp_site_data, dup.date.site.comp == FALSE)
-colnames(imp_date_comp_site_data_NOdup)[6:8] = c("Qualifier.NONEdup", "Val.NONEdup", "NONEdup")
+imp_date_comp_site_data_NOdup = 
+  subset(imp_date_comp_site_data, dup.date.site.comp == FALSE)
+colnames(imp_date_comp_site_data_NOdup)[6:8] =
+  c("Qualifier.NONEdup", "Val.NONEdup", "NONEdup")
 
-imp_dup_date_comp_site = merge(imp_date_comp_site_data_dup, imp_date_comp_site_data_NOdup, all.x = T)
-imp_dup_date_comp_site$oneValMissing = ifelse(imp_dup_date_comp_site$Val.dup == -999 | 
-                                                imp_dup_date_comp_site$Val.NONEdup == -999,
-                                              1, 0)
+imp_dup_date_comp_site = 
+  merge(imp_date_comp_site_data_dup, 
+        imp_date_comp_site_data_NOdup, all.x = T)
+imp_dup_date_comp_site$oneValMissing =
+  ifelse(imp_dup_date_comp_site$Val.dup == -999 | 
+           imp_dup_date_comp_site$Val.NONEdup == -999,
+         1, 0)
 sum(imp_dup_date_comp_site$oneValMissing); nrow(imp_dup_date_comp_site)
-imp_dup_date_comp_site_noMissing = subset(imp_dup_date_comp_site, oneValMissing == 0)
+
+imp_dup_date_comp_site_noMissing = subset(imp_dup_date_comp_site, 
+                                          oneValMissing == 0)
 length(unique(imp_dup_date_comp_site_noMissing$Date)); length(imp_date)
 length(unique(imp_dup_date_comp_site_noMissing$SiteCode))
 length(unique(imp_dup_date_comp_site_noMissing$CompName))
-imp_dup_date_comp_site_noMissing$dup = imp_dup_date_comp_site_noMissing$NONEdup = imp_dup_date_comp_site_noMissing$oneValMissing = NULL
+imp_dup_date_comp_site_noMissing$dup =
+  imp_dup_date_comp_site_noMissing$NONEdup = 
+  imp_dup_date_comp_site_noMissing$oneValMissing = NULL
 head(imp_dup_date_comp_site_noMissing)
 nrow(imp_dup_date_comp_site_noMissing)
 
-##### check if the strange duplicated component values from the same date-site-component groups exist in original dataset #####
-imp_data_org = read.csv("/Users/ztttttt/Documents/HEI PMF/IMPROVE & CSN original/ailsa2be_20221008_205315_uNQ0v IMPROVE.txt",
+######## check if the strange duplicated component values from the same date-site-component groups exist in original dataset
+imp_data_org = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20221008_205315_uNQ0v IMPROVE.txt",
                     sep = ",", dec = ".")
 head(imp_data_org)
 dim(imp_data_org) # 18003337, 25
-imp_meta_sites_use = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/IMPROVE metadata 196 sample sites info 2010-20.csv")
-imp_data_org = subset(imp_data_org, SiteCode %in% as.character(imp_meta_sites_use$SiteCode)) # some sites have no gps/location information
+
+imp_meta_sites_use = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE metadata 196 sample sites info 2010-20.csv")
+imp_data_org = 
+  subset(imp_data_org, 
+         SiteCode %in% as.character(imp_meta_sites_use$SiteCode)) # some sites have no gps/location information
 nrow(imp_data_org) # 17730878 
+
 imp_data_org = subset(imp_data_org, Unit == "ug/m^3")
 dim(imp_data_org) # 12659632, 25
 as.Date(imp_data_org$Date[1], format = "%m/%d/%Y")
 imp_data_org$Date = as.Date(imp_data_org$Date, format = "%m/%d/%Y")
 
-imp_data_org_check_1 = subset(imp_data_org, Date == imp_dup_date_comp_site_noMissing$Date[1] &
-                                SiteCode == imp_dup_date_comp_site_noMissing$SiteCode[1] &
-                                ParamCode == "ALf")
+# randomly select one species to check
+imp_data_org_check_1 = 
+  subset(imp_data_org, Date == imp_dup_date_comp_site_noMissing$Date[1] &
+           SiteCode == imp_dup_date_comp_site_noMissing$SiteCode[1] &
+           ParamCode == "ALf")
 imp_data_org_check_1
 
-imp_data_org_check_2 = subset(imp_data_org, Date == imp_dup_date_comp_site_noMissing$Date[10000] &
-                                SiteCode == imp_dup_date_comp_site_noMissing$SiteCode[10000] &
-                                ParamCode == "ALf")
+imp_data_org_check_2 = 
+  subset(imp_data_org, Date == imp_dup_date_comp_site_noMissing$Date[10000] &
+           SiteCode == imp_dup_date_comp_site_noMissing$SiteCode[10000] &
+           ParamCode == "ALf")
 imp_data_org_check_2
-
-subset(imp_data, Date == imp_dup_date_comp_site_noMissing$Date[10000] &
-         SiteCode == imp_dup_date_comp_site_noMissing$SiteCode[10000] &
-         ParamCode == "ALf")
 
 ##### the duplicated data are due to POC, Parameter Occurrence Code !!!!
 
-##### compare concentrations between POC from same date-site-component groups ####
+##### 1.2 compare concentrations between POC from same date-site-component groups ####
 imp_poc = imp_dup_date_comp_site
 imp_poc_noMissing = imp_dup_date_comp_site_noMissing
 colnames(imp_poc_noMissing)[7] = "Val.POC.1"
@@ -580,53 +653,21 @@ theme.poc = theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
                   axis.text.x = element_text(color="grey25", size = 12, angle = 90, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
                   axis.text.y = element_text(color="grey25", size = 12, angle = 0, hjust = 0.5))
 
-ggplot(subset(imp_poc_noMissing, grepl("OC", CompName, fixed = T) | grepl("EC", CompName, fixed = T)), 
+ggplot(imp_poc_noMissing, 
+       aes(Val.POC.1, Val.POC.2, color = CompName)) +
+  geom_point(size = 1.5, alpha = 0.8) + 
+  facet_wrap(CompName ~ ., scales = "free", ncol = 5) +  
+  geom_abline(slope=1, intercept=0, color = "black") +
+  theme.poc
+
+ggplot(subset(imp_poc_noMissing, 
+              grepl("OC", CompName, fixed = T) | grepl("EC", CompName, fixed = T)), 
        aes(Val.POC.1, Val.POC.2, color = CompName)) +
   geom_point(size = 1.5, alpha = 0.8) + 
   facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
   geom_abline(slope=1, intercept=0, color = "black") +
   theme.poc
 
-ggplot(subset(imp_poc_noMissing, grepl("OP", CompName, fixed = T)), 
-       aes(Val.POC.1, Val.POC.2, color = CompName)) +
-  geom_point(size = 1.5, alpha = 0.8) + 
-  facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
-  geom_abline(slope=1, intercept=0, color = "black") +
-  theme.poc
- 
-ggplot(subset(imp_poc_noMissing, CompName %in% c("Al", "Ca", "Cl",  "Fe", "K",  "Mg", "Na", "S", "Si")), 
-  aes(Val.POC.1, Val.POC.2, color = CompName)) +
-  geom_point(size = 1.5, alpha = 0.8) + 
-  facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
-  geom_abline(slope=1, intercept=0, color = "black") +
-  theme.poc
-
-ggplot(subset(imp_poc_noMissing, CompName %in% c("As", "Br", "Cr", "Cu", "Mn", "Ni", "P",  "Pb", "Rb","Se", 
-                                                 "Sr", "Ti", "V",  "Zn", "Zr")), 
-       aes(Val.POC.1, Val.POC.2, color = CompName)) +
-  geom_point(size = 1.5, alpha = 0.8) + 
-  facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
-  geom_abline(slope=1, intercept=0, color = "black") +
-  theme.poc
-
-ggplot(subset(imp_poc_noMissing, CompName %in% c("Cl-", "NO3",  "SO4")), 
-       aes(Val.POC.1, Val.POC.2, color = CompName)) +
-  geom_point(size = 1.5, alpha = 0.8) + 
-  facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
-  geom_abline(slope=1, intercept=0, color = "black") +
-  theme.poc
-
-imp_poc_noMissing_P_Zn = subset(imp_poc_noMissing, CompName == "P" | CompName == "Zn")
-unique(imp_poc_noMissing_P_Zn$Qualifier.dup); unique(imp_poc_noMissing_P_Zn$Qualifier.NONEdup)
-unique(imp_poc_noMissing$Qualifier.dup); unique(imp_poc_noMissing$Qualifier.NONEdup)
-subset(imp_poc_noMissing_P_Zn, Val.POC.2 < 0.01 & Val.POC.1 > 0.01)
-
-ggplot(subset(imp_poc_noMissing, CompName == "P" | CompName == "Zn"), 
-       aes(Val.POC.1, Val.POC.2, color = CompName)) +
-  geom_point(size = 1.5, alpha = 0.8) + 
-  facet_grid(. ~ CompName, scales = "free") +  # facet_grid(.~Freq.Flag.Counts) +
-  geom_abline(slope=1, intercept=0, color = "black") +
-  theme.poc
 ggplot(subset(imp_poc_noMissing, CompName == "S" | CompName == "SO4"), 
        aes(Val.POC.1, Val.POC.2, color = CompName)) +
   geom_point(size = 1.5, alpha = 0.8) + 
@@ -634,46 +675,70 @@ ggplot(subset(imp_poc_noMissing, CompName == "S" | CompName == "SO4"),
   geom_abline(slope=1, intercept=0, color = "black") +
   theme.poc
 # 
-##### calculate component concentrations for those with POC = 2 ####
+##### 1.3 calculate component concentrations for those with POC = 2 (duplicates) ####
 imp_data_use$POC = imp_data$POC
 head(imp_data_use)
 head(imp_dup_date_comp_site)
 sapply(imp_dup_date_comp_site, class)
-imp_dup_date_comp_site$Val.opc = (imp_dup_date_comp_site$Val.dup + imp_dup_date_comp_site$Val.NONEdup)/2
-imp_dup_date_comp_site$Val.opc = ifelse(imp_dup_date_comp_site$Val.dup == -999, imp_dup_date_comp_site$Val.NONEdup, imp_dup_date_comp_site$Val.opc)
-imp_dup_date_comp_site$Val.opc = ifelse(imp_dup_date_comp_site$Val.NONEdup == -999, imp_dup_date_comp_site$Val.dup, imp_dup_date_comp_site$Val.opc)
-imp_dup_date_comp_site_conc = select(imp_dup_date_comp_site, Date, SiteCode, CompName, Val.opc)
+
+# concentrations of the values with POC=2, average
+# if there is missing in one record, use the non-missing one
+imp_dup_date_comp_site$Val.opc = 
+  (imp_dup_date_comp_site$Val.dup + imp_dup_date_comp_site$Val.NONEdup)/2
+imp_dup_date_comp_site$Val.opc = 
+  ifelse(imp_dup_date_comp_site$Val.dup == -999, 
+         imp_dup_date_comp_site$Val.NONEdup,
+         imp_dup_date_comp_site$Val.opc)
+imp_dup_date_comp_site$Val.opc = 
+  ifelse(imp_dup_date_comp_site$Val.NONEdup == -999, 
+         imp_dup_date_comp_site$Val.dup, 
+         imp_dup_date_comp_site$Val.opc)
+
+imp_dup_date_comp_site_conc = 
+  select(imp_dup_date_comp_site, Date, SiteCode, CompName, Val.opc)
 imp_data_poc1 = join(imp_data_use, imp_dup_date_comp_site_conc)
+
 # imp_data_poc1.1 = imp_data_poc1
-imp_data_poc1$Val = ifelse(is.na(imp_data_poc1$Val.opc), imp_data_poc1$Val, imp_data_poc1$Val.opc)
+imp_data_poc1$Val = 
+  ifelse(is.na(imp_data_poc1$Val.opc), 
+         imp_data_poc1$Val, imp_data_poc1$Val.opc)
 imp_data_poc1 = subset(imp_data_poc1, POC == 1)
 imp_poc_noNA = subset(imp_data_poc1, Val != -999)
   
-imp_date_comp_site_noDup_noNA = merge(imp_date_comp_site, imp_poc_noNA, all.x = T)
+##### 1.4 data for interpolation #####
+imp_date_comp_site_noDup_noNA = 
+  merge(imp_date_comp_site, imp_poc_noNA, all.x = T)
 nrow(imp_date_comp_site_noDup_noNA)
 imp_date_comp_site_noDup_noNA$Val.opc = imp_date_comp_site_noDup_noNA$POC = 
   imp_date_comp_site_noDup_noNA$Dataset = imp_date_comp_site_noDup_noNA$State = NULL
 
-imp_date_comp_site_noDup_noNA$site.date.qualifier = paste(imp_date_comp_site_noDup_noNA$Date,
-                                                          imp_date_comp_site_noDup_noNA$SiteCode,
-                                                          imp_date_comp_site_noDup_noNA$Qualifier)
-imp_date_comp_site_noDup_noNA$Date = imp_date_comp_site_noDup_noNA$SiteCode = imp_date_comp_site_noDup_noNA$Qualifier = NULL
+imp_date_comp_site_noDup_noNA$site.date.qualifier = 
+  paste(imp_date_comp_site_noDup_noNA$Date,
+        imp_date_comp_site_noDup_noNA$SiteCode,
+        imp_date_comp_site_noDup_noNA$Qualifier)
+imp_date_comp_site_noDup_noNA$Date = 
+  imp_date_comp_site_noDup_noNA$SiteCode = 
+  imp_date_comp_site_noDup_noNA$Qualifier = NULL
 head(imp_date_comp_site_noDup_noNA)
-write.csv(imp_date_comp_site_noDup_noNA, "IMPROVE_Component_to_be_spread.csv")
+# write.csv(imp_date_comp_site_noDup_noNA, "IMPROVE_Component_to_be_spread.csv")
 
-imp_date_comp_site_noDup_noNA = read.csv("IMPROVE_Component_to_be_spread.csv")
+# imp_date_comp_site_noDup_noNA = read.csv("IMPROVE_Component_to_be_spread.csv")
 imp_daily_comp = imp_date_comp_site_noDup_noNA %>% spread(CompName, Val)
 head(imp_daily_comp)
 nrow(imp_daily_comp)
 imp_site_date_qualifier = data.frame(select(imp_daily_comp, site.date.qualifier))
-imp_site_date_qualifier_sep = imp_site_date_qualifier %>% 
-  separate(site.date.qualifier, c("Date", "SiteCode", "Qualifier"),  
+imp_site_date_qualifier_sep = 
+  imp_site_date_qualifier %>% 
+  separate(site.date.qualifier, 
+           c("Date", "SiteCode", "Qualifier"),  
            sep = "\\s+")
 head(imp_site_date_qualifier_sep)
 imp_daily_comp_use = cbind(imp_site_date_qualifier_sep, imp_daily_comp)
-imp_daily_comp_use_Q.Na = subset(imp_daily_comp_use, Qualifier == "NA")
+imp_daily_comp_use_Q.Na = 
+  subset(imp_daily_comp_use, Qualifier == "NA")
 summary(imp_daily_comp_use_Q.Na)
-imp_daily_comp_use = subset(imp_daily_comp_use, Qualifier != "NA")
+imp_daily_comp_use =
+  subset(imp_daily_comp_use, Qualifier != "NA")
 
 imp_meta_sites = read.csv("IMPROVE metadata 196 sample sites info 2010-20.csv")
 imp_state_site = select(imp_meta_sites, State, SiteCode)
@@ -1337,43 +1402,5 @@ csn_after_2015[ ,comp_miss_after] <- list(NULL)
 
 write.csv(csn_before_2015, "CSN_Component_with_missing_Before_2015.csv")
 write.csv(csn_after_2015, "CSN_Component_with_missing_After_2015.csv")
-
-#### extract data with qualifier 6 ####
-csn_daily_before = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_Component_with_missing_Before_2015.csv")
-csn_daily_after = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_Component_with_missing_After_2015.csv")
-csn_daily_before$X = csn_daily_after$X =NULL
-
-library(ggrepel)
-csn_ql_after_MX = subset(csn_daily_after, 
-                         grepl("MX", Qualifier, fixed=T))
-
-csn_ql_before_1 = subset(csn_daily_before, 
-                         grepl("1", Qualifier, fixed=T))
-
-write.csv(csn_ql_before_1, "CSN_Qualifier_1_before2015.csv")
-write.csv(csn_ql_after_MX, "CSN_Qualifier_MX_after2015.csv")
-
-#### not used: CSN OC EC ####
-csn_data_org = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN method collection analysis use 10032022.csv") ## with extracted collection, analysis methods
-# csn_data_org = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN data for analysis 10232022.csv") ## with extracted collection, analysis methods
-csn_data_org$X = csn_data_org$X.1 = csn_data_org$X.2 = NULL
-csn_data_org$Date = as.Date(csn_data_org$Date, format="%m/%d/%Y")
-head(csn_data_org)
-
-csn_ocec = subset(csn_data_org, grepl("OC1", CompName, fixed = T) | 
-                    grepl("EC1", CompName, fixed = T))
-csn_oc_unadjust = subset(csn_ocec, CompName == "OC1.unadjusted.88")
-csn_oc_unadj_urg_tor = subset(csn_oc_unadjust, Collection == "URG3000N" & Analysis == "IMPROVE_TOR")
-csn_oc_unadj_urg_imA = subset(csn_oc_unadjust, Collection == "URG3000N" & Analysis == "IMPROVE_A")
-min(csn_oc_unadj_urg_tor$Date); max(csn_oc_unadj_urg_tor$Date)
-min(csn_oc_unadj_urg_imA$Date); max(csn_oc_unadj_urg_imA$Date)
-length(unique(csn_oc_unadj_urg_tor$SiteCode))
-length(unique(csn_oc_unadj_urg_imA$SiteCode))
-
-
-################################################################################################
-#### Filling the missing data - in another file ####
-################################################################################################
-
 
 
