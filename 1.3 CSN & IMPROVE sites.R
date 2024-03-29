@@ -1145,93 +1145,171 @@ csn_date_comp_site_data$site.date.qualifier = paste(csn_date_comp_site_data$Date
                                                     csn_date_comp_site_data$SiteCode,
                                                     csn_date_comp_site_data$Qualifier)
 
+# set data with given qualifier as NA
+csn_date_comp_site_data$Val[grepl("1", csn_date_comp_site_data$Qualifier) |
+                              grepl("6", csn_date_comp_site_data$Qualifier) |
+                              grepl("QX", csn_date_comp_site_data$Qualifier)] = NA
+
+# set data with given qualifier as 0.000009 for later convertion to MDL/2
+csn_date_comp_site_data$Val[grepl("MD", csn_date_comp_site_data$Qualifier) |
+                              grepl("ND", csn_date_comp_site_data$Qualifier) |
+                              grepl("SQ", csn_date_comp_site_data$Qualifier)] = 0.000009
+
+# randomly check one site that was detected as have many qualifiers
+data_site_manyNA_bf_qualifier = subset(csn_data_compare, SiteCode == 11130003)
+data_site_manyNA_aft_qualifier = subset(csn_date_comp_site_data, SiteCode == 11130003)
+
+# save the qualifier info
+csn_qualifier = select(csn_date_comp_site_data, 
+                       Date, SiteCode, CompName, Qualifier)
+dim(csn_qualifier)
+write.csv(csn_qualifier, "CSN_Qulifier_no_missing_Val.csv")
+
+# generating information related qualifier
+csn_qualifier = select(csn_qualifier, Date, SiteCode, Qualifier)
+csn_qualifier_info = subset(csn_qualifier,
+                            grepl("I", Qualifier, fixed = T))
+csn_qualifier_info = csn_qualifier_info[!duplicated(csn_qualifier_info), ]
+
+csn_qualifier_info = csn_qualifier_info[with(csn_qualifier_info, 
+                                             order(SiteCode, Date)), ]
+csn_qualifier_info$Date = as.Date(csn_qualifier_info$Date)
+write.csv(csn_qualifier_info, "CSN_SiteCode_Information_Qualifier.csv")
+
 # delete columns not needed for merging or not to be used in the spread dataset
 csn_date_comp_site_data$Qualifier = 
   csn_date_comp_site_data$Val.dup = csn_date_comp_site_data$POC = 
   csn_date_comp_site_data$Dataset = csn_date_comp_site_data$State = NULL
 
 # double check if the date, site, and component match in the reference dataset and the extracted data
-summary(unique(csn_date_comp_site_ref$Date) %in% unique(csn_date_comp_site_data$Date))
-summary(unique(csn_date_comp_site_ref$SiteCode) %in% unique(csn_date_comp_site_data$SiteCode))
-summary(unique(csn_date_comp_site_ref$CompName) %in% unique(csn_date_comp_site_data$CompName))
+summary(unique(csn_date_comp_site_ref$Date) %in% 
+          unique(csn_date_comp_site_data$Date))
+summary(unique(csn_date_comp_site_ref$SiteCode) %in% 
+          unique(csn_date_comp_site_data$SiteCode))
+summary(unique(csn_date_comp_site_ref$CompName) %in% 
+          unique(csn_date_comp_site_data$CompName))
 
-summary(unique(csn_date_comp_site_data$Date) %in% unique(csn_date_comp_site_ref$Date))
-summary(unique(csn_date_comp_site_data$SiteCode) %in% unique(csn_date_comp_site_ref$SiteCode))
-summary(unique(csn_date_comp_site_data$CompName) %in% unique(csn_date_comp_site_ref$CompName))
+summary(unique(csn_date_comp_site_data$Date) %in% 
+          unique(csn_date_comp_site_ref$Date))
+summary(unique(csn_date_comp_site_data$SiteCode) %in% 
+          unique(csn_date_comp_site_ref$SiteCode))
+summary(unique(csn_date_comp_site_data$CompName) %in% 
+          unique(csn_date_comp_site_ref$CompName))
 
 # combine the full date-site-component list with the concentration values
 csn_date_with_missing = merge(csn_date_comp_site_ref, 
                               csn_date_comp_site_data, all.x = T)
 
-length(unique(csn_date_comp_site_measured$date.site.comp)) ==
-  length(unique(csn_date_with_missing$date.site.comp))
-length(unique(csn_date_with_missing$site.date.qualifier))
+(length(unique(csn_date_comp_site_data$site.date)) + 1) ==
+  length(unique(csn_date_with_missing$site.date))
+length(unique(csn_date_with_missing$site.date))
 
-csn_site_date_qualifier = data.frame(select(csn_date_with_missing, site.date.qualifier))
-setDT(csn_site_date_qualifier)
-csn_site_date_qualifier_sep = csn_site_date_qualifier %>% 
-  separate(site.date.qualifier, c("Date", "State", "SiteCode", "Qualifier"),  
+csn_site_date_qualifier_sep = 
+  select(csn_date_with_missing, site.date) %>% 
+  separate(site.date, c("Date", "State", "SiteCode", "CompName"),  
            sep = "\\s+")
+
+# prepare the date-site-compname list with no NA
 csn_site_date_qualifier_sep_noNA = subset(csn_site_date_qualifier_sep,
                                           !is.na(SiteCode))
-csn_site_date_qualifier_sep_noNA$Date = as.Date(csn_site_date_qualifier_sep_noNA$Date)
-csn_site_date_qualifier_sep_noNA$SiteCode = as.integer(csn_site_date_qualifier_sep_noNA$SiteCode)
+csn_site_date_qualifier_sep_noNA$Date = 
+  as.Date(csn_site_date_qualifier_sep_noNA$Date)
+csn_site_date_qualifier_sep_noNA$SiteCode = 
+  as.integer(csn_site_date_qualifier_sep_noNA$SiteCode)
 csn_site_date_qualifier_sep_noNA = 
-  csn_site_date_qualifier_sep_noNA[!duplicated(csn_site_date_qualifier_sep_noNA), ]
+  csn_site_date_qualifier_sep_noNA[!duplicated(
+    csn_site_date_qualifier_sep_noNA), ]
+dim(csn_site_date_qualifier_sep_noNA)
 
-# 
+# merge the date-site-compname list with no NA with component values
 csn_date_miss  = merge(csn_date_with_missing, 
-                       csn_site_date_qualifier_sep_noNA)
-setDT(csn_date_miss)
+                       csn_site_date_qualifier_sep_noNA,
+                       all.x = T)
+# setDT(csn_date_miss)
 summary(csn_date_miss)
 summary(is.na(csn_date_miss$State))
 summary(is.na(csn_date_miss$CompName))
-summary(is.na(csn_date_miss$Qualifier))
+# summary(is.na(csn_date_miss$Qualifier))
 
-csn_date_miss$site.date.qualifier = NULL
-csn_date_miss$site.date.qualifier = paste(csn_date_miss$Date, csn_date_miss$State, 
-                                          csn_date_miss$SiteCode, csn_date_miss$Qualifier)
+## Below is no longer needed, cause we have added state in the site.date info
+# csn_date_miss$site.date = NULL
+# csn_date_miss$site.date = paste(csn_date_miss$Date, csn_date_miss$State, 
+#                                csn_date_miss$SiteCode, csn_date_miss$Qualifier)
 
 # check if qualifiers for same day-site group are same
 # csn_miss_sample = subset(csn_date_with_missing, 
 #                          Date == csn_date_with_missing$Date[1] &
 #                            SiteCode == csn_date_with_missing$SiteCode[1])
-# length(unique(csn_miss_sample$site.date.qualifier))
+# length(unique(csn_miss_sample$site.date))
 
 # write.csv(csn_date_miss, "CSN_Component_to_be_spread_2022-12.csv")
+# write.csv(csn_date_miss, "CSN_Component_to_be_spread_2022-12_2023.02.csv")
 
 ##### 2.5 spreading - data for interpolation - before & after 2015 #####
 library(psych) # corr.test{}
 library(corrplot) # corrplot.mixed{}
 
-# csn_miss_to_spread = read.csv("CSN_Component_to_be_spread_2022-12.csv")
-# csn_miss_to_spread$X = NULL
-csn_miss_to_spread = csn_date_miss
+# csn_date_miss = read.csv("CSN_Component_to_be_spread_2022-12.csv")
+# csn_date_miss = read.csv("CSN_Component_to_be_spread_2022-12_2023.02.csv")
+# csn_date_miss$X = NULL
 
-# spreading the data to daily-site-component style
+# this old site.date info contains lots of NA, need a new one with complete list
+csn_date_miss$site.date = NULL 
+csn_date_miss$site.date = paste(csn_date_miss$Date, 
+                                csn_date_miss$SiteCode)
+
+csn_miss_to_spread = csn_date_miss
+# check if there is still NA in the site.date info
+summary(is.na(csn_miss_to_spread$site.date))
+
+# remove extral columns
 csn_miss_to_spread$Date = csn_miss_to_spread$SiteCode = 
-  csn_miss_to_spread$State = csn_miss_to_spread$Qualifier = NULL
+  csn_miss_to_spread$State = NULL
 head(csn_miss_to_spread)
 dim(csn_miss_to_spread)
 
-csn_spread_try = csn_miss_to_spread[1:888, ]
-csn_spread_try %>% spread(CompName, Val)
+# spreading the data to daily-site-component style
+csn_spread_try = csn_miss_to_spread[1:900, ]
+csn_spread_try_sp = csn_spread_try %>% spread(CompName, Val)
 
 csn_daily_comp = csn_miss_to_spread %>% spread(CompName, Val)
 head(csn_daily_comp)
 dim(csn_daily_comp)
-csn_site_date_qualifier_sep_noNA$site.date.qualifier = paste(csn_site_date_qualifier_sep_noNA$Date, 
-                                                             csn_site_date_qualifier_sep_noNA$State, 
-                                                             csn_site_date_qualifier_sep_noNA$SiteCode, 
-                                                             csn_site_date_qualifier_sep_noNA$Qualifier)
-csn_daily_comp = merge(csn_daily_comp, csn_site_date_qualifier_sep_noNA, all.x = T)
+
+### when running all steps in section 2.4
+csn_daily_comp = 
+  merge(csn_daily_comp, 
+        csn_site_date_qualifier_sep_noNA, 
+        all.x = T)
 summary(csn_daily_comp)
 csn.d.col = ncol(csn_daily_comp)
 csn_daily_comp_use = cbind(csn_daily_comp[, (csn.d.col-3):csn.d.col],
                            csn_daily_comp[, 2:(csn.d.col-4)])
-write.csv(csn_daily_comp_use, "CSN_Component_with_missing.csv")
+
+### when jumping previous steps in 2.4, then we need new info of date, site, state
+# csn_site_date_daily = 
+#   select(csn_daily_comp, site.date) %>% 
+#   separate(site.date, c("Date", "SiteCode"),  
+#            sep = "\\s+")
+# # merge date, sitecode with species concentrations
+# csn_daily_comp_use = cbind(csn_site_date_daily, 
+#                            csn_daily_comp[, 2:ncol(csn_daily_comp)])
+# # match state info
+# csn_sites_use = select(csn_sites_use, State, SiteCode)
+# csn_daily_comp_use = merge(csn_daily_comp_use, 
+#                            csn_sites_use, 
+#                            all.x = T)
+
+# write.csv(csn_daily_comp_use, "CSN_Component_with_missing.csv")
+write.csv(csn_daily_comp_use, "CSN_Component_with_missing_2023.02.csv")
 
 ##### 2.6 check correlation & missing pattern #####
+
+csn_daily_comp_use = fread("CSN_Component_with_missing_2023.02.csv")
+csn_daily_comp_use$V1 = NULL
+csn_daily_comp_use$Date = as.Date(csn_daily_comp_use$Date)
+
+
 # checking the distributinon of OC.unadjusted.88 vs. OC.TOR.unadjusted.88
 plot(csn_daily_comp_use$OC.unadjusted.88, 
      csn_daily_comp_use$OC.TOR.unadjusted.88)
@@ -1272,8 +1350,9 @@ cor(csn_daily_comp_use$OC.unadjusted.88,
     method = "spearman") # 0.9991176
 
 # checking the overall correlations for OC/EC groups
-csn_ocec = data.frame(csn_daily_comp_use)[, grepl("OC", names(data.frame(csn_daily_comp_use))) |
-                                            grepl("EC", names(data.frame(csn_daily_comp_use)))]
+csn_ocec = 
+  data.frame(csn_daily_comp_use)[, grepl("OC", names(data.frame(csn_daily_comp_use))) |
+                                   grepl("EC", names(data.frame(csn_daily_comp_use)))]
 csn_ocec_before_2015 = csn_ocec[1:62120, ]
 csn_ocec_after_2015 = csn_ocec[62121:nrow(csn_ocec), ]
 
@@ -1317,15 +1396,24 @@ csn_daily_after_2015 = subset(csn_daily_comp_use,
 dim(csn_daily_before_2015)
 dim(csn_daily_after_2015)
 
+# check the relationship between species groups suggested by Phil on 2023-02-21
+
+plot(csn_daily_comp_use$`K+`, csn_daily_comp_use$K, xlim = c(0,40), ylim = c(0,40))
+plot(csn_daily_comp_use$`Na+`, csn_daily_comp_use$Na, xlim = c(0,8), ylim = c(0,8))
+plot(csn_daily_comp_use$`Cl-`, csn_daily_comp_use$Cl, xlim = c(0,10), ylim = c(0,10))
+plot(csn_daily_comp_use$SO4, csn_daily_comp_use$S, xlim = c(0,45), ylim = c(0,15))
+
+
 # overall NA rate
-p_miss_with_neg <- data.frame(unlist(lapply(csn_daily_comp[, 2:(csn.d.col-4)], 
-                                            function(x) 
-                                              sum(is.na(x))))/
-                                nrow(csn_daily_comp))
+p_miss_with_neg <- data.frame(unlist(lapply(
+  csn_daily_comp[,2:ncol(csn_daily_comp)], 
+  function(x) 
+    sum(is.na(x))))/
+    nrow(csn_daily_comp))
 p_miss_with_neg$CompCode = rownames(p_miss_with_neg) 
 colnames(p_miss_with_neg)[1] = "Missing_Rate"
 rownames(p_miss_with_neg) = 1:nrow(p_miss_with_neg)
-ggplot(p_miss_with_neg, aes(CompCode, Missing_Rate)) +
+missing_rate = ggplot(p_miss_with_neg, aes(CompCode, Missing_Rate)) +
   geom_point() +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
@@ -1338,7 +1426,7 @@ write.csv(p_miss_with_neg, "CSN_Overall_missing_rate_NA.csv")
 
 # before 2015 - NA rate
 p_miss_with_neg_before2015 <- data.frame(unlist(lapply(
-  csn_daily_before_2015[, 5:ncol(csn_daily_before_2015)], 
+  csn_daily_before_2015[, 4:(ncol(csn_daily_before_2015)-1)], 
   function(x) 
     sum(is.na(x))))/
     nrow(csn_daily_before_2015))
@@ -1359,7 +1447,7 @@ write.csv(p_miss_with_neg_before2015, "CSN_Overall_missing_rate_NA_before_2015.c
 
 # after 2015 - NA rate
 p_miss_with_neg_after2015 <- data.frame(unlist(lapply(
-  csn_daily_after_2015[, 5:ncol(csn_daily_after_2015)], 
+  csn_daily_after_2015[, 4:(ncol(csn_daily_after_2015)-1)], 
   function(x) 
     sum(is.na(x))))/
     nrow(csn_daily_after_2015))
@@ -1384,23 +1472,121 @@ write.csv(p_miss_with_neg_after2015, "CSN_Overall_missing_rate_NA_after_2015.csv
 library(mice)
 plot.window(xlim=c(-1, ncol(csn_daily_before_2015) + 1), 
             ylim=c(-1, nrow(csn_daily_before_2015) + length_of_longest_colname), asp=1)
-mice::md.pattern(csn_daily_before_2015[, 5:ncol(csn_daily_before_2015)], rotate.names = T) 
-mice::md.pattern(csn_daily_after_2015[, 5:ncol(csn_daily_after_2015)], rotate.names = T) 
+mice::md.pattern(csn_daily_before_2015[, 4:(ncol(csn_daily_before_2015)-1)], rotate.names = T) 
+mice::md.pattern(csn_daily_after_2015[, 4:(ncol(csn_daily_after_2015)-1)], rotate.names = T) 
 
 
 ##### 2.7 data for interpolation - separate before & after 2015 #####
 csn_before_2015 = csn_daily_before_2015
 csn_after_2015 = csn_daily_after_2015
 
-# select components with 50% missing 
-comp_miss_before = unique(p_miss_with_neg_before2015$CompCode[p_miss_with_neg_before2015$Missing_Rate > 0.5])
-comp_miss_after = unique(p_miss_with_neg_after2015$CompCode[p_miss_with_neg_after2015$Missing_Rate > 0.5])
+# select components with 80% missing 
+comp_miss_before = 
+  unique(p_miss_with_neg_before2015$CompCode[
+    p_miss_with_neg_before2015$Missing_Rate > 0.8])
+comp_miss_after = 
+  unique(p_miss_with_neg_after2015$CompCode[
+    p_miss_with_neg_after2015$Missing_Rate > 0.8])
 
-# remove rows with largely missing
+# based on the result, "Cl-" was totally removed due to 100% missing before 2015
+# "Accept.PM2.5" was removed due to largely missing from 2016
+comp_miss_after = append("Cl-", comp_miss_after) 
+comp_miss_after = append("Accept.PM2.5", comp_miss_after) 
+
+
+# remove those with largely missing
 csn_before_2015[ ,comp_miss_before] <- list(NULL)
 csn_after_2015[ ,comp_miss_after] <- list(NULL)
 
-write.csv(csn_before_2015, "CSN_Component_with_missing_Before_2015.csv")
-write.csv(csn_after_2015, "CSN_Component_with_missing_After_2015.csv")
+# reorder the files according to site and date
+csn_before_2015 = csn_before_2015[with(csn_before_2015, 
+                                       order(State, SiteCode, Date)), ]
+csn_after_2015 = csn_after_2015[with(csn_after_2015, 
+                                     order(State, SiteCode, Date)), ]
 
+# write.csv(csn_before_2015, "CSN_Component_with_missing_Before_2015.csv")
+# write.csv(csn_after_2015, "CSN_Component_with_missing_After_2015.csv")
+
+
+######## start & end date for each site
+# start the record of each site from the non-NA point
+# cause some only start from very late
+site.number = length(unique(csn_after_2015$SiteCode))
+
+csn_before = NULL
+csn_bef_site_info = NULL
+for (i in 1:site.number){ 
+  # extract data for a single site
+  site.study.bef = unique(csn_before_2015$SiteCode)[i]
+  site_single = subset(csn_before_2015, SiteCode == site.study.bef)
+  
+  # detect the first date when there is no NAs in PM component
+  site_bef_1stDate = min(site_single$Date[!is.na(site_single$Al) & 
+                                            !is.na(site_single$Cu) & 
+                                            !is.na(site_single$SO4) & 
+                                            !is.na(site_single$EC.TOR.unadjust.88) &
+                                            !is.na(site_single$OC.TOR.unadjusted.88)])
+  
+  # in case of dataset with only NA
+  if(is.na(site_bef_1stDate)){
+    row.No = 0
+    Date.last.record = NA
+  } else{
+    site_bef_with_NA = subset(site_single, Date >= site_bef_1stDate)
+    row.No = nrow(site_bef_with_NA)
+    csn_before = rbind(csn_before, site_bef_with_NA)
+    Date.last.record = max(site_bef_with_NA$Date)
+  }
+  
+  site_info = data.frame(SiteCode = site.study.bef, 
+                         row.No = row.No,
+                         Date.first.record = site_bef_1stDate,
+                         Date.last.record = Date.last.record)
+  csn_bef_site_info = rbind.fill(csn_bef_site_info, site_info[1, ])
+}
+
+
+csn_after = NULL
+csn_aft_site_info = NULL
+for (i in 1:site.number){ 
+  # extract data for a single site
+  site.study.aft = unique(csn_after_2015$SiteCode)[i]
+  site_single = subset(csn_after_2015, SiteCode == site.study.aft)
+  
+  # detect the first date when there is no NAs in PM component
+  site_aft_1stDate = min(site_single$Date[!is.na(site_single$Al) & 
+                                            !is.na(site_single$Cu) & 
+                                            !is.na(site_single$SO4) & 
+                                            !is.na(site_single$EC.TOR.88) &
+                                            !is.na(site_single$OC.88)])
+  
+  # in case of dataset with only NA
+  if(is.na(site_aft_1stDate)){
+    row.No = 0
+    Date.last.record = NA
+  } else{
+    site_aft_with_NA = subset(site_single, Date >= site_aft_1stDate)
+    row.No = nrow(site_aft_with_NA)
+    csn_after = rbind(csn_after, site_aft_with_NA)
+    Date.last.record = max(site_aft_with_NA$Date)
+  }
+  
+  site_info = data.frame(SiteCode = site.study.aft, 
+                         row.No = row.No,
+                         Date.first.record = site_aft_1stDate,
+                         Date.last.record = Date.last.record)
+  csn_aft_site_info = rbind.fill(csn_aft_site_info, site_info[1, ])
+}
+
+# move state to the first column
+csn_before = csn_before %>% relocate(State, .before = SiteCode)
+csn_after = csn_after %>% relocate(State, .before = SiteCode)
+
+## The biggest difference compared with previous one is this time, 
+## unacceptable Qualifiers were marked Val as NA or 0.00009 before further process
+write.csv(csn_before, "CSN_Component_with_missing_Before_2015_2023.02.csv")
+write.csv(csn_after, "CSN_Component_with_missing_After_2015_2023.02.csv")
+
+write.csv(csn_bef_site_info, "CSN_site_StartDate_info_Before_2015_2023.02.csv")
+write.csv(csn_aft_site_info, "CSN_site_StartDate_info_After_2015_2023.02.csv")
 
