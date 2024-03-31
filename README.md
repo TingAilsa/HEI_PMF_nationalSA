@@ -11,11 +11,11 @@ This repository references two datasets: 1) Daily PM2.5 species measurements fro
 ### Explore the CSN & IMPROVE dataset
 2. `1.1 Data exploration - CSN.R` and `1.2 Data exploration - IMPROVE.R`document exploration of all variables in CSN monitoring data and metadata, the spatiotemporal trend analyses of species concentrations, the included flags/qualifiers, the concentrations of flagged and unflagged data, etc. in CSN and IMPROVE datasets. 
 3. `1.3 CSN & IMPROVE sites.R` document the idenfitication of identical sites in two monitoring networks and comparions of the measurements from the two datasets, and preparation of datasets for interpolation.
-
+4. `1.4 EPA_PM_monitor.R` documents the matching of EPA AQS sites with CSN sites and replacement of PM2.5 concentrations
+   
 ### Data interpolation, clustering, and replacement
-4. `2.1 PM_Comp_Interpolate.R` documentd the comparison of four interpolation methods
-5. `2.2 PM_Comp_Clust_ML.R` documents the clustering based on CSN and IMPROVE datasets, separately, as well as the clutering conducted based on different variables
-6. `2.3 EPA_PM_monitor.R` documents the matching of EPA AQS sites with CSN sites and replacement of PM2.5 concentrations
+5. `2.1 PM_Comp_Interpolate.R` documentd the comparison of four interpolation methods
+6. `2.2 PM_Comp_Clust_ML.R` documents the clustering based on CSN and IMPROVE datasets, separately, as well as the clutering conducted based on different variables
 
 ### PMF input preparation
 7. ` `
