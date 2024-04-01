@@ -854,7 +854,7 @@ colnames(species_test_tra_month)
 
 ##### 5.3 Monthly & Site Level - cluster with random forest - GPS #####
 
-# consider no gps info in the random forest model
+# consider gps info in the random forest model
 species_month_rf_fit <- randomForest(x = species_train_tra_month[, ncol(species_train_tra_month)], 
                                      y = NULL, 
                                      ntree = 10000, 
@@ -943,10 +943,14 @@ ggplot(site_summary,
 
 # merge results from 5 train datasets
 rf_cluster_train_list = 
-  list.files(pattern = "site_level_randomForest_.*\\.csv$", full.names = TRUE)
+  list.files(pattern = "IMPROVE_.*_randomForest_.*\\.csv$", full.names = TRUE)
 rf_cluster_train_list = 
-  rf_cluster_train_list[
-    (length(rf_cluster_train_list)-4):length(rf_cluster_train_list)]
+  rf_cluster_train_list[1:5]
+
+rf_cluster_train_list = 
+  list.files(pattern = "CSN_.*_randomForest_.*\\.csv$", full.names = TRUE)
+rf_cluster_train_list = 
+  rf_cluster_train_list[3:7]
 
 rf_cluster_train = 
   do.call(
@@ -1293,12 +1297,29 @@ site_cluster$dup = duplicated(paste(site_cluster$siteA.new, site_cluster$siteB))
 site_cluster = subset(site_cluster, dup == FALSE)
 site_cluster$dup = NULL
 
-write.csv(site_cluster, "species_Cluster_RF.csv")
+site_cluster_combined =
+  site_cluster %>%
+  dplyr::group_by(siteA.new, sequence_cluster) %>%
+  dplyr::summarise(combined = 
+              toString(
+                unique(
+                  c(siteA.new, siteB))), 
+            .groups = 'drop')
+
+site_cluster_combined =
+  site_cluster_combined %>%
+  mutate(SiteCode = strsplit(combined, ",\\s*")) %>%
+  unnest(SiteCode) %>%
+  select(SiteCode, sequence_cluster)
+names(site_cluster_combined)[2] = "Final.Decision"
+
+write.csv(site_cluster_combined, "IMPROVE_Cluster_RF.csv")
+write.csv(site_cluster_combined, "CSN_Cluster_RF.csv")
 
 
 # extract & assign GPS info
 species_site_gps = dplyr::select(species_train_mean_bdr, fips, SiteCode, Longitude, Latitude)
-species_rf_5train = merge(site_cluster, species_site_gps)
+species_rf_5train = merge(site_cluster_combined, species_site_gps)
 
 UScounty <- map_data("county")
 ggplot(species_rf_5train, 
@@ -1307,7 +1328,7 @@ ggplot(species_rf_5train,
                color="lightgrey", fill="white", alpha = 0.4) +
   geom_point(size = 2, alpha = 0.6) +
   geom_line(aes(group = as.factor(Final.Decision)), linetype="dashed") +
-  # scale_color_manual(values = npg.color[1:20]) +
-  theme_linedraw()
+  scale_color_manual(values = npg.color[1:25]) +
+  theme_void()
 
 
