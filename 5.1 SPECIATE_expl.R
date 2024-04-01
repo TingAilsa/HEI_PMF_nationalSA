@@ -2,9 +2,13 @@
 # rm(list=ls())
 
 ##set working directory
-setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/SPECIATE_2018")
+# setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/SPECIATE_2018")
+# getwd()
+# data.dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/SPECIATE_2018"
+
+setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/SPECIATE_2018")
 getwd()
-data.dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/SPECIATE_2018"
+data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/SPECIATE_2018"
 
 ##packages in need
 require(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
