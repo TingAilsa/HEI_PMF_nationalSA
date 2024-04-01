@@ -496,7 +496,7 @@ OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
 
 #### IMPROVE
 OOB_comb_avg = fread("IMPROVE_OOBerror_random-forest.csv")
-miss_comb_avg = fread("IMPROVE_Missing_Rate_Site-level.csv")
+miss_comb_avg = fread("IMPROVE_Missing_Qualifier_interpolation_All.csv")
 OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
 
 
@@ -841,8 +841,6 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   
   # write.csv(thresholds_TimesMean, "CSN_thresholds_25TimesMean.csv")
   write.csv(thresholds_TimesMean, "CSN_site_thresholds_15TimesMean.csv")
-
-
 
   ###### Extremes 1.2 - seasonal 99th STOP Using #####
   # already decide using the N times mean as threshold

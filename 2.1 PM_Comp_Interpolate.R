@@ -1380,6 +1380,9 @@ for (i in 1:n.site){
 }
 
 rownames(p_miss_summary) = 1:nrow(p_miss_summary)
+names(mix_error_intp_pstv_summary)[
+  (ncol(mix_error_intp_pstv_summary)-3):ncol(mix_error_intp_pstv_summary)] =
+  c("Running_Avg", "Linear", "Multiple", "Random_Forest")
 
 #### output interpolation results ####
 
@@ -1400,8 +1403,13 @@ write.csv(rf_sum, "IMPROVE_interpulation_random-forest_2023.csv")
 
 #### plot: Mix Erro distribution ####
 ME_summary = read.csv("IMPROVE_interpulation_Mix_Error.csv")
-ME_plot = select(ME_summary, SiteCode, Running_Avg, Linear, Multiple, Random_Forest)
+ME_plot = select(ME_summary,
+                 SiteCode, Running_Avg, Linear, Multiple, Random_Forest)
 
+ME_plot = 
+  ME_plot %>%
+  gather(Interpolations, NRMSE, -SiteCode)
+  
 ## plotting
 theme.mix.err = theme(axis.title.y.right = element_blank(),
                       panel.spacing = unit(10, "mm"),   
@@ -1414,10 +1422,10 @@ theme.mix.err = theme(axis.title.y.right = element_blank(),
                       axis.text.x = element_text(color="grey25", size = 18, angle = 30, hjust = 0.5, vjust = 0.5), plot.margin = unit(c(2,1,2, 2), "lines"),
                       axis.text.y = element_text(color="grey25", size = 18, angle = 0, hjust = 0.5))
 
-ggplot(ME_plot, aes(Interpolations, NRMSE, fill = Interpolations)) +
+ggplot(ME_plot, 
+       aes(Interpolations, NRMSE, fill = Interpolations)) +
   geom_boxplot() +
   geom_jitter(color="black", size=1.1, alpha=0.5) +
-  facet_wrap(Year ~.) + 
   scale_fill_npg() + 
   ylim(0, 0.65) +
   theme_bw() +
@@ -1434,7 +1442,7 @@ OOB_plot = gather(OOB_summary,
 colnames(OOB_plot)[1] = "Species"
 
 # group species
-ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
+ions = c("NO2.", "NO3", "SO4")
 OOB_plot$class = "Element"
 OOB_plot$class[OOB_plot$Species %in% ions] = "Ion"
 OOB_plot$class[grepl("OC", OOB_plot$Species, fixed = T) |
@@ -1446,56 +1454,20 @@ theme.obb = theme(axis.title.y.right = element_blank(),
                   panel.spacing = unit(10, "mm"),   
                   legend.background = element_blank(),
                   strip.text = element_text(face="bold", size=rel(1.5)),
-                  strip.background = element_rect(fill="lightblue", colour="grey", size=16),
-                  axis.title.x = element_text(color="grey25", size = 16, vjust=-2, margin=margin(0,0,0,300)), 
-                  axis.title.y = element_text(color="grey25", size = 16, vjust=2, margin=margin(0,2,0,0)),
+                  strip.background = element_rect(fill="lightblue", colour="grey", linewidth=16),
+                  axis.title.x = element_text(color="grey25", size = 16, vjust=-2), 
+                  axis.title.y = element_text(color="grey25", size = 16, vjust=2),
                   plot.title=element_text(size=rel(2)), 
-                  axis.text.x = element_text(color="grey25", size = 14, angle = 90, hjust = 0.5, vjust = 0.5), plot.margin = unit(c(2,1,2, 2), "lines"),
+                  axis.text.x = element_text(color="grey25", size = 14, angle = 90, hjust = 0.5, vjust = 0.5),
                   axis.text.y = element_text(color="grey25", size = 14, angle = 0, hjust = 0.5))
 
-# facet_grid with "free" space
-ggplot(OOB_plot, aes(Species, OOB_error)) +
-  geom_boxplot() +
-  geom_jitter(color="black", size=1, alpha=0.5) +
-  facet_grid(Year ~ class, scales = "free", space = "free") + 
-  # scale_fill_npg() + 
-  ggtitle("IMPROVE_OOB_Error") +
-  theme_bw() +
-  theme.obb
-
-# exclude OC/EC subgroups
-ggplot(
-  subset(
-    OOB_plot, 
-    !(grepl("88", OOB_plot$Species, fixed = T))), 
-  aes(Species, OOB_error)) +
-  geom_boxplot() +
-  geom_jitter(color="black", size=1, alpha=0.5) +
-  facet_grid(Year ~ class, scales = "free", space = "free") + 
-  # scale_fill_npg() + 
-  ggtitle("IMPROVE_OOB_Error") +
-  theme_bw() +
-  theme.obb
-
-OOB_final_plot = 
-  subset(
-    OOB_plot, 
-    !(grepl("88", OOB_plot$Species, fixed = T)) &
-      !(grepl("PM", OOB_plot$Species, fixed = T)))
-colnames(OOB_final_plot)[1] = "Species"
-
-OOB_final_plot$Species[OOB_final_plot$Species == "K."] = "KIon"
-OOB_final_plot$Species[OOB_final_plot$Species == "Na."] = "NaIon"
-OOB_final_plot$Species[OOB_final_plot$Species == "NH4."] = "NH4Ion"
 OOB_final_plot$Species[OOB_final_plot$Species == "NO3"] = "NO3Ion"
 OOB_final_plot$Species[OOB_final_plot$Species == "SO4"] = "SO4Ion"
 
-
-ggplot(OOB_final_plot, 
+ggplot(OOB_plot, 
        aes(Species, OOB_error)) +
   geom_boxplot() +
   geom_jitter(color="black", size=1, alpha=0.5) +
-  facet_grid(Year ~ class, scales = "free", space = "free") + 
   # scale_fill_npg() + 
   ggtitle("IMPROVE_OOB_Error") +
   xlab(format_variable("PM25 Species")) +
@@ -1509,11 +1481,9 @@ ggplot(OOB_final_plot,
         legend.background = element_blank(),
         strip.text = element_text(face="bold", size=rel(1.5)),
         strip.background = element_rect(fill="lightblue", colour="grey", size=16),
-        axis.title.x = element_text(color="grey25", size = 16, vjust=-2, 
-                                    margin=margin(0,0,0,300),
+        axis.title.x = element_text(color="grey25", size = 16, vjust=-2,
                                     family = "Arial Unicode MS"), 
         axis.title.y = element_text(color="grey25", size = 16, vjust=2, 
-                                    margin=margin(0,2,0,0), 
                                     family = "Arial Unicode MS"),
         plot.title=element_text(size=rel(2)), 
         plot.margin = unit(c(2,1,2, 2), "lines"),
@@ -1523,12 +1493,11 @@ ggplot(OOB_final_plot,
         axis.text.y = element_text(color="grey25", size = 14, angle = 0, 
                                    hjust = 0.5, family = "Arial Unicode MS"))
 
-ggplot(OOB_final_plot, 
+ggplot(OOB_plot, 
        aes(Species, OOB_error, 
            color = class)) +
   geom_boxplot(outlier.colour = NA) +
   geom_jitter(size=1, alpha=0.3) +
-  facet_grid(. ~ class, scales = "free", space = "free") + 
   # scale_fill_npg() + 
   ggtitle("IMPROVE_OOB_Error") +
   scale_color_nejm() + 
@@ -1542,11 +1511,9 @@ ggplot(OOB_final_plot,
         legend.background = element_blank(),
         strip.text = element_text(face="bold", size=rel(1.5)),
         strip.background = element_rect(fill="lightblue", colour="grey", size=16),
-        axis.title.x = element_text(color="grey25", size = 16, vjust=-2, 
-                                    margin=margin(0,0,0,300),
+        axis.title.x = element_text(color="grey25", size = 16, vjust=-2,
                                     family = "Arial Unicode MS"), 
         axis.title.y = element_text(color="grey25", size = 16, vjust=2, 
-                                    margin=margin(0,2,0,0), 
                                     family = "Arial Unicode MS"),
         plot.title=element_text(size=rel(2)), 
         plot.margin = unit(c(2,1,2, 2), "lines"),
@@ -1576,295 +1543,55 @@ ggplot(data.frame(percentiles, values),
   theme_bw() +
   theme.obb
 
-## combine two dataframe & remove rownames to save
-OOB_RowCol_bef_t = data.frame(t(OOB_commonRowCol_bef))
-OOB_RowCol_bef_t = subset(OOB_RowCol_bef_t, 
-                          row.names(OOB_RowCol_bef_t) != 
-                            "Variables")
-OOB_RowCol_bef_t$Year = "2011-15"
-
-OOB_RowCol_aft_t = data.frame(t(OOB_commonRowCol_aft))
-OOB_RowCol_aft_t = subset(OOB_RowCol_aft_t, 
-                          row.names(OOB_RowCol_aft_t) != 
-                            "Variables")
-OOB_RowCol_aft_t$Year = "2016-20"
-
-# change row.names to SiteCode
-OOB_RowCol_bef_t$SiteCode = row.names(OOB_RowCol_bef_t)
-OOB_RowCol_aft_t$SiteCode = row.names(OOB_RowCol_aft_t)
-
-OOB_comb = rbind(OOB_RowCol_bef_t, OOB_RowCol_aft_t)
-
-# remove "X" in SiteCode
-OOB_comb$SiteCode = gsub("X", "", OOB_comb$SiteCode)
-row.names(OOB_comb) = NULL
-
-# Remove variables not needed for PMF (C-subgroups)
-IMPROVE_remove = c("EC1.unadjusted.88", "EC2.unadjusted.88", "EC3.unadjusted.88",  
-               "OC1.unadjusted.88", "OC2.unadjusted.88", 
-               "OC3.unadjusted.88", "OC4.unadjusted.88",
-               "OC.unadjusted.88", "EC.unadjusted.88", "OPC.unadjusted.88",
-               "OP")
-OOB_comb[ ,IMPROVE_remove] <- list(NULL)
-
-# Move grouped columns to the right of the dataframe
-# match(), select columns that match a specific pattern in their names
-# everything(), include all remaining columns not selected by matches()
-OC.EC = c("EC", "OC")
-ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
-OOB_comb = OOB_comb %>%
-  select(!(matches(OC.EC)), 
-         everything())
-OOB_comb = OOB_comb %>%
-  select(!(matches(ions)), 
-         everything())
-
-# OOB_comb$PM25 = -999
-
-# Replace other columns
-OOB_comb = OOB_comb %>% relocate(PM25, .after = SO4)
-OOB_comb = OOB_comb %>% relocate(Year, .after = PM25)
-OOB_comb = OOB_comb %>% relocate(SiteCode, .before = Ag)
-
-write.csv(OOB_comb, "IMPROVE_OOBerror_random-forest_All.csv")
 
 #### Plot: Missing percent file merge ####
-miss_bef = read.csv("IMPROVE_Missing_Rate_Site_until_2015_2023.03.csv")
-miss_aft = read.csv("IMPROVE_Missing_Rate_Site_from_2016_2023.03.csv")
-miss_bef$X = miss_aft$X = NULL
+miss_rate = read.csv("IMPROVE_Missing_Rate_Site-level.csv")
+miss_rate$X = NULL
 
-# convert values in first column to row names
-rownames(miss_bef) <- miss_bef[,1]
-rownames(miss_aft) <- miss_aft[,1]
+# prepara data for plotting
+miss_rate_ga =
+  miss_comb %>%
+  gather(SiteCode, Missing_Rate, -Variables)
+miss_rate_ga = 
+  subset(miss_rate_ga, 
+         !(Variables %in% c("Date", "State", "SiteCode")))
+miss_rate_ga$Variables = ifelse(
+  miss_rate_ga$Variables == "PM2.5", "PM25", miss_rate_ga$Variables
+)
+names(miss_rate_ga)[1] = "Species"
 
-# check the potential duplicates
-"EC" %in% rownames(miss_bef)
-"OC" %in% rownames(miss_bef)
-"OP" %in% rownames(miss_bef)
+# check if there is NA
+# which(is.na(miss_rate_ga), arr.ind=TRUE) # 
 
-"EC" %in% rownames(miss_aft)
-"OC" %in% rownames(miss_aft)
-"OP" %in% rownames(miss_aft)
-
-# "OC" already existed in rownames after 2015, so delete it first
-miss_aft = 
-  miss_aft[!(
-    row.names(miss_aft) == "OC"),]
-
-# select rows used as OC, EC & OP for PMF
-dup_row_bef = c("EC.TOR.unadjust.88", 
-                "OC.TOR.unadjusted.88", 
-                "OP.TOR.unadjusted.88",
-                "Accept.PM2.5")
-dup_row_aft = c("EC.TOR.88", 
-                "OC.88", 
-                "OPC.TOR.88",
-                "PM2.5RC")
-
-# Identify the rows to rename
-row_to_change_bef <- 
-  rownames(miss_bef) %in% 
-  dup_row_bef
-summary(row_to_change_bef)
-
-row_to_change_aft <- 
-  rownames(miss_aft) %in% 
-  dup_row_aft
-summary(row_to_change_aft)
-
-# Rename the rows
-rownames(miss_bef)[row_to_change_bef] <- c("PM25", "EC", "OC", "OP")
-rownames(miss_aft)[row_to_change_aft] <- c("EC", "OC", "OP","PM25")
-
-# get common rownames & colnames
-obb_common_rows <- intersect(row.names(miss_bef), 
-                             row.names(miss_aft))
-
-obb_common_cols <- intersect(names(miss_bef), 
-                             names(miss_aft))
-
-# Subset data frames using common rownames and column names
-miss_commonRowCol_bef <- miss_bef[obb_common_rows, 
-                                  obb_common_cols]
-miss_commonRowCol_aft <- miss_aft[obb_common_rows, 
-                                  obb_common_cols]
-
-## combine two dataframe & remove rownames to save
-miss_RowCol_bef_t = data.frame(t(miss_commonRowCol_bef))
-miss_RowCol_bef_t = subset(miss_RowCol_bef_t, 
-                           row.names(miss_RowCol_bef_t) != 
-                             "Variables")
-miss_RowCol_bef_t$Year = "2011-15"
-
-miss_RowCol_aft_t = data.frame(t(miss_commonRowCol_aft))
-miss_RowCol_aft_t = subset(miss_RowCol_aft_t, 
-                           row.names(miss_RowCol_aft_t) != 
-                             "Variables")
-miss_RowCol_aft_t$Year = "2016-20"
-
-# change row.names to SiteCode
-miss_RowCol_bef_t$SiteCode = row.names(miss_RowCol_bef_t)
-miss_RowCol_aft_t$SiteCode = row.names(miss_RowCol_aft_t)
-
-miss_comb = rbind(miss_RowCol_bef_t, miss_RowCol_aft_t)
-
-# remove "X" in SiteCode
-miss_comb$SiteCode = gsub("X", "", miss_comb$SiteCode)
-row.names(miss_comb) = NULL
-
-# Remove variables not needed for PMF (C-subgroups)
-IMPROVE_remove = c("EC1.unadjusted.88", "EC2.unadjusted.88", "EC3.unadjusted.88",  
-               "OC1.unadjusted.88", "OC2.unadjusted.88", 
-               "OC3.unadjusted.88", "OC4.unadjusted.88",
-               "OC.unadjusted.88", "EC.unadjusted.88", "OPC.unadjusted.88",
-               "OP")
-miss_comb[ ,IMPROVE_remove] <- list(NULL)
-
-# Move grouped columns to the right of the dataframe
-# match(), select columns that match a specific pattern in their names
-# everything(), include all remaining columns not selected by matches()
+# group species
+ions = c("NO2.", "NO3", "SO4", "NH4")
 OC.EC = c("EC", "OC")
-ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
-miss_comb = miss_comb %>%
-  select(!(matches(OC.EC)), 
-         everything())
-miss_comb = miss_comb %>%
-  select(!(matches(ions)), 
-         everything())
+miss_rate_ga$class = "Element"
+miss_rate_ga$class[miss_rate_ga$Species %in% ions] = "Ion"
+miss_rate_ga$class[grepl("OC", miss_rate_ga$Species, fixed = T) |
+                     grepl("EC", miss_rate_ga$Species, fixed = T) |
+                     grepl("OP", miss_rate_ga$Species, fixed = T)] = "OC.EC"
 
-# Replace other columns
-miss_comb = miss_comb %>% relocate(PM25, .after = SO4)
-miss_comb = miss_comb %>% relocate(Year, .after = PM25)
-miss_comb = miss_comb %>% relocate(SiteCode, .before = Ag)
 
-miss_comb$State = miss_comb$Date = NULL
+miss_comb =
+  miss_rate_ga %>%
+  spread(Species, Missing_Rate)
 
 # change numemic rate to the XX in XX%
-miss_comb[, 2:(ncol(miss_comb)-1)] = lapply(
-  miss_comb[, 2:(ncol(miss_comb)-1)], 
-  as.numeric)
-# multiple 100
-miss_comb[, 2:(ncol(miss_comb)-1)] = miss_comb[, 2:(ncol(miss_comb)-1)]*100
+miss_comb[, 2:ncol(miss_comb)] = 
+  lapply(
+    miss_comb[, 2:ncol(miss_comb)], 
+  as.numeric) * 100
 
 write.csv(miss_comb, "IMPROVE_Missing_Qualifier_interpolation_All.csv")
 
-# combine two dataframe & remove rownames
-miss_commonRowCol_bef$Variables = rownames(miss_commonRowCol_bef)
-miss_commonRowCol_aft$Variables = rownames(miss_commonRowCol_aft)
-miss_plot = rbind(miss_commonRowCol_bef, miss_commonRowCol_aft)
-rownames(miss_plot) <- NULL
-
-# gather dataframe 
-miss_plot = gather(miss_plot, 
-                   "SiteCode", "miss_error",
-                   -Variables)
-colnames(miss_plot)[1] = "Species"
-
-# the 1st appearance of sitecode-variable group is from "2011-15" and 2nd "2016-20"
-miss_plot$Year = "2011-15"
-miss_plot$Year[duplicated(miss_plot[, 1:2])] = "2016-20"
-
-# group species
-miss_plot$class = "Element"
-miss_plot$class[miss_plot$Species %in% ions] = "Ion"
-miss_plot$class[grepl("OC", miss_plot$Species, fixed = T) |
-                  grepl("EC", miss_plot$Species, fixed = T) |
-                  grepl("OP", miss_plot$Species, fixed = T)] = "OC.EC"
-
-# facet_grid with "free" space
-ggplot(miss_plot, aes(Species, miss_error)) +
-  geom_boxplot() +
-  geom_jitter(color="black", size=1, alpha=0.5) +
-  facet_grid(Year ~ class, scales = "free", space = "free") + 
+ggplot(subset(miss_rate_ga, Missing_Rate<0.8), 
+       aes(Species, Missing_Rate, color = class)) +
+  geom_jitter(color="grey75", size=1, alpha=0.5) +
+  geom_boxplot(outlier.shape = NA, fill = NA) +
   # scale_fill_npg() + 
-  ggtitle("IMPROVE_miss_Error") +
+  ggtitle("IMPROVE_Missing-rate") +
   theme_bw() +
   theme.obb
 
-# exclude OC/EC subgroups
-ggplot(
-  subset(
-    miss_plot, 
-    !(grepl("88", miss_plot$Species, fixed = T))), 
-  aes(Species, miss_error)) +
-  geom_boxplot() +
-  geom_jitter(color="black", size=1, alpha=0.5) +
-  facet_grid(Year ~ class, scales = "free", space = "free") + 
-  # scale_fill_npg() + 
-  ggtitle("IMPROVE_miss_qualifier_interpolation") +
-  theme_bw() +
-  # ylim(0, 0.5) +
-  ylim(0, 0.2) +
-  theme.obb
-
-# Calculate percentiles and corresponding values
-percentiles <- seq(0, 100, 10)
-percentiles = append(c(95, 98), percentiles)
-miss_values <- quantile(miss_plot$miss_error, 
-                        probs = percentiles/100)*100
-
-miss_values <- quantile(subset(miss_plot, Variables != "PM25")$miss_error, 
-                        probs = percentiles/100)*100
-
-# Plot miss_values at each percentile
-ggplot(data.frame(percentiles, miss_values), 
-       aes(x = percentiles, y = miss_values)) +
-  geom_line(linetype = "dashed", color = "burlywood3") +
-  geom_text(aes(label = round(miss_values, 2)), vjust = -0.1, size = 5) +
-  scale_x_continuous(breaks = percentiles) +
-  labs(x = "Percentile", y = "Value") +
-  ylim(0, 21) +
-  ggtitle("IMPROVE_miss_qualifier_interpolation") +
-  theme_bw() +
-  theme.obb
-
-
-missing_final_plot = 
-  subset(
-    miss_plot, 
-    !(grepl("88", miss_plot$Species, fixed = T)) &
-      !(grepl("PM", miss_plot$Species, fixed = T)) &
-      !(grepl("State", miss_plot$Species, fixed = T)) &
-      !(grepl("SiteCode", miss_plot$Species, fixed = T)) &
-      !(grepl("Date", miss_plot$Species, fixed = T)))
-
-missing_final_plot$Species[missing_final_plot$Species == "K."] = "KIon"
-missing_final_plot$Species[missing_final_plot$Species == "Na."] = "NaIon"
-missing_final_plot$Species[missing_final_plot$Species == "NH4."] = "NH4Ion"
-missing_final_plot$Species[missing_final_plot$Species == "NO3"] = "NO3Ion"
-missing_final_plot$Species[missing_final_plot$Species == "SO4"] = "SO4Ion"
-
-ggplot(missing_final_plot, 
-       aes(Species, miss_error, 
-           color = class)) +
-  geom_boxplot(outlier.colour = NA) +
-  geom_jitter(size=1, alpha=0.3) +
-  facet_grid(. ~ class, scales = "free", space = "free") + 
-  # scale_fill_npg() + 
-  ggtitle("IMPROVE_OOB_Error") +
-  scale_color_nejm() + 
-  xlab(format_variable("PM25 Species")) +
-  ylab(format_variable("Missing rate")) +
-  # to display the superscript & subscript in axis labels
-  scale_x_discrete(labels = function(x) format_variable(x)) +
-  theme_bw() +
-  theme(panel.spacing.x = unit(0.2, "cm")) +
-  theme(axis.title.y.right = element_blank(),
-        panel.spacing = unit(10, "mm"),   
-        legend.background = element_blank(),
-        strip.text = element_text(face="bold", size=rel(1.5)),
-        strip.background = element_rect(fill="lightblue", colour="grey", size=16),
-        axis.title.x = element_text(color="grey25", size = 16, vjust=-2, 
-                                    margin=margin(0,0,0,300),
-                                    family = "Arial Unicode MS"), 
-        axis.title.y = element_text(color="grey25", size = 16, vjust=2, 
-                                    margin=margin(0,2,0,0), 
-                                    family = "Arial Unicode MS"),
-        plot.title=element_text(size=rel(2)), 
-        plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.x = element_text(color="grey25", size = 14, angle = 90, 
-                                   hjust = 0.5, vjust = 0.5,
-                                   family = "Arial Unicode MS"), 
-        axis.text.y = element_text(color="grey25", size = 14, angle = 0, 
-                                   hjust = 0.5, family = "Arial Unicode MS"))
 
