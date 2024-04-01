@@ -1430,7 +1430,7 @@ ggplot(ME_plot,
   ylim(0, 0.65) +
   theme_bw() +
   theme(legend.position = "none") +
-  theme.mix.err
+  theme.obb
 
 #### plot: OOB (out-of-bag) Error distribution ####
 OOB_summary = read.csv("IMPROVE_OOBerror_random-forest.csv")
@@ -1529,7 +1529,7 @@ percentiles = append(c(95, 98), percentiles)
 values <- quantile(OOB_plot$OOB_error, 
                    probs = percentiles/100)
 
-values <- quantile(subset(OOB_plot, Variables != "PM25")$OOB_error, 
+values <- quantile(subset(OOB_plot, Species!= "PM25")$OOB_error, 
                    probs = percentiles/100)
 
 # Plot values at each percentile
@@ -1550,7 +1550,7 @@ miss_rate$X = NULL
 
 # prepara data for plotting
 miss_rate_ga =
-  miss_comb %>%
+  miss_rate %>%
   gather(SiteCode, Missing_Rate, -Variables)
 miss_rate_ga = 
   subset(miss_rate_ga, 
@@ -1572,18 +1572,15 @@ miss_rate_ga$class[grepl("OC", miss_rate_ga$Species, fixed = T) |
                      grepl("EC", miss_rate_ga$Species, fixed = T) |
                      grepl("OP", miss_rate_ga$Species, fixed = T)] = "OC.EC"
 
-
-miss_comb =
-  miss_rate_ga %>%
+miss_comb_imp =
+  select(miss_rate_ga, -class) %>%
   spread(Species, Missing_Rate)
 
 # change numemic rate to the XX in XX%
-miss_comb[, 2:ncol(miss_comb)] = 
-  lapply(
-    miss_comb[, 2:ncol(miss_comb)], 
-  as.numeric) * 100
+miss_comb_imp[, 2:ncol(miss_comb_imp)] =
+  miss_comb_imp[, 2:ncol(miss_comb_imp)] * 100
 
-write.csv(miss_comb, "IMPROVE_Missing_Qualifier_interpolation_All.csv")
+write.csv(miss_comb_imp, "IMPROVE_Missing_Qualifier_interpolation_All.csv")
 
 ggplot(subset(miss_rate_ga, Missing_Rate<0.8), 
        aes(Species, Missing_Rate, color = class)) +

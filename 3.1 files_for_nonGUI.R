@@ -279,17 +279,17 @@ csn_aqs_pm$PM25_Combine =
 
 # check the correlation
 plot(csn_aqs_pm$PM25, 
-     csn_aqs_pm$PM25_AQS)
+     csn_aqs_pm$PM25_AQS, ylim = c(1, 100))
 plot(csn_aqs_pm$PM25, 
-     csn_aqs_pm$PM25_Combine)
+     csn_aqs_pm$PM25_Combine, ylim = c(1, 100))
 summary(lm(csn_aqs_pm$PM25 ~ csn_aqs_pm$PM25_Combine))
 summary(lm(csn_aqs_pm$PM25 ~ csn_aqs_pm$PM25_AQS))
 summary(csn_aqs_pm$PM25_Combine)
 
 # sum of species vs. PM2.5
 csn_aqs_pm$species.sum = sum(csn_aqs_pm[, 4:37],
-                                   csn_aqs_pm[, 41],
-                                   csn_aqs_pm[, 46:50])
+                             csn_aqs_pm[, 41],
+                             csn_aqs_pm[, 46:50])
 
 summary(csn_aqs_pm$species.sum > csn_aqs_pm$PM25_Combine)
 summary(csn_aqs_pm$species.sum > csn_aqs_pm$PM25)
@@ -300,25 +300,15 @@ csn_aqs_pm =
     with(csn_aqs_pm,
          order(SiteCode, Date)), ]
 
-summary(colnames(unc_pmf_cluster)[4:(ncol(unc_pmf_cluster)-1)] == 
-          colnames(csn_aqs_pm)[4:(ncol(csn_aqs_pm)-5)])
-summary(unc_pmf_cluster$SiteCode == csn_aqs_pm$SiteCode &
-          unc_pmf_cluster$Date == csn_aqs_pm$Date)
-
-# detect PM2.5 from interpolation
-unc_pmf_cluster.1 = unc_pmf_cluster
-unc_pmf_cluster$PM25_interp = F
-summary(unc_pmf_cluster$PM25/csn_aqs_pm$PM25_Combine == 4.5)
-unc_pmf_cluster$PM25_interp[unc_pmf_cluster$PM25/csn_aqs_pm$PM25_Combine == 4.5] = T
-summary(unc_pmf_cluster$PM25/csn_aqs_pm$PM25_Combine)
-summary(unc_pmf_cluster$PM25_interp)
+summary(colnames(csn_daily)[4:ncol(csn_daily)] == 
+          colnames(csn_aqs_pm)[4:(ncol(csn_aqs_pm)-3)])
+summary(csn_daily$SiteCode == csn_aqs_pm$SiteCode &
+          csn_daily$Date == csn_aqs_pm$Date)
 
 # reasign PM value, mainly use AQS, and delete not used
 csn_aqs_pm$PM25 = csn_aqs_pm$PM25_Combine
 csn_aqs_pm$species.sum = csn_aqs_pm$PM25_Combine = 
-  csn_aqs_pm$PM25_AQS = csn_aqs_pm$dup = NULL
-
-csn_aqs_pm$K = NULL
+  csn_aqs_pm$PM25_AQS = csn_aqs_pm$K = NULL
 
 # earlier version, use "_corrected_*.csv" concentrations already reset for PMF (half MDL, etc.)
 # write.csv(conc_pmf_cluster, "CSN_concentration_AQS.PM_PMF_C-subgroup_2023.04.csv")
@@ -334,7 +324,7 @@ write.csv(csn_aqs_pm, "CSN_concentration_AQS.PM_PMF_C-sub_2024.03.csv")
 species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
 
 ## IMPROVE
-species_daily = fread("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv")
+species_daily = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv")
 
 species_daily$V1 = NULL
 species_daily$Date = as.Date(species_daily$Date)
@@ -371,9 +361,37 @@ species_mdl = species_mdl[with(
   species_mdl, 
   order(SiteCode, year, month)), ]
 
-# check if columns from concentration & MDL datasets match
+#### check if columns from concentration & MDL datasets match
+# csn
 summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-2)] == 
           colnames(species_mdl)[4:ncol(species_mdl)])
+
+# imp
+species_daily_conc$ammNO3 = species_daily_conc$ammSO4 = species_daily_conc$Cl. = 
+  species_daily_conc$NO2. = NULL
+species_daily_conc =
+  plyr::rename(species_daily_conc, 
+               c("PM2.5" = "PM25", 
+                 "SO4" = "SO4Ion",
+                 "NO3" = "NO3Ion"))
+species_daily_conc =
+  relocate(species_daily_conc, PM25, .after = Zr)
+colnames(species_daily_conc)[3:(ncol(species_daily_conc) - 2)] =
+  colnames(species_mdl)[4:ncol(species_mdl)]
+species_daily_conc_reag = 
+  species_daily_conc[, 3:(ncol(species_daily_conc)-2)]
+
+# reorder columns the dataset for matching
+setcolorder(species_daily_conc_reag, 
+            names(species_mdl[, 4:ncol(species_mdl)]))
+species_daily_conc = 
+  data.frame(species_daily_conc[, 1:2], 
+        species_daily_conc_reag,
+        species_daily_conc[, (ncol(species_daily_conc)-1):ncol(species_daily_conc)])
+
+summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-2)] == 
+          colnames(species_mdl)[4:ncol(species_mdl)])
+
 dim(species_daily_conc)
 dim(species_mdl)
 
@@ -414,6 +432,8 @@ summary(colnames(species_daily_fullMDL) == colnames(species_daily_conc))
 # compare concentration and MDL of a given component
 cols_to_extract <- setdiff(names(species_daily_conc), 
                            c("SiteCode", "Date"))
+setDT(species_daily_conc)
+setDT(species_daily_fullMDL)
 species_conc = species_daily_conc[, ..cols_to_extract]
 species_mdl = species_daily_fullMDL[, ..cols_to_extract]
 
@@ -456,7 +476,7 @@ species_conc_mdl_randomsite[1:3, 4:13]
 ####### For site & date match check, finished!
 
 # only SiteCode & Date before species
-species_conc_mdl_cluster$K = species_conc_mdl_cluster$State = NULL
+species_conc_mdl_Site$K = species_conc_mdl_Site$State = NULL
 
 # write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2023.05.csv")
 # write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.02.csv")
@@ -466,5 +486,5 @@ species_conc_mdl_Site = subset(species_conc_mdl_Site, !is.na(OP))
 
 # write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2023.csv")
 write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.csv")
-
+write.csv(species_conc_mdl_Site, "IMPROVE_interpulation_random-forest_2023.csv")
 
