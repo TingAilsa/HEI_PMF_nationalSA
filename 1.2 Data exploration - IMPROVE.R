@@ -171,6 +171,82 @@ imp_data$CompName.use = NULL
 write.csv(imp_data, "IMPROVE component only 10092022.csv")
 write.csv(method_comp, "IMPROVE reogranized method.csv")
 
+### time-series trends
+imp_data$year = year(imp_data$Date)
+imp_data$month = month(imp_data$Date)
+
+imp_plot = select(imp_data, 
+                  SiteCode, Date, year, month,
+                  ParamCode, Val, Unc, MDL)
+imp_plot_year = ddply(imp_plot, .(SiteCode, ParamCode, year), summarise,
+                      Val = median(Val, na.rm = T),
+                      Unc = median(Unc, na.rm = T),
+                      MDL = median(MDL, na.rm = T))
+imp_plot_month = ddply(imp_plot, .(SiteCode, ParamCode, month), summarise,
+                       Val = median(Val, na.rm = T),
+                       Unc = median(Unc, na.rm = T),
+                       MDL = median(MDL, na.rm = T))
+
+unique_comp = unique(imp_plot$ParamCode)
+
+# theme for spatial distribution of species
+theme_species_spatial =
+  theme(plot.title = element_text(hjust = 0.05, vjust = -25, size = 16),
+        axis.title.x = element_text(color="grey25", size = 12, vjust=0), 
+        axis.title.y = element_text(color="grey25", size = 12, vjust=1),
+        axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3),
+        axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
+
+
+for(site_imp in unique(imp_plot$SiteCode)) {
+  site_year_info = subset(imp_plot_year, SiteCode == site_imp) 
+  site_month_info = subset(imp_plot_month, SiteCode == site_imp) 
+  
+  for(comp_name in unique_comp) {
+    site_comp_year = subset(site_year_info, ParamCode == comp_name)
+    site_comp_month = subset(site_month_info, ParamCode == comp_name)
+    
+    Val_year = ggplot(site_comp_year, aes(x = year, y = Val)) +
+      geom_line(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
+      theme_minimal()
+    Unc_year = ggplot(site_comp_year, aes(x = year, y = Unc)) +
+      geom_line(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
+      theme_minimal()
+    MDL_year = ggplot(site_comp_year, aes(x = year, y = MDL)) +
+      geom_line(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
+      theme_minimal()
+    
+    Val_month = ggplot(site_comp_month, aes(x = month, y = Val)) +
+      geom_line(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
+      theme_minimal()
+    Unc_month = ggplot(site_comp_month, aes(x = month, y = Unc)) +
+      geom_line(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
+      theme_minimal()
+    MDL_month = ggplot(site_comp_month, aes(x = month, y = MDL)) +
+      geom_line(alpha = 0.2,size = 3.5) + theme(legend.position="none") +
+      theme_minimal()
+    
+    Val_Unc = ggplot(site_comp_month, aes(x = Val, y = Unc), color = year) +
+      geom_point(alpha = 0.2,size = 3.5) + 
+      theme_minimal()
+    Val_MDL = ggplot(site_comp_month, aes(x = Val, y = MDL), color = year) +
+      geom_point(alpha = 0.2,size = 3.5) + 
+      theme_minimal()
+    MDL_Unc = ggplot(site_comp_month, aes(x = MDL, y = Unc), color = year) +
+      geom_point(alpha = 0.2,size = 3.5) + 
+      theme_minimal()
+    
+    ts_plots <- list(Val_year, Unc_year, MDL_year,
+                     Val_month, Unc_month, MDL_month,
+                     Val_Unc, Val_MDL, MDL_Unc)
+    pdf(file.path("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE",
+                  paste0("IMPROVE_", site_imp, "_",comp_name, "_Val MD & Unc.pdf")), height = 8, width = 12)
+    grid.arrange(grobs = ts_plots, ncol = 3, nrow = 3)
+    
+    dev.off()
+  }
+}
+
 ##########################################################################################
 ####### 2. Applied Method ####### 
 ##########################################################################################

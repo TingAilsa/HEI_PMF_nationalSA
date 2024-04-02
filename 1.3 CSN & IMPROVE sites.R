@@ -61,11 +61,12 @@ csn_data$Date = as.Date(csn_data$Date)
 csn_data = subset(csn_data, Date > as.Date("2010-12-31"))
 
 csn_data$Dataset = "EPACSN"
-excluded.variables.csn = c("FlowRate", "FlowRate.tf", "FlowRate.ny", "FlowRate.qz", 
-                           "Volumn.tf", "Volumn.qz", "avgT.URG", "avgP.URG", "Volumn.ny", 
-                           "Soil", "Volume", "CS2", 
-                           "Levoglucosan", "Mannosan", "Galactosan", 
-                           "MinT", "MaxT", "avgT", "MinP", "MaxP", "avgP")
+excluded.variables.csn = 
+  c("FlowRate", "FlowRate.tf", "FlowRate.ny", "FlowRate.qz", 
+    "Volumn.tf", "Volumn.qz", "avgT.URG", "avgP.URG", "Volumn.ny", 
+    "Soil", "Volume", "CS2", 
+    "Levoglucosan", "Mannosan", "Galactosan", 
+    "MinT", "MaxT", "avgT", "MinP", "MaxP", "avgP")
 csn_data = subset(csn_data, !(CompName %in% excluded.variables.csn))
 # csn_data.1 = csn_data
 
@@ -147,9 +148,9 @@ write.csv(near_csn_in_imp, "The closest sampling points of CSN in IMPROVE.csv")
 # map CSN & IMPROVE sites (US mainland)
 MainStates <- map_data("state")
 theme.3 = theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
-                axis.title.x = element_text(color="grey25", size = 12, vjust=0, margin=margin(0,0,0,300)), 
-                axis.title.y = element_text(color="grey25", size = 12, vjust=1, margin=margin(0,2,0,0)),
-                axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3), plot.margin = unit(c(2,1,2, 2), "lines"),
+                axis.title.x = element_text(color="grey25", size = 12, vjust=0), 
+                axis.title.y = element_text(color="grey25", size = 12, vjust=1),
+                axis.text.x = element_text(color="grey25", size = 11, angle = 0, hjust = 0, vjust = 0.3),
                 axis.text.y = element_text(color="grey25", size = 11, angle = 0, hjust = 0.5))
 
 # subset(imp_csn_site, Longitude < -140), sites from AK & HI
