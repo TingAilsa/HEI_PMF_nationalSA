@@ -145,6 +145,17 @@ near_csn_in_imp = near_csn_in_imp[with(near_csn_in_imp, order(distance)), ]
 
 write.csv(near_csn_in_imp, "The closest sampling points of CSN in IMPROVE.csv")
 
+
+near_csn_in_imp_closet = near_csn_in_imp[1:20, ]
+closet_imp = select(near_csn_in_imp_closet, imp.site, imp.Latitude, imp.Longitude)
+closet_csn = select(near_csn_in_imp_closet, csn.site, csn.Latitude, csn.Longitude)
+closet_imp$Dataset = "IMPROVE"
+closet_csn$Dataset = "CSN"
+names(closet_csn)[1:3] = c("SiteCode", "Latitude", "Longitude")
+names(closet_imp)[1:3] = c("SiteCode", "Latitude", "Longitude")
+
+closet_imp_csn = rbind(closet_imp, closet_csn)
+
 # map CSN & IMPROVE sites (US mainland)
 MainStates <- map_data("state")
 theme.3 = theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
@@ -156,6 +167,15 @@ theme.3 = theme(plot.title = element_text(hjust = 0.05, vjust = 0, size = 16),
 # subset(imp_csn_site, Longitude < -140), sites from AK & HI
 # subset(imp_csn_site, Latitude < 20), sites from VI (Idaho?) & HI
 ggplot(subset(imp_csn_site, Longitude > -140 & Latitude > 20), 
+       aes(Longitude, Latitude, color= Dataset)) + 
+  geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
+               color="darkgrey", fill="lightgrey", alpha = 0.6) +
+  geom_point(size = 2, alpha = 0.6) +
+  scale_color_manual(values = c("yellow", "purple")) +
+  ggtitle("Distribution of IMPROVE & CSN sites") + 
+  theme.3 
+
+ggplot(closet_imp_csn, 
        aes(Longitude, Latitude, color= Dataset)) + 
   geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),
                color="darkgrey", fill="lightgrey", alpha = 0.6) +
