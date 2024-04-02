@@ -18,7 +18,7 @@ This repository references two datasets: 1) Daily PM2.5 species measurements fro
 6. `2.2 PM_Comp_Clust_ML.R` documents the clustering based on CSN and IMPROVE datasets, separately, as well as the clutering conducted based on different variables
 
 ### PMF input preparation
-7. ` `
+7. `3.1 files_for_nonGUI.R` documents the files used for the preparaton of nonGUI concentrations & uncertainties.
 8. `3.2 PMF_nonGUI_prepare.R` documents the preparation of concentration and uncertainty inputs for GUI and non-GUI PMF analyses, including the process of handling the extreme concentration points, dispersion normalization, etc.
 9. `3.3 PMF_CMD_txt_fn.R` and `3.4 PMF_CMD_txt_Site.R` document the preparation of input parameter files for non-GUI PMF analyses
 
