@@ -271,17 +271,52 @@ aqs_PM25$Date = as.Date(aqs_PM25$Date)
 csn_aqs_pm = join(csn_daily,
                         aqs_PM25)
 
+# compare the PM2.5 from measurement+interpolation vs. from AQS
+# compare data till 2015 (more measurements) and from 2016 (mostly interpolated)
+plot(csn_aqs_pm$PM25, csn_aqs_pm$PM25_AQS)
+plot(csn_aqs_pm$PM25, csn_aqs_pm$PM25_AQS, 
+     ylim = c(0,100), xlim = c(0,100))
+cor(csn_aqs_pm$PM25, csn_aqs_pm$PM25_AQS, 
+    method = "spearman", use = "complete.obs")
+cor(csn_aqs_pm$PM25, csn_aqs_pm$PM25_AQS, 
+    method = "pearson", use = "complete.obs")
+
+csn_aqs_pm_2015 = 
+  subset(csn_aqs_pm, Date < as.Date("2016-01-01"))
+plot(csn_aqs_pm_2015$PM25, csn_aqs_pm_2015$PM25_AQS)
+plot(csn_aqs_pm_2015$PM25, csn_aqs_pm_2015$PM25_AQS, 
+     ylim = c(0,100), xlim = c(0,100))
+cor(csn_aqs_pm_2015$PM25, csn_aqs_pm_2015$PM25_AQS, 
+    method = "spearman", use = "complete.obs")
+cor(csn_aqs_pm_2015$PM25, csn_aqs_pm_2015$PM25_AQS, 
+    method = "pearson", use = "complete.obs")
+
+csn_aqs_pm_2016 = 
+  subset(csn_aqs_pm, Date > as.Date("2015-12-31"))
+plot(csn_aqs_pm_2016$PM25, csn_aqs_pm_2016$PM25_AQS)
+plot(csn_aqs_pm_2016$PM25, csn_aqs_pm_2016$PM25_AQS, 
+     ylim = c(0,100), xlim = c(0,100))
+cor(csn_aqs_pm_2016$PM25, csn_aqs_pm_2016$PM25_AQS, 
+    method = "spearman", use = "complete.obs")
+cor(csn_aqs_pm_2016$PM25, csn_aqs_pm_2016$PM25_AQS, 
+    method = "pearson", use = "complete.obs")
+
 csn_aqs_pm$PM25_Combine = 
   ifelse((is.na(csn_aqs_pm$PM25_AQS) |
             csn_aqs_pm$PM25_AQS <= 2), 
          csn_aqs_pm$PM25, 
          csn_aqs_pm$PM25_AQS)
 
-# check the correlation
+# check the overall correlation
 plot(csn_aqs_pm$PM25, 
      csn_aqs_pm$PM25_AQS, ylim = c(1, 100))
 plot(csn_aqs_pm$PM25, 
      csn_aqs_pm$PM25_Combine, ylim = c(1, 100))
+cor(csn_aqs_pm$PM25, csn_aqs_pm$PM25_Combine, 
+    method = "pearson", use = "complete.obs")
+cor(csn_aqs_pm$PM25, csn_aqs_pm$PM25_AQS, 
+    method = "pearson", use = "complete.obs")
+
 summary(lm(csn_aqs_pm$PM25 ~ csn_aqs_pm$PM25_Combine))
 summary(lm(csn_aqs_pm$PM25 ~ csn_aqs_pm$PM25_AQS))
 summary(csn_aqs_pm$PM25_Combine)

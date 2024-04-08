@@ -166,22 +166,34 @@ aqs_PM25$V1 = NULL
 aqs_PM25$Date = as.Date(aqs_PM25$Date)
 sapply(aqs_PM25, class)
 
+csn_daily = plyr::rename(csn_daily, 
+                         c("Accept.PM2.5" = "PM25"))
+
 # match PM2.5
 csn_daily = merge(csn_daily, aqs_PM25)
 
+csn_daily$PM25_Combine = 
+  ifelse((is.na(csn_daily$PM25_AQS) |
+            csn_daily$PM25_AQS <= 2), 
+         csn_daily$PM25, 
+         csn_daily$PM25_AQS)
+
 # compare
-csn_daily_PM = select(csn_daily, Accept.PM2.5, PM25_AQS)
+csn_daily_PM = select(csn_daily, PM25, PM25_AQS, PM25_Combine)
 summary(csn_daily_PM)
-csn_daily_PM = subset(csn_daily_PM, !is.na(Accept.PM2.5))
+csn_daily_PM = subset(csn_daily_PM, !is.na(PM25))
 summary(csn_daily_PM)
 
-plot(csn_daily_PM$Accept.PM2.5, csn_daily_PM$PM25_AQS)
-plot(csn_daily_PM$Accept.PM2.5, csn_daily_PM$PM25_AQS, 
+plot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS)
+plot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, 
      ylim = c(0,100), xlim = c(0,100))
-cor(csn_daily_PM$Accept.PM2.5, csn_daily_PM$PM25_AQS, method = "spearman")
-cor(csn_daily_PM$Accept.PM2.5, csn_daily_PM$PM25_AQS, method = "pearson")
-boxplot(csn_daily_PM$Accept.PM2.5, csn_daily_PM$PM25_AQS)
-boxplot(csn_daily_PM$Accept.PM2.5, csn_daily_PM$PM25_AQS, 
+cor(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, method = "spearman")
+cor(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, method = "pearson")
+cor(csn_daily_PM$PM25, csn_daily_PM$PM25_Combine, method = "spearman")
+cor(csn_daily_PM$PM25, csn_daily_PM$PM25_Combine, method = "pearson")
+
+boxplot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS)
+boxplot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, 
         ylim = c(0,20))
 # detect those with large difference
 
@@ -270,9 +282,28 @@ ggplot(subset(csn_sites), # , Longitude > -130 & Latitude > 20
 
 #### filling the NAs for each site (logged, no negative)- na.omit & check Mix Error ####
 csn_daily = subset(csn_daily, SiteCode != "20900035")
-n.site = length(unique(csn_daily$SiteCode))
+csn_daily$PM2.5RC = NULL
 csn_miss = as.data.frame(csn_daily)
-csn_miss$PM25_AQS = NULL
+csn_miss$PM25 = csn_miss$PM25_Combine
+csn_miss$PM25_AQS = csn_miss$PM25_Combine = NULL
+
+## remove the rows where all component concentrations are NAs
+col.withAllNA = ncol(csn_miss)
+cols.comp.pm = 5:col.withAllNA # columns for components
+col.component.pm = ncol(site_single[, cols.comp.pm]) # the code does not work for data.table
+# earlier (before 2024) also interpolate for columns with PM concentration only, now remove, but these rows may not considered because lots of PM fromo 2016 are missing
+# from 2024, combine the AQS first, cause the measuremnts are better correlated with AQS, but the interpolations (2023.03 data or before) are not
+
+cols.comp = 4:col.withAllNA # columns for PM/components
+col.component = ncol(site_single[, cols.comp]) 
+
+# a = is.na(site_single[, cols.comp])
+# rowSums(a)
+
+csn_miss = subset(csn_miss, 
+                  rowSums(is.na(csn_miss[, cols.comp.pm])) != 
+                    col.component.pm)
+n.site = length(unique(csn_miss$SiteCode))
 
 # create data.frame to store results
 running_avg_sum = linear_sum = mice_sum = rf_sum = NULL
@@ -289,24 +320,13 @@ colnames(rf_vw_oob_summary)[1] = "Variables"
 #### start interpolating ####
 for (i in 1:n.site){ 
   # 12, 20, 89, 101-2, 124 (before_2015 data)
-  # 3, 13, 35, 47, 69, 74, 110, 142 (after_2015 data)
+  # 3 (no Ca), 13, 35, 47, 69, 74, 110 (the rest no PM) (after_2015 data)
 
   ###### 1.prepare data set - remove those with only NA & log ######
   site.study = unique(csn_miss$SiteCode)[i]
-  site_single = subset(csn_miss, SiteCode == site.study)
-  row.all = nrow(site_single)
+  site_single_noAllNA = subset(csn_miss, SiteCode == site.study)
+  # row.all = nrow(site_single)
 
-  ## remove the rows where all component concentrations are NAs
-  col.withAllNA = ncol(site_single)
-  cols.comp = 4:col.withAllNA # columns for PM/components
-  col.component = ncol(site_single[, cols.comp]) # the code does not work for data.table
-  
-  # a = is.na(site_single[, cols.comp])
-  # rowSums(a)
-  
-  site_single_noAllNA = subset(site_single, 
-                               rowSums(is.na(site_single[, cols.comp])) != 
-                                 col.component)
   row.No = nrow(site_single_noAllNA)
   
   ## detect the percent of missing concentration values for each component
@@ -337,16 +357,15 @@ for (i in 1:n.site){
   na.count = sum(is.na(site_single_log[ ,cols.comp]))
   na.percent = na.count/(row.No * col.component)
   
-  # site_single_no_NA$Accept.PM2.5 = NA
+  # site_single_no_NA$PM25 = NA
   # site_single_no_NA = 
-  #   relocate(site_single_no_NA, Accept.PM2.5, .after = State)
+  #   relocate(site_single_no_NA, PM25, .after = State)
   # 
   # random set a dataframe with same percent of NAs as the original dataset
-  if(sum(is.na(site_single$Accept.PM2.5)) == row.all){
-    site_single_log$Accept.PM2.5 = NULL
+  if(sum(is.na(site_single_noAllNA$PM25)) == row.No){
+    site_single_log$PM25 = NULL
     site_single_no_NA = na.omit(site_single_log)
-    site_single_no_NA = na.omit(site_single_log_noPM)
-    
+
     cols.comp.use = cols.comp[1:(col.component-1)]
     
   } else{
@@ -411,7 +430,7 @@ for (i in 1:n.site){
   mix_error_intp = data.frame(State = site_single_rdm_NA$State[1], 
                               SiteCode = site.study, 
                               percent.NA = na.percent, 
-                              row.total = row.all, 
+                              # row.total = row.all, 
                               row.not.all.NA = row.No, 
                               row.no.NA = nrow(site_single_rdm_NA), 
                               me.running.avg = me.running.avg, 
@@ -463,31 +482,31 @@ for (i in 1:n.site){
   rf_vw_oob = data.frame(sgl_intp_rf_mf$OOBerror)
   colnames(rf_vw_oob) = paste0("X", site.study)
   
-  if(sum(is.na(site_single$Accept.PM2.5)) == row.all){
+  if(sum(is.na(site_single$PM25)) == row.No){
     # insert first row of NA
     rf_vw_oob = 
       rbind(data.frame(lapply(rf_vw_oob, function(x) NA)), rf_vw_oob)
     
-    # insert Accept.PM2.5 column of NA
+    # insert PM25 column of NA
     sgl_intp_running_avg = 
       sgl_intp_running_avg %>%
-      dplyr::mutate(Accept.PM2.5 = NA) %>%
-      relocate(Accept.PM2.5, .after = State)
+      dplyr::mutate(PM25 = NA) %>%
+      relocate(PM25, .after = State)
     
     sgl_intp_linear = 
       sgl_intp_linear %>%
-      dplyr::mutate(Accept.PM2.5 = NA) %>%
-      relocate(Accept.PM2.5, .after = State)
+      dplyr::mutate(PM25 = NA) %>%
+      relocate(PM25, .after = State)
     
     sgl_intp_mice = 
       sgl_intp_mice %>%
-      dplyr::mutate(Accept.PM2.5 = NA) %>%
-      relocate(Accept.PM2.5, .after = State)
+      dplyr::mutate(PM25 = NA) %>%
+      relocate(PM25, .after = State)
     
     sgl_intp_rf = 
       sgl_intp_rf %>%
-      dplyr::mutate(Accept.PM2.5 = NA) %>%
-      relocate(Accept.PM2.5, .after = State)
+      dplyr::mutate(PM25 = NA) %>%
+      relocate(PM25, .after = State)
   } 
   
   rf_vw_oob_summary = cbind(rf_vw_oob_summary, rf_vw_oob[, 1])
@@ -502,24 +521,45 @@ rownames(p_miss_summary) = 1:nrow(p_miss_summary)
 #### output interpolation results ####
 
 # out put results for data until 2015
-write.csv(p_miss_summary, "CSN_Missing_Rate_Site_until_2015_2023.03.csv")
-write.csv(mix_error_intp_pstv_summary, "CSN_interpulation_Mix_Error_until_2015_2023.03.csv")
-write.csv(rf_vw_oob_summary, "CSN_OOBerror_random-forest_until_2015_2023.03.csv")
+write.csv(p_miss_summary, "CSN_Missing_Rate_Site_until_2015_2024.04.csv")
+write.csv(mix_error_intp_pstv_summary, "CSN_interpulation_Mix_Error_until_2015_2024.04.csv")
+write.csv(rf_vw_oob_summary, "CSN_OOBerror_random-forest_until_2015_2024.04.csv")
 
-write.csv(running_avg_sum, "CSN_interpulation_running-average_until_2015_2023.03.csv")
-write.csv(linear_sum, "CSN_interpulation_linear_until_2015_2023.03.csv")
-write.csv(mice_sum, "CSN_interpulation_multi-mice_until_2015_2023.03.csv")
-write.csv(rf_sum, "CSN_interpulation_random-forest_until_2015_2023.03.csv")
+write.csv(running_avg_sum, "CSN_interpulation_running-average_until_2015_2024.04.csv")
+write.csv(linear_sum, "CSN_interpulation_linear_until_2015_2024.04.csv")
+write.csv(mice_sum, "CSN_interpulation_multi-mice_until_2015_2024.04.csv")
+write.csv(rf_sum, "CSN_interpulation_random-forest_until_2015_2024.04.csv")
 
 # out put results for data from 2016
-write.csv(p_miss_summary, "CSN_Missing_Rate_Site_from_2016_2023.03.csv")
-write.csv(mix_error_intp_pstv_summary, "CSN_interpulation_Mix_Error_from_2016_2023.03.csv")
-write.csv(rf_vw_oob_summary, "CSN_OOBerror_random-forest_from_2016_2023.03.csv")
+write.csv(p_miss_summary, "CSN_Missing_Rate_Site_from_2016_2024.04.csv")
+write.csv(mix_error_intp_pstv_summary, "CSN_interpulation_Mix_Error_from_2016_2024.04.csv")
+write.csv(rf_vw_oob_summary, "CSN_OOBerror_random-forest_from_2016_2024.04.csv")
 
-write.csv(running_avg_sum, "CSN_interpulation_running-average_from_2016_2023.03.csv")
-write.csv(linear_sum, "CSN_interpulation_linear_from_2016_2023.03.csv")
-write.csv(mice_sum, "CSN_interpulation_multi-mice_from_2016_2023.03.csv")
-write.csv(rf_sum, "CSN_interpulation_random-forest_from_2016_2023.03.csv")
+write.csv(running_avg_sum, "CSN_interpulation_running-average_from_2016_2024.04.csv")
+write.csv(linear_sum, "CSN_interpulation_linear_from_2016_2024.04.csv")
+write.csv(mice_sum, "CSN_interpulation_multi-mice_from_2016_2024.04.csv")
+write.csv(rf_sum, "CSN_interpulation_random-forest_from_2016_2024.04.csv")
+
+
+# # out put results for data until 2015
+# write.csv(p_miss_summary, "CSN_Missing_Rate_Site_until_2015_2023.03.csv")
+# write.csv(mix_error_intp_pstv_summary, "CSN_interpulation_Mix_Error_until_2015_2023.03.csv")
+# write.csv(rf_vw_oob_summary, "CSN_OOBerror_random-forest_until_2015_2023.03.csv")
+# 
+# write.csv(running_avg_sum, "CSN_interpulation_running-average_until_2015_2023.03.csv")
+# write.csv(linear_sum, "CSN_interpulation_linear_until_2015_2023.03.csv")
+# write.csv(mice_sum, "CSN_interpulation_multi-mice_until_2015_2023.03.csv")
+# write.csv(rf_sum, "CSN_interpulation_random-forest_until_2015_2023.03.csv")
+# 
+# # out put results for data from 2016
+# write.csv(p_miss_summary, "CSN_Missing_Rate_Site_from_2016_2023.03.csv")
+# write.csv(mix_error_intp_pstv_summary, "CSN_interpulation_Mix_Error_from_2016_2023.03.csv")
+# write.csv(rf_vw_oob_summary, "CSN_OOBerror_random-forest_from_2016_2023.03.csv")
+# 
+# write.csv(running_avg_sum, "CSN_interpulation_running-average_from_2016_2023.03.csv")
+# write.csv(linear_sum, "CSN_interpulation_linear_from_2016_2023.03.csv")
+# write.csv(mice_sum, "CSN_interpulation_multi-mice_from_2016_2023.03.csv")
+# write.csv(rf_sum, "CSN_interpulation_random-forest_from_2016_2023.03.csv")
 
 # ### to find out how was mixError calculated, the dataset was generated from the loop above
 # # based on IMPROVE data
@@ -615,7 +655,7 @@ OOB_summary_aft =
 dup_row_bef = c("EC.TOR.unadjust.88", 
                 "OC.TOR.unadjusted.88", 
                 "OP.TOR.unadjusted.88",
-                "Accept.PM2.5")
+                "PM25")
 dup_row_aft = c("EC.TOR.88", 
                 "OC.88", 
                 "OPC.TOR.88",
@@ -889,7 +929,7 @@ miss_aft =
 dup_row_bef = c("EC.TOR.unadjust.88", 
                 "OC.TOR.unadjusted.88", 
                 "OP.TOR.unadjusted.88",
-                "Accept.PM2.5")
+                "PM25")
 dup_row_aft = c("EC.TOR.88", 
                 "OC.88", 
                 "OPC.TOR.88",
@@ -1322,7 +1362,7 @@ for (i in 1:n.site){
   mix_error_intp = data.frame(State = site_single_rdm_NA$State[1], 
                               SiteCode = site.study, 
                               percent.NA = na.percent, 
-                              row.total = row.all, 
+                              # row.total = row.all, 
                               row.not.all.NA = row.No, 
                               row.no.NA = nrow(site_single_rdm_NA), 
                               me.running.avg = me.running.avg, 
