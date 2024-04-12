@@ -10,7 +10,6 @@ setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/
 getwd()
 data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
 
-
 ##packages in need
 library(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
 library(ggplot2)
@@ -150,6 +149,11 @@ plot(us_states_csn_NA)
 ##### 11111. CSN - Fill the Missing, till & after 2015 separately #####
 ####################################################################################
 #### generate basic data for filling ####
+aqs_PM25 = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/EPA_CSN_AQS_daily_PM25.csv")
+aqs_PM25$V1 = NULL
+aqs_PM25$Date = as.Date(aqs_PM25$Date)
+sapply(aqs_PM25, class)
+
 # csn_daily = fread("CSN_Component_with_missing_Before_2015.csv")
 # csn_daily = fread("CSN_Component_with_missing_After_2015.csv")
 # csn_daily = fread("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_Component_with_missing_After_2015.csv")
@@ -161,15 +165,10 @@ csn_daily$V1 = NULL
 csn_daily$Date = as.Date(csn_daily$Date)
 sapply(csn_daily, class)
 
-aqs_PM25 = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/EPA_CSN_AQS_daily_PM25.csv")
-aqs_PM25$V1 = NULL
-aqs_PM25$Date = as.Date(aqs_PM25$Date)
-sapply(aqs_PM25, class)
-
 csn_daily = plyr::rename(csn_daily, 
                          c("Accept.PM2.5" = "PM25"))
 
-# match PM2.5
+# match PM2.5 by AQS values
 csn_daily = merge(csn_daily, aqs_PM25)
 
 csn_daily$PM25_Combine = 
@@ -184,17 +183,17 @@ summary(csn_daily_PM)
 csn_daily_PM = subset(csn_daily_PM, !is.na(PM25))
 summary(csn_daily_PM)
 
-plot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS)
-plot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, 
-     ylim = c(0,100), xlim = c(0,100))
-cor(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, method = "spearman")
-cor(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, method = "pearson")
-cor(csn_daily_PM$PM25, csn_daily_PM$PM25_Combine, method = "spearman")
-cor(csn_daily_PM$PM25, csn_daily_PM$PM25_Combine, method = "pearson")
-
-boxplot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS)
-boxplot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, 
-        ylim = c(0,20))
+# plot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS)
+# plot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, 
+#      ylim = c(0,100), xlim = c(0,100))
+# cor(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, method = "spearman")
+# cor(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, method = "pearson")
+# cor(csn_daily_PM$PM25, csn_daily_PM$PM25_Combine, method = "spearman")
+# cor(csn_daily_PM$PM25, csn_daily_PM$PM25_Combine, method = "pearson")
+# 
+# boxplot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS)
+# boxplot(csn_daily_PM$PM25, csn_daily_PM$PM25_AQS, 
+#         ylim = c(0,20))
 # detect those with large difference
 
 
@@ -204,9 +203,39 @@ csn_daily$SiteCode = as.character(csn_daily$SiteCode)
 # reorder the dataframe
 csn_daily = csn_daily[with(csn_daily, order(State, SiteCode, Date)), ]
 
+#### filling the NAs for each site (logged, no negative)- na.omit & check Mix Error ####
+csn_daily = subset(csn_daily, SiteCode != "20900035")
+csn_daily$PM2.5RC = NULL
+csn_miss = as.data.frame(csn_daily)
+csn_miss$PM25 = csn_miss$PM25_Combine
+csn_miss$PM25_AQS = csn_miss$PM25_Combine = NULL
+
+## remove the rows where all component concentrations are NAs
+col.withAllNA = ncol(csn_miss)
+cols.comp.pm = 5:col.withAllNA # columns for components
+col.component.pm = ncol(csn_miss[, cols.comp.pm]) # the code does not work for data.table
+names(csn_miss)
+# earlier (before 2024) also interpolate for columns with PM concentration only, now remove, but these rows may not considered because lots of PM fromo 2016 are missing
+# from 2024, combine the AQS first, cause the measuremnts are better correlated with AQS, but the interpolations (2023.03 data or before) are not
+
+cols.comp = 4:col.withAllNA # columns for PM/components
+col.component = length(names(csn_miss)[cols.comp]) 
+
+# a = is.na(site_single[, cols.comp])
+# rowSums(a)
+
+csn_miss = subset(csn_miss, 
+                  rowSums(is.na(csn_miss[, cols.comp.pm])) != 
+                    col.component.pm)
+n.site = length(unique(csn_miss$SiteCode))
+dim(csn_miss) # 44558,55 for before; 54668, 68 for data since 2016
+
+# write.csv(csn_miss, "CSN_NA_after_matching_AQS_PM_Before_2015_2024.04.csv")
+# write.csv(csn_miss, "CSN_NA_after_matching_AQS_PM_Since_2016_2024.04.csv")
+
 # calculate the overall percentages of NA for selected species
 ## !!! until 2015
-site_day_NA_count = ddply(csn_daily, 
+site_day_NA_count = ddply(csn_miss, 
                           .(SiteCode), 
                           summarise,
                           count = length(Date),
@@ -216,7 +245,7 @@ site_day_NA_count = ddply(csn_daily,
                           SO4.NA = sum(is.na(SO4)))
 
 ## !!! after 2015
-site_day_NA_count = ddply(csn_daily, 
+site_day_NA_count = ddply(csn_miss, 
                           .(SiteCode), 
                           summarise,
                           count = length(Date),
@@ -233,15 +262,15 @@ site_day_NA_count$SO4.NA.per = round(site_day_NA_count$SO4.NA/site_day_NA_count$
 
 # check the sites with high percentage NAs
 site.lots.NA = site_day_NA_count$SiteCode[
-  site_day_NA_count$Mg.NA.per > 0.5 & 
-    site_day_NA_count$SO4.NA.per > 0.5 &
-    site_day_NA_count$EC.NA.per > 0.5 & 
-    site_day_NA_count$OC.NA.per > 0.5]
+  site_day_NA_count$Mg.NA.per > 0.05 & 
+    site_day_NA_count$SO4.NA.per > 0.05 &
+    site_day_NA_count$EC.NA.per > 0.05 & 
+    site_day_NA_count$OC.NA.per > 0.05]
 length(site.lots.NA)
 
-csn_daily_halfNA = subset(csn_daily, SiteCode %in% site.lots.NA)
-# subset(csn_daily, SiteCode == site.lots.NA[1])[1:12, 2:5]
-# subset(csn_daily, SiteCode == site.lots.NA[34])[1:110, 2:5]
+csn_miss_halfNA = subset(csn_miss, SiteCode %in% site.lots.NA)
+# subset(csn_miss, SiteCode == site.lots.NA[1])[1:12, 2:5]
+# subset(csn_miss, SiteCode == site.lots.NA[34])[1:110, 2:5]
 
 # plot their distribution
 csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
@@ -252,7 +281,7 @@ csn_sites$High.P.NA[csn_sites$SiteCode %in% site.lots.NA] = "Y"
 # only keep the sites used
 csn_sites = subset(csn_sites, 
                    SiteCode %in% 
-                     unique(csn_daily$SiteCode))
+                     unique(csn_miss$SiteCode))
 table(csn_sites$High.P.NA)
 
 # mainland US
@@ -272,39 +301,9 @@ ggplot(subset(csn_sites), # , Longitude > -130 & Latitude > 20
   scale_color_npg() +
   theme_bw()
 
-# csn_miss = subset(csn_daily, !(SiteCode %in% site.lots.NA))
-## 135 out of 136 sites left for data before 2015, records in 2022
-## 146 out of 149 sites left for data after 2015, records in 2022
-## after considering qualifier data in 2023.02, MANY MORE sites excluded
-## thus, remove this analysis to the interpolation for each site from 2023.02
-## from now on, code in PM_Comp_Interpolate
 
-
-#### filling the NAs for each site (logged, no negative)- na.omit & check Mix Error ####
-csn_daily = subset(csn_daily, SiteCode != "20900035")
-csn_daily$PM2.5RC = NULL
-csn_miss = as.data.frame(csn_daily)
-csn_miss$PM25 = csn_miss$PM25_Combine
-csn_miss$PM25_AQS = csn_miss$PM25_Combine = NULL
-
-## remove the rows where all component concentrations are NAs
-col.withAllNA = ncol(csn_miss)
-cols.comp.pm = 5:col.withAllNA # columns for components
-col.component.pm = ncol(site_single[, cols.comp.pm]) # the code does not work for data.table
-# earlier (before 2024) also interpolate for columns with PM concentration only, now remove, but these rows may not considered because lots of PM fromo 2016 are missing
-# from 2024, combine the AQS first, cause the measuremnts are better correlated with AQS, but the interpolations (2023.03 data or before) are not
-
-cols.comp = 4:col.withAllNA # columns for PM/components
-col.component = ncol(site_single[, cols.comp]) 
-
-# a = is.na(site_single[, cols.comp])
-# rowSums(a)
-
-csn_miss = subset(csn_miss, 
-                  rowSums(is.na(csn_miss[, cols.comp.pm])) != 
-                    col.component.pm)
-n.site = length(unique(csn_miss$SiteCode))
-
+#### start interpolating ####
+###### 0.create df to store results ######
 # create data.frame to store results
 running_avg_sum = linear_sum = mice_sum = rf_sum = NULL
 mix_error_intp_pstv_summary = NULL
@@ -317,7 +316,6 @@ rf_vw_oob_summary = data.frame(csn_var[4:nrow(csn_var), ])
 colnames(rf_vw_oob_summary)[1] = "Variables"
 # a = data.frame(csn_var[4:nrow(csn_var), ])
 
-#### start interpolating ####
 for (i in 1:n.site){ 
   # 12, 20, 89, 101-2, 124 (before_2015 data)
   # 3 (no Ca), 13, 35, 47, 69, 74, 110 (the rest no PM) (after_2015 data)
@@ -582,21 +580,24 @@ write.csv(rf_sum, "CSN_interpulation_random-forest_from_2016_2024.04.csv")
 # nrmse(rf_intp_example, rdm_NA_example, site_noNa_example)
 
 #### plot: Mix Erro distribution ####
-ME_summary_bef = read.csv("CSN_interpulation_Mix_Error_until_2015_2023.03.csv")
-ME_summary_aft = read.csv("CSN_interpulation_Mix_Error_from_2016_2023.03.csv")
+# ME_summary_bef = read.csv("CSN_interpulation_Mix_Error_until_2015_2023.03.csv")
+# ME_summary_aft = read.csv("CSN_interpulation_Mix_Error_from_2016_2023.03.csv")
+
+ME_summary_bef = read.csv("CSN_interpulation_Mix_Error_until_2015_2024.04.csv")
+ME_summary_aft = read.csv("CSN_interpulation_Mix_Error_from_2016_2024.04.csv")
 
 ## data for plotting
 ME_summary_bef$X = NULL
-colnames(ME_summary_bef)[7:10]
-colnames(ME_summary_bef)[7:10] = c("Running_Avg", "Linear", "Multiple", "Random_Forest")
+colnames(ME_summary_bef)[6:9]
+colnames(ME_summary_bef)[6:9] = c("Running_Avg", "Linear", "Multiple", "Random_Forest")
 ME_bef_plot = select(ME_summary_bef, SiteCode, Running_Avg, Linear, Multiple, Random_Forest)
 ME_bef_plot = gather(ME_bef_plot, "Interpolations", "NRMSE", -SiteCode)
 # ME_bef_plot = gather(ME_bef_plot, "Interpolations", "Mix_Error", -SiteCode)
 ME_bef_plot$Year = "2011-15"
 
 ME_summary_aft$X = NULL
-colnames(ME_summary_aft)[7:10]
-colnames(ME_summary_aft)[7:10] = c("Running_Avg", "Linear", "Multiple", "Random_Forest")
+colnames(ME_summary_aft)[6:9]
+colnames(ME_summary_aft)[6:9] = c("Running_Avg", "Linear", "Multiple", "Random_Forest")
 ME_aft_plot = select(ME_summary_aft, SiteCode, Running_Avg, Linear, Multiple, Random_Forest)
 ME_aft_plot = gather(ME_aft_plot, "Interpolations", "NRMSE", -SiteCode)
 # ME_aft_plot = gather(ME_aft_plot, "Interpolations", "Mix_Error", -SiteCode)
@@ -628,8 +629,12 @@ ggplot(ME_plot, aes(Interpolations, NRMSE, fill = Interpolations)) +
   theme.mix.err
 
 #### plot: OOB (out-of-bag) Error distribution ####
-OOB_summary_bef = read.csv("CSN_OOBerror_random-forest_until_2015_2023.03.csv")
-OOB_summary_aft = read.csv("CSN_OOBerror_random-forest_from_2016_2023.03.csv")
+# OOB_summary_bef = read.csv("CSN_OOBerror_random-forest_until_2015_2023.03.csv")
+# OOB_summary_aft = read.csv("CSN_OOBerror_random-forest_from_2016_2023.03.csv")
+
+OOB_summary_bef = read.csv("CSN_OOBerror_random-forest_until_2015_2024.04.csv")
+OOB_summary_aft = read.csv("CSN_OOBerror_random-forest_from_2016_2024.04.csv")
+
 OOB_summary_bef$X = OOB_summary_aft$X = NULL
 
 # convert values in first column to row names
@@ -651,30 +656,59 @@ OOB_summary_aft =
   OOB_summary_aft[!(
     row.names(OOB_summary_aft) == "OC"),]
 
+# # select rows used as OC, EC & OP for PMF
+# dup_row_bef = c("EC.TOR.unadjust.88", 
+#                 "OC.TOR.unadjusted.88", 
+#                 "OP.TOR.unadjusted.88",
+#                 "PM25")
+# dup_row_aft = c("EC.TOR.88", 
+#                 "OC.88", 
+#                 "OPC.TOR.88",
+#                 "PM2.5RC")
+# 
+# # Identify the rows to rename
+# row_to_change_bef <- 
+#   rownames(OOB_summary_bef) %in% 
+#   dup_row_bef
+# summary(row_to_change_bef)
+# 
+# row_to_change_aft <- 
+#   rownames(OOB_summary_aft) %in% 
+#   dup_row_aft
+# summary(row_to_change_aft)
+# 
+# # Rename the rows
+# rownames(OOB_summary_bef)[row_to_change_bef] <- c("PM25", "EC", "OC", "OP")
+# rownames(OOB_summary_aft)[row_to_change_aft] <- c("EC", "OC", "OP","PM25")
+
 # select rows used as OC, EC & OP for PMF
-dup_row_bef = c("EC.TOR.unadjust.88", 
-                "OC.TOR.unadjusted.88", 
-                "OP.TOR.unadjusted.88",
-                "PM25")
-dup_row_aft = c("EC.TOR.88", 
-                "OC.88", 
-                "OPC.TOR.88",
-                "PM2.5RC")
+row_bef = 
+  c("EC.TOR.unadjust.88" = "EC", 
+    "EC1.unadjusted.88" = "EC1", 
+    "EC2.unadjusted.88" = "EC2",
+    "EC3.unadjusted.88" = "EC3",
+    "OC.TOR.unadjusted.88" = "OC",
+    "OC1.unadjusted.88" = "OC1",
+    "OC2.unadjusted.88" = "OC2", 
+    "OC3.unadjusted.88" = "OC3",
+    "OC4.unadjusted.88" = "OC4",
+    "OP.TOR.unadjusted.88" = "OP")
 
-# Identify the rows to rename
-row_to_change_bef <- 
-  rownames(OOB_summary_bef) %in% 
-  dup_row_bef
-summary(row_to_change_bef)
+row_aft = 
+  c("EC.TOR.88" = "EC", 
+    "OC.88" = "OC",
+    "OC1.88" = "OC1",
+    "OC2.88" = "OC2", 
+    "OC3.88" = "OC3",
+    "OC4.88" = "OC4",
+    "OPC.TOR.88" = "OP")
 
-row_to_change_aft <- 
-  rownames(OOB_summary_aft) %in% 
-  dup_row_aft
-summary(row_to_change_aft)
+rownames(OOB_summary_bef)[rownames(OOB_summary_bef) %in% names(row_bef)] = row_bef
+rownames(OOB_summary_aft)[rownames(OOB_summary_aft) %in% names(row_aft)] = row_aft
 
-# Rename the rows
-rownames(OOB_summary_bef)[row_to_change_bef] <- c("PM25", "EC", "OC", "OP")
-rownames(OOB_summary_aft)[row_to_change_aft] <- c("EC", "OC", "OP","PM25")
+# change column names
+names(OOB_summary_bef)[2:ncol(OOB_summary_bef)] = ME_summary_bef$SiteCode
+names(OOB_summary_aft)[2:ncol(OOB_summary_aft)] = ME_summary_aft$SiteCode
 
 # get common rownames & colnames
 obb_common_rows <- intersect(row.names(OOB_summary_bef), 
@@ -684,28 +718,93 @@ obb_common_cols <- intersect(names(OOB_summary_bef),
                              names(OOB_summary_aft))
 
 # Subset data frames using common rownames and column names
-OOB_commonRowCol_bef <- OOB_summary_bef[obb_common_rows, 
-                                        obb_common_cols]
-OOB_commonRowCol_aft <- OOB_summary_aft[obb_common_rows, 
-                                        obb_common_cols]
+OOB_commonRowCol_bef <- OOB_summary_bef[obb_common_rows, ]
+OOB_commonRowCol_aft <- OOB_summary_aft[obb_common_rows, ]
 
-# change variable column to rownames
+# remove not used rows 
+csn_remove = c("OC.unadjusted.88", "EC.unadjusted.88", 
+               "OPC.unadjusted.88")
+OOB_commonRowCol_bef = 
+  OOB_commonRowCol_bef[!(rownames(OOB_commonRowCol_bef) %in% csn_remove), ]
+OOB_commonRowCol_aft = 
+  OOB_commonRowCol_aft[!(rownames(OOB_commonRowCol_aft) %in% csn_remove), ]
+
+# change variable column to rownames 
 OOB_commonRowCol_bef$Variables = row.names(OOB_commonRowCol_bef)
 OOB_commonRowCol_aft$Variables = row.names(OOB_commonRowCol_aft)
+
+## combine two dataframe & remove rownames to save
+OOB_RowCol_bef_t = data.frame(t(OOB_commonRowCol_bef))
+OOB_RowCol_bef_t = subset(OOB_RowCol_bef_t, 
+                          row.names(OOB_RowCol_bef_t) != 
+                            "Variables")
+OOB_RowCol_bef_t$Year = "2011-15"
+
+OOB_RowCol_aft_t = data.frame(t(OOB_commonRowCol_aft))
+OOB_RowCol_aft_t = subset(OOB_RowCol_aft_t, 
+                          row.names(OOB_RowCol_aft_t) != 
+                            "Variables")
+OOB_RowCol_aft_t$Year = "2016-20"
+
+# change row.names to SiteCode
+OOB_RowCol_bef_t$SiteCode = row.names(OOB_RowCol_bef_t)
+OOB_RowCol_aft_t$SiteCode = row.names(OOB_RowCol_aft_t)
+
+OOB_comb = rbind(OOB_RowCol_bef_t, OOB_RowCol_aft_t)
+
+# remove "X" in SiteCode
+OOB_comb$SiteCode = gsub("X", "", OOB_comb$SiteCode)
+row.names(OOB_comb) = NULL
+
+# Move grouped columns to the right of the dataframe
+# match(), select columns that match a specific pattern in their names
+# everything(), include all remaining columns not selected by matches()
+OC.EC = c("EC", "OC")
+ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
+OOB_comb = OOB_comb %>%
+  select(!(matches(OC.EC)), 
+         everything())
+OOB_comb = OOB_comb %>%
+  select(!(matches(ions)), 
+         everything())
+
+# OOB_comb$PM25 = -999
+dim(OOB_comb)
+
+# Replace other columns
+OOB_comb = OOB_comb %>% relocate(PM25, .after = SO4)
+OOB_comb = OOB_comb %>% relocate(Year, .after = PM25)
+OOB_comb = OOB_comb %>% relocate(SiteCode, .before = Ag)
+
+# average of the time till & from 2016
+OOB_comb[, 2:(ncol(OOB_comb) - 1)] =
+  lapply(OOB_comb[, 2:(ncol(OOB_comb) - 1)], as.numeric)
+OOB_comb_avg = aggregate(.~SiteCode, 
+                         data=OOB_comb[, 1:(ncol(OOB_comb)-1)], 
+                         mean)
+dim(OOB_comb_avg)
+
+# write.csv(OOB_comb, "CSN_OOBerror_random-forest_All.csv")
+
+write.csv(OOB_comb, "CSN_OOBerror_random-forest_All_2024.csv")
+write.csv(OOB_comb_avg, "CSN_OOBerror_random-forest_for_PMF_2024.csv")
 
 # combine two dataframe & remove rownames
 OOB_plot = rbind(OOB_commonRowCol_bef, OOB_commonRowCol_aft)
 rownames(OOB_plot) <- NULL
 
 # gather dataframe 
-OOB_plot = gather(OOB_plot, 
-                  "SiteCode", "OOB_error",
-                  -Variables)
-colnames(OOB_plot)[1] = "Species"
+OOB_plot = 
+  pivot_longer(
+    OOB_comb, 
+    cols = -c(SiteCode, Year),
+    names_to = "Species",
+    values_to = "OOB_error"
+  )
 
-# the 1st appearance of sitecode-variable group is from "2011-15" and 2nd "2016-20"
-OOB_plot$Year = "2011-15"
-OOB_plot$Year[duplicated(OOB_plot[, 1:2])] = "2016-20"
+# # the 1st appearance of sitecode-variable group is from "2011-15" and 2nd "2016-20"
+# OOB_plot$Year = "2011-15"
+# OOB_plot$Year[duplicated(OOB_plot[, 1:2])] = "2016-20"
 
 # group species
 ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
@@ -737,35 +836,14 @@ ggplot(OOB_plot, aes(Species, OOB_error)) +
   theme_bw() +
   theme.obb
 
-# exclude OC/EC subgroups
-ggplot(
-  subset(
-    OOB_plot, 
-    !(grepl("88", OOB_plot$Species, fixed = T))), 
-  aes(Species, OOB_error)) +
-  geom_boxplot() +
-  geom_jitter(color="black", size=1, alpha=0.5) +
-  facet_grid(Year ~ class, scales = "free", space = "free") + 
-  # scale_fill_npg() + 
-  ggtitle("CSN_OOB_Error") +
-  theme_bw() +
-  theme.obb
-
-OOB_final_plot = 
-  subset(
-    OOB_plot, 
-    !(grepl("88", OOB_plot$Species, fixed = T)) &
-      !(grepl("PM", OOB_plot$Species, fixed = T)))
-colnames(OOB_final_plot)[1] = "Species"
-
-OOB_final_plot$Species[OOB_final_plot$Species == "K."] = "KIon"
-OOB_final_plot$Species[OOB_final_plot$Species == "Na."] = "NaIon"
-OOB_final_plot$Species[OOB_final_plot$Species == "NH4."] = "NH4Ion"
-OOB_final_plot$Species[OOB_final_plot$Species == "NO3"] = "NO3Ion"
-OOB_final_plot$Species[OOB_final_plot$Species == "SO4"] = "SO4Ion"
+OOB_plot$Species[OOB_plot$Species == "K."] = "KIon"
+OOB_plot$Species[OOB_plot$Species == "Na."] = "NaIon"
+OOB_plot$Species[OOB_plot$Species == "NH4."] = "NH4Ion"
+OOB_plot$Species[OOB_plot$Species == "NO3"] = "NO3Ion"
+OOB_plot$Species[OOB_plot$Species == "SO4"] = "SO4Ion"
 
 
-ggplot(OOB_final_plot, 
+ggplot(OOB_plot, 
   aes(Species, OOB_error)) +
   geom_boxplot() +
   geom_jitter(color="black", size=1, alpha=0.5) +
@@ -797,7 +875,7 @@ ggplot(OOB_final_plot,
         axis.text.y = element_text(color="grey25", size = 14, angle = 0, 
                                    hjust = 0.5, family = "Arial Unicode MS"))
 
-ggplot(OOB_final_plot, 
+ggplot(OOB_plot, 
        aes(Species, OOB_error, 
            color = class)) +
   geom_boxplot(outlier.colour = NA) +
@@ -836,7 +914,7 @@ percentiles = append(c(95, 98), percentiles)
 values <- quantile(OOB_plot$OOB_error, 
                    probs = percentiles/100)
 
-values <- quantile(subset(OOB_plot, Variables != "PM25")$OOB_error, 
+values <- quantile(subset(OOB_plot, Species != "PM25")$OOB_error, 
                    probs = percentiles/100)
 
 # Plot values at each percentile
@@ -850,67 +928,21 @@ ggplot(data.frame(percentiles, values),
   theme_bw() +
   theme.obb
 
-## combine two dataframe & remove rownames to save
-OOB_RowCol_bef_t = data.frame(t(OOB_commonRowCol_bef))
-OOB_RowCol_bef_t = subset(OOB_RowCol_bef_t, 
-                          row.names(OOB_RowCol_bef_t) != 
-                            "Variables")
-OOB_RowCol_bef_t$Year = "2011-15"
 
-OOB_RowCol_aft_t = data.frame(t(OOB_commonRowCol_aft))
-OOB_RowCol_aft_t = subset(OOB_RowCol_aft_t, 
-                          row.names(OOB_RowCol_aft_t) != 
-                            "Variables")
-OOB_RowCol_aft_t$Year = "2016-20"
-
-# change row.names to SiteCode
-OOB_RowCol_bef_t$SiteCode = row.names(OOB_RowCol_bef_t)
-OOB_RowCol_aft_t$SiteCode = row.names(OOB_RowCol_aft_t)
-
-OOB_comb = rbind(OOB_RowCol_bef_t, OOB_RowCol_aft_t)
-
-# remove "X" in SiteCode
-OOB_comb$SiteCode = gsub("X", "", OOB_comb$SiteCode)
-row.names(OOB_comb) = NULL
-
-# Remove variables not needed for PMF (C-subgroups)
-csn_remove = c("EC1.unadjusted.88", "EC2.unadjusted.88", "EC3.unadjusted.88",  
-               "OC1.unadjusted.88", "OC2.unadjusted.88", 
-               "OC3.unadjusted.88", "OC4.unadjusted.88",
-               "OC.unadjusted.88", "EC.unadjusted.88", "OPC.unadjusted.88",
-               "OP")
-OOB_comb[ ,csn_remove] <- list(NULL)
-
-# Move grouped columns to the right of the dataframe
-# match(), select columns that match a specific pattern in their names
-# everything(), include all remaining columns not selected by matches()
-OC.EC = c("EC", "OC")
-ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
-OOB_comb = OOB_comb %>%
-  select(!(matches(OC.EC)), 
-         everything())
-OOB_comb = OOB_comb %>%
-  select(!(matches(ions)), 
-         everything())
-
-# OOB_comb$PM25 = -999
-
-# Replace other columns
-OOB_comb = OOB_comb %>% relocate(PM25, .after = SO4)
-OOB_comb = OOB_comb %>% relocate(Year, .after = PM25)
-OOB_comb = OOB_comb %>% relocate(SiteCode, .before = Ag)
-
-write.csv(OOB_comb, "CSN_OOBerror_random-forest_All.csv")
 
 #### Plot: Missing percent file merge ####
-miss_bef = read.csv("CSN_Missing_Rate_Site_until_2015_2023.03.csv")
-miss_aft = read.csv("CSN_Missing_Rate_Site_from_2016_2023.03.csv")
+# miss_bef = read.csv("CSN_Missing_Rate_Site_until_2015_2023.03.csv")
+# miss_aft = read.csv("CSN_Missing_Rate_Site_from_2016_2023.03.csv")
+
+miss_bef = read.csv("CSN_Missing_Rate_Site_until_2015_2024.04.csv")
+miss_aft = read.csv("CSN_Missing_Rate_Site_from_2016_2024.04.csv")
 miss_bef$X = miss_aft$X = NULL
 
 # convert values in first column to row names
 rownames(miss_bef) <- miss_bef[,1]
 rownames(miss_aft) <- miss_aft[,1]
 
+# Changed selected to OC, EC & OP for PMF
 # check the potential duplicates
 "EC" %in% rownames(miss_bef)
 "OC" %in% rownames(miss_bef)
@@ -926,29 +958,29 @@ miss_aft =
     row.names(miss_aft) == "OC"),]
 
 # select rows used as OC, EC & OP for PMF
-dup_row_bef = c("EC.TOR.unadjust.88", 
-                "OC.TOR.unadjusted.88", 
-                "OP.TOR.unadjusted.88",
-                "PM25")
-dup_row_aft = c("EC.TOR.88", 
-                "OC.88", 
-                "OPC.TOR.88",
-                "PM2.5RC")
+row_bef = 
+  c("EC.TOR.unadjust.88" = "EC", 
+    "EC1.unadjusted.88" = "EC1", 
+    "EC2.unadjusted.88" = "EC2",
+    "EC3.unadjusted.88" = "EC3",
+    "OC.TOR.unadjusted.88" = "OC",
+    "OC1.unadjusted.88" = "OC1",
+    "OC2.unadjusted.88" = "OC2", 
+    "OC3.unadjusted.88" = "OC3",
+    "OC4.unadjusted.88" = "OC4",
+    "OP.TOR.unadjusted.88" = "OP")
 
-# Identify the rows to rename
-row_to_change_bef <- 
-  rownames(miss_bef) %in% 
-  dup_row_bef
-summary(row_to_change_bef)
+row_aft = 
+  c("EC.TOR.88" = "EC", 
+    "OC.88" = "OC",
+    "OC1.88" = "OC1",
+    "OC2.88" = "OC2", 
+    "OC3.88" = "OC3",
+    "OC4.88" = "OC4",
+    "OPC.TOR.88" = "OP")
 
-row_to_change_aft <- 
-  rownames(miss_aft) %in% 
-  dup_row_aft
-summary(row_to_change_aft)
-
-# Rename the rows
-rownames(miss_bef)[row_to_change_bef] <- c("PM25", "EC", "OC", "OP")
-rownames(miss_aft)[row_to_change_aft] <- c("EC", "OC", "OP","PM25")
+rownames(miss_bef)[rownames(miss_bef) %in% names(row_bef)] = row_bef
+rownames(miss_aft)[rownames(miss_aft) %in% names(row_aft)] = row_aft
 
 # get common rownames & colnames
 obb_common_rows <- intersect(row.names(miss_bef), 
@@ -958,10 +990,20 @@ obb_common_cols <- intersect(names(miss_bef),
                              names(miss_aft))
 
 # Subset data frames using common rownames and column names
-miss_commonRowCol_bef <- miss_bef[obb_common_rows, 
-                                  obb_common_cols]
-miss_commonRowCol_aft <- miss_aft[obb_common_rows, 
-                                  obb_common_cols]
+miss_commonRowCol_bef <- miss_bef[obb_common_rows, ]
+miss_commonRowCol_aft <- miss_aft[obb_common_rows, ]
+
+# remove not used rows 
+csn_remove = c("OC.unadjusted.88", "EC.unadjusted.88", 
+               "OPC.unadjusted.88")
+miss_commonRowCol_bef = 
+  miss_commonRowCol_bef[!(rownames(miss_commonRowCol_bef) %in% csn_remove), ]
+miss_commonRowCol_aft = 
+  miss_commonRowCol_aft[!(rownames(miss_commonRowCol_aft) %in% csn_remove), ]
+
+# change variable column to rownames 
+miss_commonRowCol_bef$Variables = row.names(miss_commonRowCol_bef)
+miss_commonRowCol_aft$Variables = row.names(miss_commonRowCol_aft)
 
 ## combine two dataframe & remove rownames to save
 miss_RowCol_bef_t = data.frame(t(miss_commonRowCol_bef))
@@ -986,14 +1028,6 @@ miss_comb = rbind(miss_RowCol_bef_t, miss_RowCol_aft_t)
 miss_comb$SiteCode = gsub("X", "", miss_comb$SiteCode)
 row.names(miss_comb) = NULL
 
-# Remove variables not needed for PMF (C-subgroups)
-csn_remove = c("EC1.unadjusted.88", "EC2.unadjusted.88", "EC3.unadjusted.88",  
-               "OC1.unadjusted.88", "OC2.unadjusted.88", 
-               "OC3.unadjusted.88", "OC4.unadjusted.88",
-               "OC.unadjusted.88", "EC.unadjusted.88", "OPC.unadjusted.88",
-               "OP")
-miss_comb[ ,csn_remove] <- list(NULL)
-
 # Move grouped columns to the right of the dataframe
 # match(), select columns that match a specific pattern in their names
 # everything(), include all remaining columns not selected by matches()
@@ -1006,12 +1040,19 @@ miss_comb = miss_comb %>%
   select(!(matches(ions)), 
          everything())
 
+# miss_comb$PM25 = -999
+dim(miss_comb)
+
 # Replace other columns
 miss_comb = miss_comb %>% relocate(PM25, .after = SO4)
 miss_comb = miss_comb %>% relocate(Year, .after = PM25)
 miss_comb = miss_comb %>% relocate(SiteCode, .before = Ag)
 
+# average of the time till & from 2016
 miss_comb$State = miss_comb$Date = NULL
+miss_comb[, 2:(ncol(miss_comb) - 1)] =
+  lapply(miss_comb[, 2:(ncol(miss_comb) - 1)], as.numeric)
+sapply(miss_comb, class)
 
 # change numemic rate to the XX in XX%
 miss_comb[, 2:(ncol(miss_comb)-1)] = lapply(
@@ -1020,105 +1061,105 @@ miss_comb[, 2:(ncol(miss_comb)-1)] = lapply(
 # multiple 100
 miss_comb[, 2:(ncol(miss_comb)-1)] = miss_comb[, 2:(ncol(miss_comb)-1)]*100
 
-write.csv(miss_comb, "CSN_Missing_Qualifier_interpolation_All.csv")
 
-# combine two dataframe & remove rownames
-miss_commonRowCol_bef$Variables = rownames(miss_commonRowCol_bef)
-miss_commonRowCol_aft$Variables = rownames(miss_commonRowCol_aft)
-miss_plot = rbind(miss_commonRowCol_bef, miss_commonRowCol_aft)
-rownames(miss_plot) <- NULL
+miss_comb_avg = aggregate(.~SiteCode, 
+                         data=miss_comb[, 1:(ncol(miss_comb)-1)], 
+                         mean)
+dim(miss_comb_avg)
+
+# write.csv(miss_comb, "CSN_Missing_Qualifier_interpolation_All.csv")
+
+write.csv(miss_comb, "CSN_Missing_Qualifier_interpolation_All_2024.csv")
+write.csv(miss_comb_avg, "CSN_Missing_Qualifier_interpolation_for_PMF_2024.csv")
 
 # gather dataframe 
-miss_plot = gather(miss_plot, 
-                  "SiteCode", "miss_error",
-                  -Variables)
-colnames(miss_plot)[1] = "Species"
-
-# the 1st appearance of sitecode-variable group is from "2011-15" and 2nd "2016-20"
-miss_plot$Year = "2011-15"
-miss_plot$Year[duplicated(miss_plot[, 1:2])] = "2016-20"
+miss_plot = 
+  pivot_longer(
+    miss_comb, 
+    cols = -c(SiteCode, Year),
+    names_to = "Species",
+    values_to = "missing_rate"
+  )
 
 # group species
+ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
 miss_plot$class = "Element"
 miss_plot$class[miss_plot$Species %in% ions] = "Ion"
 miss_plot$class[grepl("OC", miss_plot$Species, fixed = T) |
                  grepl("EC", miss_plot$Species, fixed = T) |
                  grepl("OP", miss_plot$Species, fixed = T)] = "OC.EC"
 
+miss_plot$Species[miss_plot$Species == "K."] = "KIon"
+miss_plot$Species[miss_plot$Species == "Na."] = "NaIon"
+miss_plot$Species[miss_plot$Species == "NH4."] = "NH4Ion"
+miss_plot$Species[miss_plot$Species == "NO3"] = "NO3Ion"
+miss_plot$Species[miss_plot$Species == "SO4"] = "SO4Ion"
+
+
+## plotting
+theme.obb = theme(axis.title.y.right = element_blank(),
+                  panel.spacing = unit(10, "mm"),   
+                  legend.background = element_blank(),
+                  strip.text = element_text(face="bold", size=rel(1.5)),
+                  strip.background = element_rect(fill="lightblue", colour="grey", size=16),
+                  axis.title.x = element_text(color="grey25", size = 16, vjust=-2, margin=margin(0,0,0,300)), 
+                  axis.title.y = element_text(color="grey25", size = 16, vjust=2, margin=margin(0,2,0,0)),
+                  plot.title=element_text(size=rel(2)), 
+                  axis.text.x = element_text(color="grey25", size = 14, angle = 90, hjust = 0.5, vjust = 0.5), plot.margin = unit(c(2,1,2, 2), "lines"),
+                  axis.text.y = element_text(color="grey25", size = 14, angle = 0, hjust = 0.5))
+
 # facet_grid with "free" space
-ggplot(miss_plot, aes(Species, miss_error)) +
+ggplot(miss_plot, aes(Species, missing_rate)) +
   geom_boxplot() +
   geom_jitter(color="black", size=1, alpha=0.5) +
   facet_grid(Year ~ class, scales = "free", space = "free") + 
   # scale_fill_npg() + 
-  ggtitle("CSN_miss_Error") +
+  ggtitle("CSN_missing_rate") +
   theme_bw() +
   theme.obb
 
-# exclude OC/EC subgroups
-ggplot(
-  subset(
-    miss_plot, 
-    !(grepl("88", miss_plot$Species, fixed = T))), 
-  aes(Species, miss_error)) +
+ggplot(miss_plot, 
+       aes(Species, missing_rate)) +
   geom_boxplot() +
   geom_jitter(color="black", size=1, alpha=0.5) +
   facet_grid(Year ~ class, scales = "free", space = "free") + 
   # scale_fill_npg() + 
-  ggtitle("CSN_miss_qualifier_interpolation") +
+  ggtitle("CSN_missing_rate") +
+  xlab(format_variable("PM25 Species")) +
+  # to display the superscript & subscript in axis labels
+  scale_x_discrete(labels = function(x) format_variable(x)) +
   theme_bw() +
-  # ylim(0, 0.5) +
-  ylim(0, 0.2) +
-  theme.obb
+  theme(panel.spacing.x = unit(0.2, "cm")) +
+  theme(panel.spacing.y = unit(0.2, "cm")) +
+  theme(axis.title.y.right = element_blank(),
+        panel.spacing = unit(10, "mm"),   
+        legend.background = element_blank(),
+        strip.text = element_text(face="bold", size=rel(1.5)),
+        strip.background = element_rect(fill="lightblue", colour="grey", size=16),
+        axis.title.x = element_text(color="grey25", size = 16, vjust=-2, 
+                                    margin=margin(0,0,0,300),
+                                    family = "Arial Unicode MS"), 
+        axis.title.y = element_text(color="grey25", size = 16, vjust=2, 
+                                    margin=margin(0,2,0,0), 
+                                    family = "Arial Unicode MS"),
+        plot.title=element_text(size=rel(2)), 
+        plot.margin = unit(c(2,1,2, 2), "lines"),
+        axis.text.x = element_text(color="grey25", size = 14, angle = 90, 
+                                   hjust = 0.5, vjust = 0.5,
+                                   family = "Arial Unicode MS"), 
+        axis.text.y = element_text(color="grey25", size = 14, angle = 0, 
+                                   hjust = 0.5, family = "Arial Unicode MS"))
 
-# Calculate percentiles and corresponding values
-percentiles <- seq(0, 100, 10)
-percentiles = append(c(95, 98), percentiles)
-miss_values <- quantile(miss_plot$miss_error, 
-                   probs = percentiles/100)*100
-
-miss_values <- quantile(subset(miss_plot, Variables != "PM25")$miss_error, 
-                   probs = percentiles/100)*100
-
-# Plot miss_values at each percentile
-ggplot(data.frame(percentiles, miss_values), 
-       aes(x = percentiles, y = miss_values)) +
-  geom_line(linetype = "dashed", color = "burlywood3") +
-  geom_text(aes(label = round(miss_values, 2)), vjust = -0.1, size = 5) +
-  scale_x_continuous(breaks = percentiles) +
-  labs(x = "Percentile", y = "Value") +
-  ylim(0, 21) +
-  ggtitle("CSN_miss_qualifier_interpolation") +
-  theme_bw() +
-  theme.obb
-
-
-missing_final_plot = 
-  subset(
-    miss_plot, 
-    !(grepl("88", miss_plot$Species, fixed = T)) &
-      !(grepl("PM", miss_plot$Species, fixed = T)) &
-      !(grepl("State", miss_plot$Species, fixed = T)) &
-      !(grepl("SiteCode", miss_plot$Species, fixed = T)) &
-      !(grepl("Date", miss_plot$Species, fixed = T)))
-
-missing_final_plot$Species[missing_final_plot$Species == "K."] = "KIon"
-missing_final_plot$Species[missing_final_plot$Species == "Na."] = "NaIon"
-missing_final_plot$Species[missing_final_plot$Species == "NH4."] = "NH4Ion"
-missing_final_plot$Species[missing_final_plot$Species == "NO3"] = "NO3Ion"
-missing_final_plot$Species[missing_final_plot$Species == "SO4"] = "SO4Ion"
-
-ggplot(missing_final_plot, 
-       aes(Species, miss_error, 
+ggplot(miss_plot, 
+       aes(Species, missing_rate, 
            color = class)) +
   geom_boxplot(outlier.colour = NA) +
   geom_jitter(size=1, alpha=0.3) +
   facet_grid(. ~ class, scales = "free", space = "free") + 
   # scale_fill_npg() + 
-  ggtitle("CSN_OOB_Error") +
+  ggtitle("CSN_missing_rate") +
   scale_color_nejm() + 
   xlab(format_variable("PM25 Species")) +
-  ylab(format_variable("Missing rate")) +
   # to display the superscript & subscript in axis labels
   scale_x_discrete(labels = function(x) format_variable(x)) +
   theme_bw() +
