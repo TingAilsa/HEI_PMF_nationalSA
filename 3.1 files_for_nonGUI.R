@@ -28,17 +28,20 @@ library(missForest)
 # csn_daily_before = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/CSN_Interpolation/CSN_interpulation_random-forest_afterLog_before_2015.csv")
 # csn_daily_after = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/CSN_Interpolation/CSN_interpulation_random-forest_afterLog_after_2015.csv")
 
-csn_daily_before = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2023.03.csv")
-csn_daily_after = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2023.03.csv")
+# csn_daily_before = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2023.03.csv")
+# csn_daily_after = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2023.03.csv")
 
-csn_daily_before$X = csn_daily_after$X = NULL
+csn_daily_before = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2024.04.csv")
+csn_daily_after = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2024.04.csv")
+
+csn_daily_before$V1 = csn_daily_after$V1 = NULL
 csn_daily_before$Date = as.Date(csn_daily_before$Date)
 csn_daily_after$Date = as.Date(csn_daily_after$Date)
 
 # "OC" already existed in rownames after 2015, so delete it first
 csn_daily_after$OC = NULL
 
-# Changed selected to OC, EC & OP for PMF
+# changed selected to OC, EC & OP for PMF
 csn_daily_before = plyr::rename(csn_daily_before, 
                                 c("EC1.unadjusted.88" = "EC1", 
                                   "EC2.unadjusted.88" = "EC2",
@@ -47,7 +50,7 @@ csn_daily_before = plyr::rename(csn_daily_before,
                                   "OC2.unadjusted.88" = "OC2", 
                                   "OC3.unadjusted.88" = "OC3",
                                   "OC4.unadjusted.88" = "OC4",
-                                  "Accept.PM2.5" = "PM25",
+                                  # "Accept.PM2.5" = "PM25",
                                   "EC.TOR.unadjust.88" = "EC", 
                                   "OC.TOR.unadjusted.88" = "OC",
                                   "OP.TOR.unadjusted.88" = "OP"))
@@ -57,7 +60,7 @@ csn_daily_after = plyr::rename(csn_daily_after,
                                  "OC2.88" = "OC2", 
                                  "OC3.88" = "OC3",
                                  "OC4.88" = "OC4",
-                                 "PM2.5RC" = "PM25",
+                                 # "PM2.5RC" = "PM25",
                                  "EC.TOR.88" = "EC", 
                                  "OC.88" = "OC",
                                  "OPC.TOR.88" = "OP"))
@@ -67,16 +70,18 @@ conc_common_cols <- intersect(names(csn_daily_before),
                               names(csn_daily_after))
 
 # Subset data frames using shared colnames
-csn_daily_before <- csn_daily_before[, conc_common_cols]
-csn_daily_after <- csn_daily_after[, conc_common_cols]
+# csn_daily_before <- csn_daily_before[, conc_common_cols]
+# csn_daily_after <- csn_daily_after[, conc_common_cols]
+csn_daily_before <- csn_daily_before[, ..conc_common_cols]
+csn_daily_after <- csn_daily_after[, ..conc_common_cols]
 
 # combine the dataset
 csn_daily_OrigOrder = rbind(csn_daily_before, csn_daily_after)
-setDT(csn_daily_OrigOrder)
+# setDT(csn_daily_OrigOrder)
 
 # Remove variables not needed for PMF (C-subgroups)
 csn_remove = c("OC.unadjusted.88", "EC.unadjusted.88", 
-               "OPC.unadjusted.88", "OP")
+               "OPC.unadjusted.88") # , "OP"
 csn_daily_OrigOrder[ ,csn_remove] <- list(NULL)
 
 # Move grouped columns to the right of the dataframe
@@ -105,12 +110,16 @@ csn_daily = csn_daily[with(
   csn_daily, 
   order(SiteCode, Date)), ]
 
-write.csv(csn_daily, "CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
+# write.csv(csn_daily, "CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
+write.csv(csn_daily, "CSN_RFinterpulated_combine_Csubgroup_2024.04.csv")
+length(unique(csn_daily$SiteCode))
 
 ##### Combine CSN till & after 2015 - the marked NA & replaced qualifiers - interpolated points #####
 
-csn_NA_bef = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_Component_with_missing_Before_2015_2023.02.csv")
-csn_NA_aft = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_Component_with_missing_After_2015_2023.02.csv")
+# csn_NA_bef = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_Component_with_missing_Before_2015_2023.02.csv")
+# csn_NA_aft = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_Component_with_missing_After_2015_2023.02.csv")
+csn_NA_bef = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_NA_after_matching_AQS_PM_Before_2015_2024.04.csv")
+csn_NA_aft = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_NA_after_matching_AQS_PM_Since_2016_2024.04.csv")
 csn_NA_bef$V1 = csn_NA_aft$V1 = NULL
 csn_NA_bef$Date = as.Date((csn_NA_bef$Date))
 csn_NA_aft$Date = as.Date((csn_NA_aft$Date))
@@ -167,24 +176,19 @@ summary(colnames(csn_RowCol_bef) == colnames(csn_RowCol_aft))
 
 csn_RowCol_bef$Date = as.Date(csn_RowCol_bef$Date)
 csn_RowCol_aft$Date = as.Date(csn_RowCol_aft$Date)
-csn_combine = rbind(csn_RowCol_bef, csn_RowCol_aft)
+csn_noAllNA = rbind(csn_RowCol_bef, csn_RowCol_aft)
 
-## remove the rows where all component concentrations are NAs
-cols.comp = 4:ncol(csn_combine) # columns for PM/components
-
-csn_noAllNA = subset(csn_combine, 
-                     rowSums(is.na(csn_combine[, cols.comp])) != 
-                       ncol(csn_combine[, cols.comp]))
-
-# remove sites not in csn_daily, which are not in mainland US
-csn_noAllNA = subset(csn_noAllNA, 
-                     SiteCode %in% csn_daily$SiteCode)
+summary(csn_noAllNA$SiteCode %in% csn_daily$SiteCode)
+summary(csn_noAllNA$Date %in% csn_daily$Date)
 dim(csn_noAllNA)
 
 # define the data in csn_noAllNA but not csn_daily
 csn_noAllNA$site.date = paste(csn_noAllNA$SiteCode, csn_noAllNA$Date)
 csn_daily$site.date = paste(csn_daily$SiteCode, csn_daily$Date)
+csn_noAllNA$dup = duplicated(csn_noAllNA$site.date)
+summary(csn_noAllNA$dup)
 
+# site 11130001 has no Ca data since 2016, not able to interpolate
 csn_noAllNA_notPMF = subset(csn_noAllNA, 
                             !(csn_noAllNA$site.date %in% csn_daily$site.date) )
 csn_PMF_notNoAllNA = subset(csn_daily, 
@@ -195,13 +199,7 @@ unique(csn_noAllNA_notPMF$SiteCode)
 
 csn_noAllNA_left = subset(csn_noAllNA, 
                           csn_noAllNA$site.date %in% csn_daily$site.date)
-csn_daily$site.date = csn_noAllNA_left$site.date = NULL
-
-################# not for C-subgroup!
-csn_daily = subset(csn_daily, 
-                   !(SiteCode == csn_PMF_notNoAllNA$SiteCode[1] &
-                       Date == csn_PMF_notNoAllNA$Date[1]))
-# write.csv(csn_daily, "CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
+csn_daily$site.date = csn_noAllNA_left$site.date = csn_noAllNA_left$dup = NULL
 
 # OP not used for PMF
 # csn_noAllNA_left$OP = NULL
@@ -211,8 +209,8 @@ dim(csn_daily)
 
 # Move grouped columns to the right of the dataframe
 # OC.EC = c("EC", "OC")
-OC.EC = c("EC", "EC1", "EC2", "EC3", 
-          "OC", "OC1", "OC2", "OC3", "OC4")
+OC.EC = c("EC", "EC1", "EC2", "EC3",
+          "OC", "OC1", "OC2", "OC3", "OC4", "OP")
 ions = c("Na.", "K.", "NH4.", "NO3", "SO4")
 csn_noAllNA_left = csn_noAllNA_left %>%
   select(!(matches(OC.EC)), 
@@ -223,20 +221,22 @@ csn_noAllNA_left = csn_noAllNA_left %>%
 
 # relocate columns
 csn_noAllNA_left = csn_noAllNA_left %>% relocate(PM25, .after = SO4)
-csn_noAllNA_left = csn_noAllNA_left %>% relocate(SiteCode, .before = Date)
 csn_noAllNA_left = csn_noAllNA_left %>% relocate(Date, .before = State)
+csn_noAllNA_left = csn_noAllNA_left %>% relocate(SiteCode, .before = Date)
 
 summary(colnames(csn_noAllNA_left) == colnames(csn_daily))
 
 # reorder dataset
 csn_noAllNA_left = csn_noAllNA_left[with(
   csn_noAllNA_left, 
-  order(State, SiteCode, Date)), ]
+  order(SiteCode, Date)), ]
 
 summary(csn_noAllNA_left$Date == csn_daily$Date)
 summary(csn_noAllNA_left$SiteCode == csn_daily$SiteCode)
 
 # write.csv(csn_noAllNA_left, "CSN_withNA_combine_PMFuncertainty_Estimation_C-subgroup.csv")
+# write.csv(csn_noAllNA_left, "CSN_withNA_combine_PMFuncertainty_Estimation_C-subgroup_2024.04.csv") # previous naming pattern
+write.csv(csn_noAllNA_left, "CSN_withNA_combined_concentration_AQS_PM_C-subgroup_2024.04.csv")
 
 # csn_noAllNA_left = fread("CSN_withNA_combine_PMFuncertainty_Estimation_C-subgroup.csv")
 csn_NA_intp = csn_noAllNA_left
@@ -251,12 +251,13 @@ csn_NA_intp = csn_NA_intp[with(
   csn_NA_intp, 
   order(SiteCode, Date)), ]
 
-write.csv(csn_NA_intp, "CSN_TF_logical_InterpolatedOrNot_C-subgroup.csv")
+# write.csv(csn_NA_intp, "CSN_TF_logical_InterpolatedOrNot_C-subgroup.csv")
+write.csv(csn_NA_intp, "CSN_TF_logical_InterpolatedOrNot_C-subgroup_2024.04.csv")
 
-##### CSN - replace PM2.5 with EPA AQS #####
+##### CSN - replace PM2.5 with EPA AQS, combined into 2.1 interpolation since 2024.04 #####
 ## CSN
 # species_daily = fread("CSN_RFinterpulated_combine_2023.04.csv")
-csn_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
+csn_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv") # interpolation after AQS PM matching
 csn_daily$V1 = NULL
 csn_daily$Date = as.Date(csn_daily$Date)
 
@@ -356,7 +357,8 @@ write.csv(csn_aqs_pm, "CSN_concentration_AQS.PM_PMF_C-sub_2024.03.csv")
 ##### CSN & IMPROVE - concentration vs. MDL #####
 ## CSN
 # species_daily = fread("CSN_RFinterpulated_combine_2023.04.csv")
-species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
+# species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv") ## interpolation after AQS PM matching
+species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2024.04.csv") ## interpolation Before AQS PM matching
 
 ## IMPROVE
 species_daily = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv")
@@ -404,15 +406,28 @@ summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-2)] ==
 # imp
 species_daily_conc$ammNO3 = species_daily_conc$ammSO4 = species_daily_conc$Cl. = 
   species_daily_conc$NO2. = NULL
+
 species_daily_conc =
   plyr::rename(species_daily_conc, 
                c("PM2.5" = "PM25", 
                  "SO4" = "SO4Ion",
-                 "NO3" = "NO3Ion"))
-species_daily_conc =
-  relocate(species_daily_conc, PM25, .after = Zr)
-colnames(species_daily_conc)[3:(ncol(species_daily_conc) - 2)] =
-  colnames(species_mdl)[4:ncol(species_mdl)]
+                 "NO3" = "NO3Ion",
+                 "K." = "KIon",
+                 "Na." = "NaIon",
+                 "NH4." = "NH4Ion"))
+
+species_mdl =
+  plyr::rename(species_mdl, 
+               c("PM2.5" = "PM25", 
+                 "SO4" = "SO4Ion",
+                 "NO3" = "NO3Ion",
+                 "K." = "KIon",
+                 "Na." = "NaIon",
+                 "NH4." = "NH4Ion"))
+
+# species_daily_conc = relocate(species_daily_conc, PM25, .after = Zr)
+summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc) - 2)] ==
+          colnames(species_mdl)[4:ncol(species_mdl)])
 species_daily_conc_reag = 
   species_daily_conc[, 3:(ncol(species_daily_conc)-2)]
 
@@ -424,7 +439,7 @@ species_daily_conc =
         species_daily_conc_reag,
         species_daily_conc[, (ncol(species_daily_conc)-1):ncol(species_daily_conc)])
 
-summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-2)] == 
+summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-3)] == 
           colnames(species_mdl)[4:ncol(species_mdl)])
 
 dim(species_daily_conc)
@@ -455,10 +470,6 @@ setcolorder(species_daily_fullMDL,
 species_daily_fullMDL$year = species_daily_fullMDL$month = 
   species_daily_conc$year = species_daily_conc$month = NULL
 
-# Again check if columns from concentration & new MDL datasets match
-summary(colnames(species_daily_conc) == 
-          colnames(species_daily_fullMDL))
-
 # double check if date & site match
 summary(species_daily_fullMDL$SiteCode == species_daily_conc$SiteCode)
 summary(species_daily_fullMDL$Date == species_daily_conc$Date)
@@ -467,6 +478,7 @@ summary(colnames(species_daily_fullMDL) == colnames(species_daily_conc))
 # compare concentration and MDL of a given component
 cols_to_extract <- setdiff(names(species_daily_conc), 
                            c("SiteCode", "Date"))
+species_daily_conc$OP = NULL # remove later, keep OP
 setDT(species_daily_conc)
 setDT(species_daily_fullMDL)
 species_conc = species_daily_conc[, ..cols_to_extract]
@@ -511,11 +523,12 @@ species_conc_mdl_randomsite[1:3, 4:13]
 ####### For site & date match check, finished!
 
 # only SiteCode & Date before species
-species_conc_mdl_Site$K = species_conc_mdl_Site$State = NULL
+# species_conc_mdl_Site$State = NULL
 
 # write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2023.05.csv")
 # write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.02.csv")
-write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.03.csv")
+# write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.03.csv")
+write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.04.csv")
 
 species_conc_mdl_Site = subset(species_conc_mdl_Site, !is.na(OP))
 
