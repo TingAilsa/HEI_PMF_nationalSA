@@ -1200,8 +1200,47 @@ colnames(imp_daily)[36:47] # OPC sub-group
 imp_daily_opt_sub = imp_daily[ ,36:47]
 imp_daily = cbind(imp_daily[,1:35], imp_daily[,48:ncol(imp_daily)])
 
+# remove those not directly detected, except of RC.PM2.5, ammoniaSO4, ammoniaNO3, OC & EC
+imp_daily$SeaSalt = imp_daily$Soil = imp_daily$PM10 = imp_daily$RC.PM10 = 
+  imp_daily$site.date.qualifier = imp_daily$OC_UCD = imp_daily$EC_UCD = 
+  imp_daily$OMC = imp_daily$CM_calculated = imp_daily$TC =
+  imp_daily$RC.PM2.5 = NULL
+imp_daily$OPT = NULL # OPT is deleted cause it is not used to calculated OC & EC
+
+# exclude states not located in the "Continental and mainland USA"
+imp_daily = imp_daily[with(imp_daily, order(State, SiteCode, Date)), ]
+imp_daily = subset(imp_daily, !(State %in% c("AK", "HI", "PR", "VI"))) 
+
+# site almost all NA
+imp_daily = subset(imp_daily, 
+                  !(SiteCode %in% c("DETR1", "RENO1", "RENO2", "RENO3")))
+imp_daily_siteNA = subset(imp_daily, 
+                          SiteCode %in% c("DETR1", "RENO1", "RENO2", "RENO4"))
+
+#### prepare data used for interpolation ####
+# imp_miss = subset(imp_daily, !(SiteCode %in% site.lots.NA))
+imp_miss = data.frame(imp_daily)
+
+imp_miss = 
+  relocate(imp_miss, PM2.5, .after = SiteCode)
+names(imp_miss)
+
+## remove the rows where all component concentrations are NAs
+col.withAllNA = ncol(imp_miss)
+cols.comp.pm = 5:col.withAllNA # columns for components
+col.component.pm = ncol(imp_miss[, cols.comp.pm]) # the code does not work for data.table
+names(imp_miss)
+
+cols.comp = 4:col.withAllNA # columns for PM/components
+col.component = length(names(imp_miss)[cols.comp]) 
+
+imp_miss_noAllNA = subset(imp_miss, 
+                          rowSums(is.na(imp_miss[, cols.comp.pm])) != 
+                            col.component.pm)
+n.site = length(unique(imp_miss_noAllNA$SiteCode))
+
 # calculate the overall percentages of NA for selected species
-site_day_NA_count = ddply(imp_daily, 
+site_day_NA_count = ddply(imp_miss_noAllNA, 
                           .(SiteCode), 
                           summarise,
                           count = length(Date),
@@ -1218,14 +1257,13 @@ site_day_NA_count$SO4.NA.per = round(site_day_NA_count$SO4.NA/site_day_NA_count$
 
 # check the sites with high percentage NAs
 site.lots.NA = site_day_NA_count$SiteCode[
-  site_day_NA_count$Mg.NA.per > 0.5 & 
-    site_day_NA_count$SO4.NA.per > 0.5 &
-    site_day_NA_count$EC.NA.per > 0.5 & 
-    site_day_NA_count$OC.NA.per > 0.5]
+  site_day_NA_count$Mg.NA.per > 0.05 & 
+    site_day_NA_count$SO4.NA.per > 0.05 &
+    site_day_NA_count$EC.NA.per > 0.05 & 
+    site_day_NA_count$OC.NA.per > 0.05]
 length(site.lots.NA)
 
-imp_daily_halfNA = subset(imp_daily, SiteCode %in% site.lots.NA)
-
+imp_halfNA = subset(imp_miss_noAllNA, SiteCode %in% site.lots.NA)
 
 # plot their distribution
 imp_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE metadata 192 sample sites info 2010-20.csv")
@@ -1257,40 +1295,7 @@ ggplot(subset(imp_sites), # , Longitude > -130 & Latitude > 20
   scale_color_npg() +
   theme_bw()
 
-
-#### filling the NAs for each site (logged, no negative)- na.omit & check Mix Error ####
-# imp_miss = subset(imp_daily, !(SiteCode %in% site.lots.NA))
-imp_miss = data.frame(imp_daily)
-
-# exclude states not located in the "Continental and mainland USA"
-imp_miss = imp_miss[with(imp_miss, order(State, SiteCode, Date)), ]
-imp_miss = subset(imp_miss, !(State %in% c("AK", "HI", "PR", "VI"))) 
-
-# site almost all NA
-imp_miss = subset(imp_miss, 
-                  !(SiteCode %in% c("DETR1", "RENO1", "RENO2", "RENO3")))
-
-# remove those not directly detected, except of RC.PM2.5, ammoniaSO4, ammoniaNO3, OC & EC
-imp_miss$SeaSalt = imp_miss$Soil = imp_miss$PM10 = imp_miss$RC.PM10 = 
-  imp_miss$site.date.qualifier = imp_miss$OC_UCD = imp_miss$EC_UCD = 
-  imp_miss$OMC = imp_miss$CM_calculated = imp_miss$TC =
-  imp_miss$RC.PM2.5 = NULL
-imp_miss$OPT = NULL # OPT is deleted cause it is not used to calculated OC & EC
-
-
-## remove the rows where all component concentrations are NAs
-col.withAllNA = ncol(imp_miss)
-cols.comp = 4:col.withAllNA # columns for PM/components
-col.component = ncol(imp_miss[, cols.comp])
-
-imp_miss_noAllNA = subset(imp_miss, 
-                          rowSums(is.na(imp_miss[, cols.comp])) != 
-                            col.component)
-n.site = length(unique(imp_miss_noAllNA$SiteCode))
-
-imp_miss_noAllNA = 
-  relocate(imp_miss_noAllNA, PM2.5, .after = SiteCode)
-names(imp_miss_noAllNA)
+#### start interpolating ####
 
 # create data.frame to store results
 running_avg_sum = linear_sum = mice_sum = rf_sum = NULL
@@ -1303,7 +1308,7 @@ p_miss_summary = imp_var
 rf_vw_oob_summary = data.frame(imp_var[4:nrow(imp_var), ])
 names(rf_vw_oob_summary)[1] = "Variables"
 
-#### start interpolating ####
+# start the loop
 for (i in 1:n.site){ 
   
   ###### 1.prepare data set - remove those with only NA & log ######
