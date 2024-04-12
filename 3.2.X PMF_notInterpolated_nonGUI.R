@@ -1,0 +1,1136 @@
+##clear environment
+# rm(list=ls())
+
+##set working directory
+# setwd("/Users/ztttttt/Documents/HEI PMF/CSN_IMPROVE")
+# getwd()
+# data.dir <- "/Users/ztttttt/Documents/HEI PMF/CSN_IMPROVE"
+
+setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC")
+getwd()
+data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC"
+
+library(tidyverse)
+library(readxl)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(plyr)
+library(ggplot2) 
+library(base)
+library(ggrepel)
+library(missForest)
+
+
+################################################################################
+#### Non-GUI-2 - NO EXTREMES - Origin_MDL ####
+################################################################################
+
+##### Read data files #####
+########## read.1 concentration ##########
+
+#### CSN
+conc_pmf = fread("CSN_withNA_combined_concentration_AQS_PM_C-subgroup_2024.04.csv")
+
+#### IMPROVE
+conc_pmf = fread("XXX")
+
+conc_pmf$V1 = NULL #conc_pmf$Final.Decision = 
+dim(conc_pmf)
+
+conc_pmf = na.omit(conc_pmf)
+dim(conc_pmf)
+conc_pmf = species_col_reorder(conc_pmf)
+conc_pmf = relocate(conc_pmf, SiteCode, .before = Date)
+conc_pmf$Date = as.Date(conc_pmf$Date)
+names(conc_pmf)
+
+# reorder to ensure the sequence for those need row-by-row process
+conc_pmf = 
+  conc_pmf[with(
+    conc_pmf, 
+    order(SiteCode, Date)), ]
+
+conc_pmf_date_site = select(conc_pmf, SiteCode, Date)
+
+########## read.3 test uncertainty, error_fraction  ##########
+
+# comp_error_fraction = fread("/Users/ztttttt/Documents/HEI PMF/IMPROVE & CSN original/CSN_k_Error Fraction.csv")
+comp_error_fraction = fread("CSN_k_Error-Fraction_2023.04.csv")
+comp_error_fraction$data = NULL
+comp_error_fraction = species_col_reorder(comp_error_fraction)
+
+# set EF of subgroups to the same of OC, EC
+comp_error_fraction$EC3 = comp_error_fraction$EC2 = comp_error_fraction$EC1 = comp_error_fraction$EC
+comp_error_fraction$OC4 = comp_error_fraction$OC3 = comp_error_fraction$OC2 = comp_error_fraction$OC1 = comp_error_fraction$OC
+comp_error_fraction$OP = comp_error_fraction$EC
+
+########## read.4 site_code_serial  ##########
+
+site_code_serial = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial$V1 = NULL
+
+# add 0 to force the serial.No being three digits
+site_code_serial$serial.No =
+  ifelse(site_code_serial$serial.No < 100,
+         sprintf("%03d", site_code_serial$serial.No),
+         as.character(site_code_serial$serial.No))
+
+## CSN
+site_code_serial = subset(site_code_serial, Dataset == "EPACSN") 
+
+## IMPROVE
+site_code_serial = subset(site_code_serial, Dataset == "IMPAER") 
+
+dim(site_code_serial)
+
+# exclude sites that only include in conc_pmf
+all_sites = unique(conc_pmf$SiteCode)
+site_list = subset(site_code_serial,
+                   SiteCode %in% all_sites)
+
+length(all_sites)
+
+all_sites[13] %in% site_code_serial$SiteCode # 60731018
+all_sites = all_sites[-13]
+
+########## read.4 conc vs. MDL  ##########
+
+### CSN
+species_conc_above_mdl = fread("CSN_conc_vs_MDL_C-subgroup_corrected_2024.04.csv")
+
+### IMPROVE
+species_conc_above_mdl = fread("IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.csv")
+
+
+species_conc_above_mdl$V1 = species_conc_above_mdl$ClIon = NULL # imp_mdl$OP = 
+species_conc_above_mdl$Date = as.Date(species_conc_above_mdl$Date)
+
+species_conc_above_mdl = 
+  merge(conc_pmf_date_site, species_conc_above_mdl, all.x = TRUE)
+species_conc_above_mdl$State = conc_pmf$State
+species_conc_above_mdl = 
+  relocate(species_conc_above_mdl, State, .after = Date)
+dim(species_conc_above_mdl)
+
+species_conc_above_mdl = 
+  species_conc_above_mdl[with(
+    species_conc_above_mdl, 
+    order(SiteCode, Date)), ]
+
+summary(species_conc_above_mdl$Date == conc_pmf$Date & 
+          species_conc_above_mdl$SiteCode == conc_pmf$SiteCode)
+
+########## read.5 mdl  ##########
+### CSN
+# csn_mdl = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_MDL_monthly.csv")
+# csn_mdl = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_MDL_monthly_2023.02.27.csv")
+species_mdl = fread("CSN_MDL_C-Sub_monthly_2023.05.csv")
+species_mdl$V1 = species_mdl$Cl. = NULL
+
+### IMPROVE
+species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
+
+species_mdl$V1 = NULL # csn_mdl$OP = 
+
+conc_pmf_date = select(conc_pmf, SiteCode, Date, State)
+conc_pmf_date$year = year(conc_pmf_date$Date)
+conc_pmf_date$month = month(conc_pmf_date$Date)
+head(conc_pmf_date)
+
+species_daily_fullMDL = 
+  merge(conc_pmf_date, species_mdl, all.x = T)
+
+species_daily_fullMDL$year = species_daily_fullMDL$month = NULL
+species_daily_fullMDL = species_col_reorder(species_daily_fullMDL)
+species_daily_fullMDL = relocate(species_daily_fullMDL, SiteCode, .before = Date)
+
+dim(species_daily_fullMDL)
+
+########## read.6 the marked Interpolated points  ##########
+
+### CSN
+#species_NA_intp = fread("CSN_TF_logical_InterpolatedOrNot.csv")
+# species_NA_intp = fread("CSN_TF_logical_InterpolatedOrNot_C-subgroup.csv")
+species_NA_intp = fread("CSN_TF_logical_InterpolatedOrNot_C-subgroup_2024.04.csv")
+# species_NA_intp$K = NULL
+
+### IMPROVE
+species_NA_intp = fread("IMPROVE_TF_logical_InterpolatedOrNot_allSpecies.csv")
+
+species_NA_intp = species_col_reorder(species_NA_intp)
+species_NA_intp$V1 = NULL
+species_NA_intp = relocate(species_NA_intp, SiteCode, .before = Date)
+
+species_NA_intp = 
+  species_NA_intp[
+    with(
+      species_NA_intp, 
+      order(SiteCode, Date)), ]
+
+species_NA_intp = merge(conc_pmf_date_site, species_NA_intp, all.x = TRUE)
+
+# double check if rows & columns match
+summary(species_NA_intp$SiteCode == conc_pmf$SiteCode)
+summary(species_NA_intp$Date == conc_pmf$Date)
+summary(names(species_NA_intp)[4:ncol(species_NA_intp)] == 
+          names(conc_pmf)[4:ncol(conc_pmf)])
+
+# cols_comp = col_comp(species_NA_intp, "Al", "PM25")
+# species_NA_intp$year = species_NA_intp$month = NULL
+
+########## read.7 excluding species not to be used  ##########
+
+OC.EC.sub = c("EC1", "EC2", "EC3", "OP",
+              "OC1", "OC2", "OC3", "OC4")
+# species_exclude <- OC.EC.sub
+species_exclude <- c(OC.EC.sub, c("Ag", "K", "Na", "S")) # not used for SA, or colinearity
+
+conc_pmf[ , species_exclude] <- list(NULL)
+species_conc_above_mdl[ , species_exclude] <- list(NULL)
+species_NA_intp[ , species_exclude] <- list(NULL)
+species_daily_fullMDL[ , species_exclude] <- list(NULL)
+
+# extract species colnames, those after excluding "SiteCode", "State" & "Date"
+species_columns = 
+  setdiff(names(conc_pmf), 
+          c("SiteCode", "Date", "State"))
+
+# if include more species than in conc_pmf, exclude them
+comp_error_fraction = comp_error_fraction[, ..species_columns]
+summary(names(comp_error_fraction) == names(conc_pmf)[4:ncol(conc_pmf)])
+
+##### define the species_source_groups ##### 
+
+species_source_groups = 
+  list(earth_elements = c("Al", "Fe", "Ca", "Si", "Ti", "AlIon", "FeIon", "CaIon", "Mg", "MgIon"),
+       resuspend_dust = c("Ba", "Br", "Pb", "Ti", "Fe"),
+       construction = c("Ca", "Mg", "CaIon", "MgIon"), # Peilin Chen_2023, or only Ca, Liu_2017_EP_PMF
+       fugtive_dust = c("Ti", "K", "KIon"), # Kotchenruther_2016_AE
+       sec_nitrate = c("NH4Ion", "NO3Ion"),
+       sulfate = c("NH4Ion", "SO4Ion"),
+       fresh_sea_salt = c("NaIon", "ClIon", "Na", "Cl", "Sr", "Br"), #Louie_2005_STE
+       aged_sea_salt = c("SO4Ion", "NO3Ion", "Mg", "MgIon", "NaIon", "ClIon", "Na", "Cl", "NO3Ion"),
+       galvanizing = c("Pb", "Zn"), # Dai_2023_EP
+       ferros_metal = c("Fe", "Zn", "Mn"), # Yang_2023_Atmosphere
+       non_ferros_metal = c("Cu", "Cr", "Ni", "Pb"), # Yang_2023_Atmosphere
+       biomass = c("OC", "K", "KIon", "Br", "Cl", "ClIon", "S", "SO4Ion"), # Singh_2022_AAQR OC/EC ratio, Masiol_2017_AE
+       heavy_oil = c("Ni", "V"), # Ni:V ratio, Kotchenruther_2013_AE_PM, SPECIATE, Hadley_2017_AE
+       coal_burn = c("S", "SO4Ion", "EC", "OC", "As", "Se", "Pb", "Cl", "ClIon"), # Xie_2022_EP
+       firework = c("K", "Pb", "Cu", "Sr", "As", "Ba", "Na", "KIon", "NaIon", "Mg", "MgIon", "OC", "EC", "NO3Ion", "SO4Ion"), # Phil, slides, natural relationships
+       non_tailpipe = c("Fe", "Cu", "Zn", "Pb", "Mn", "Ba", "Sb", "Al", "Cr"), # Hasheminassab_2014_ACP, also , EC/OC gas/diesel; Nanjing_Zheng_2019; Park_STOTEN_2022_Beijing-Seoul
+       vehicle = c("OC", "EC", "Fe", "Zn", "NO3Ion") # Dai_2023_EP, Nanjing_Zheng_2019
+  )
+
+
+##### choose the Folder ##### 
+# ONLY apply this to SITEs, and combine site data if running the cluster analyses
+
+###### define the subfolder to save cluster files
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
+
+#### CSN, extreme, mean*15, 4.5 times uncertainty for interpolated values, match AQS before interpolation
+nonGUI.site.folder <- "CSN_NoGUI_noIntp_15t45uncAQS_site" ## if no OC EC subgroups, no extreme values 
+GUI.site.folder <- "CSN_GUI_noIntp_15t45uncAQS_site"
+prefix = "CSN_noIntp_15t45uncAQS_S_"
+
+# #### CSN, extreme, season 99th as threshold of outlier
+# Clusterfolder <- "CSN_NoGUI_noIntp_99season_cluster"
+# GUI.cluster.folder <- "CSN_GUI_noIntp_99season_cluster"
+# prefix = "CSN_noIntp_noSeason99_C_"
+# 
+# #### IMPROVE, extreme, mean*25
+# Clusterfolder <- "IMPROVE_noGUI_noIntp_NoExtreme_cluster"
+# GUI.cluster.folder <- "IMPROVE_GUI_noIntp_NoExtreme_cluster"
+# prefix = "IMPROVE_noIntp_noExtreme_C_"
+
+##### create Dataset/Folder to save results ##### 
+
+###### create folder for out puts if not exist
+
+if (!dir.exists(file.path(dropbox_path, GUI.site.folder))) {
+  dir.create(file.path(dropbox_path, GUI.site.folder))
+}
+
+if (!dir.exists(file.path(dropbox_path, nonGUI.site.folder))) {
+  dir.create(file.path(dropbox_path, nonGUI.site.folder))
+}
+
+###### a dataframe to save the decision of weak, bad, or strong 
+
+species.name = 
+  setdiff(names(conc_pmf),
+          c("SiteCode", "Date", "X", "V1", 
+            "State", "Final.Decision"))
+
+cmd_species_class_site = 
+  data.frame(
+    matrix(ncol = length(species.name), 
+           nrow = length(all_sites)))
+names(cmd_species_class_site) = species.name
+
+# add PM2.5 and other variables
+cmd_species_class_site = 
+  data.frame(site_list, 
+             cmd_species_class_site, 
+             sum.weak.good = NA, style.weak.good = NA, 
+             site.row = NA, extreme_rowNo_remain = NA, 
+             extreme_rowNo_replace = NA, extreme_rowNo_remove = NA, 
+             row_count_org = NA, original_PM_weak = NA)
+
+
+dataset = "CSN"
+# dataset = "IMPROVE"
+cmd_species_class_site$Dataset = dataset
+
+cmd_species_class_site[, species_exclude] <- list(NULL)
+head(cmd_species_class_site)
+
+### Others
+# extreme_K = NULL
+# thresholds_Seasonal99th = NULL
+thresholds_TimesMean = NULL
+extreme_events_remove = extreme_events_remain = extreme_events_replace = NULL
+
+##### START the LOOP ##### 
+
+# all_sites[!(all_sites %in% OOB_comb_avg$SiteCode)]
+prefix_swb = sub("S_$", "", str_extract(prefix,  "^(.*?)S_"))
+prefix_swb = "CSN_noIntp_15t45uncAQS"
+
+# avoid saving numeric as txt in csv files, if ending "options(scipen=0)"
+options(scipen=999)
+
+# extract concentration & uncertainty of single cluster for PMF
+for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[40], "261630001"
+  
+  # generate site.serial and corresponding datasets
+  site.serial = site_list$serial.No[site_list$SiteCode == site_code]
+  conc_site = subset(conc_pmf, SiteCode == site_code)
+  row_count_org = nrow(conc_site)
+  
+  species_NA_intp_site = 
+    subset(species_NA_intp, SiteCode == site_code &
+             Date %in% conc_site$Date)
+  conc_above_mdl_site = 
+    subset(species_conc_above_mdl, SiteCode == site_code &
+             Date %in% conc_site$Date)
+  species_fullMDL_site =
+    subset(species_daily_fullMDL, SiteCode == site_code &
+             Date %in% conc_site$Date)
+  
+  # summary(species_NA_intp_site$Date == conc_site$Date)
+  # summary(conc_above_mdl_site$Date == conc_site$Date)
+  # summary(species_fullMDL_site$Date == conc_site$Date)
+  # summary(names(species_fullMDL_site) == names(conc_above_mdl_site))
+  # summary(names(species_fullMDL_site) == names(species_NA_intp_site))
+  # summary(names(species_fullMDL_site) == names(conc_site))
+  
+  dim(conc_site)
+  dim(species_NA_intp_site)
+  
+  ##### Extremes 1 - N*mean #####
+  conc_site_forExe = conc_site
+  # summary(conc_site_forExe)
+  cols_comp = col_comp(conc_site_forExe, "Al", "PM25")
+  mean_conc_site = conc_site_forExe[, lapply(.SD, mean), .SDcols = cols_comp]
+  
+  # med_conc_site*25 < max_conc_site
+  
+  # # mean value and 25 times were selected due to the data observation.
+  # # however, for some site, mean * 20 may alreay miss some very high values
+  # # for earth elements (Si, Al), mean * 20 may filter too many values
+  # UPdate 2024.02, 1-if extreme values are detected in multiple featured species of a given source, then keep the extremes
+  # UPdate 2024.02, 2-with threshold 25, extremes in many other sources were kept, influence the overall performance
+  # UPdate 2024.02, 3-after checking more source peaks, using the value of 15
+  times_value = 15
+  extreme_conc_site = mean_conc_site * times_value
+  
+  # identify rows in conc_site_forExe with values higher than the extreme values
+  # rows_to_remove_25mean <- apply(conc_site_forExe[, 4:ncol(conc_site_forExe)], 1, 
+  #                        function(row) 
+  #                          any(row > extreme_conc_site))
+  
+  # expand the extreme rows to the same as conc_site
+  extreme_conc_site_exp = 
+    extreme_conc_site %>% 
+    slice(rep(1:n(), 
+              each = nrow(conc_site_forExe)))
+  
+  # 1/3 of extreme to detect other high concentrations
+  second_extreme_conc_site_exp = extreme_conc_site_exp/3
+  
+  thresholds_TimesMean = rbind(thresholds_TimesMean, extreme_conc_site)
+  
+  write.csv(thresholds_TimesMean, "CSN_site_thresholds_noInterpolation_AQSmatchFirst_15TimesMean.csv")
+  
+  ##### Extremes 2 - decisions on how to deal with extremes #####
+  
+  # identify rows in conc_site with values higher than the extreme values
+  conc_site_forExe_species = conc_site_forExe[, ..species_columns]
+  
+  # summary(names(extreme_conc_site_exp) == names(conc_site_forExe_species))
+  # summary(names(second_extreme_conc_site_exp) == names(conc_site_forExe_species))
+  
+  conc_site_extreme_comp = 
+    data.frame(conc_site_forExe_species > extreme_conc_site_exp)
+  second_conc_site_extreme_comp = 
+    data.frame(conc_site_forExe_species > second_extreme_conc_site_exp)
+  
+  # extract days with extremes and high values (extreme/3)
+  day_extreme = 
+    conc_site_extreme_comp[rowSums(conc_site_extreme_comp) >= 1, ]
+  day_high = 
+    second_conc_site_extreme_comp[rowSums(second_conc_site_extreme_comp) >= 1, ]
+  
+  day_extreme$row_serial = row.names(day_extreme)
+  day_high$row_serial = row.names(day_high)
+  day_high = subset(day_high, row_serial %in% day_extreme$row_serial)
+  
+  # dim(day_extreme); dim(day_high)
+  
+  ##### detect days with extremes and whether the extreme is only for one species or there are covarying species
+  ## do not consider the K-extreme days for now
+  
+  extreme_site <- data.table(
+    day_extreme_rows = integer(0),
+    SiteCode = character(0),
+    serial.No = character(0),
+    Date = as.Date(character(0)),
+    extreme_species = character(0),
+    co_detected_species_high = character(0),
+    potential_source = character(0)
+  )
+  
+  for (exe.row in 1:nrow(day_extreme)) {
+    day_extreme_rows = as.integer(day_extreme$row_serial[exe.row])
+    
+    # species with extreme values in day_extreme & covarying species in day_high, if any
+    species_extreme_true <- 
+      names(day_extreme[exe.row, ])[day_extreme[exe.row, ] == TRUE]
+    species_high_true <- names(day_high[exe.row,])[day_high[exe.row,] == TRUE]
+    
+    # check for matching source groups among species_extreme_true and species_high_true
+    matched_species <- list()
+    
+    for (source_group in names(species_source_groups)) {
+      
+      # identify if any species in species_extreme_true & species_high_true be in this source_group
+      species_in_group_extreme <- 
+        species_extreme_true[
+          species_extreme_true %in% 
+            species_source_groups[[source_group]]]
+      
+      species_in_group_high <- 
+        species_high_true[
+          species_high_true %in% 
+            species_source_groups[[source_group]]]
+      
+      if (length(species_in_group_extreme) > 0) {
+        matched_species[[source_group]] <- 
+          list(species_extreme = species_in_group_extreme, 
+               species_high = species_in_group_high)
+      }
+      
+      # save the information for each source group where a match was found
+      
+      for (matched_source_group in names(matched_species)) {
+        species_high = matched_species[[matched_source_group]]$species_high
+        species_extreme = matched_species[[matched_source_group]]$species_extreme
+        species_high_not_extreme = species_high[!(species_high %in% species_extreme)]
+        
+        # combine all species, if more than one, into a single string
+        species_extreme_combined <- 
+          paste(species_extreme, collapse = ", ")
+        species_high_not_extreme_combined <- 
+          paste(species_high_not_extreme, collapse = ", ")
+        
+        extreme_event_daily <-
+          data.frame(
+            # cluster.No = cluster.No,
+            SiteCode = site_code,
+            serial.No = site.serial,
+            day_extreme_rows = day_extreme_rows, 
+            Date = conc_site_forExe$Date[day_extreme_rows],
+            extreme_species = species_extreme_combined, 
+            co_detected_species_high = species_high_not_extreme_combined,
+            potential_source = matched_source_group)
+        
+        extreme_site <- rbind(extreme_site, extreme_event_daily)
+      }
+    }
+  }
+  
+  # remove duplicates if any
+  extreme_site_use <- unique(extreme_site)
+  
+  # detect days potentially related BB & firework
+  extreme_site_use$real_bb_firework = FALSE
+  
+  extreme_site_use$real_bb_firework[
+    grepl("K", extreme_site_use$extreme_species)] = TRUE
+  
+  # remove the case when "K" is not in species_extreme and no covarying species, they are supposed to be replaced 
+  extreme_site_use$extreme_species_count = 
+    lengths(strsplit(extreme_site_use$extreme_species, ",\\s*"))
+  extreme_site_use$covarying_species_count = 
+    lengths(strsplit(extreme_site_use$co_detected_species_high, ",\\s*"))
+  
+  
+  extreme_day_remove =
+    subset(extreme_site_use, real_bb_firework)
+  extreme_day_remove = 
+    unique(
+      select(
+        extreme_day_remove,
+        SiteCode, serial.No, 
+        day_extreme_rows, Date, extreme_species, co_detected_species_high))
+  
+  extreme_day_replace = 
+    subset(extreme_site_use, 
+           extreme_species_count == 1 &
+             covarying_species_count == 0 &
+             (! Date %in% extreme_day_remove$Date))
+  extreme_day_replace = 
+    unique(
+      select(
+        extreme_day_replace,
+        SiteCode, serial.No, 
+        day_extreme_rows, Date, extreme_species, co_detected_species_high))
+  
+  extreme_day_remain =
+    subset(extreme_site_use, 
+           !(Date %in% extreme_day_replace$Date |
+               Date %in% extreme_day_remove$Date))
+  extreme_day_remain = 
+    unique(
+      select(
+        extreme_day_remain,
+        SiteCode, serial.No, 
+        day_extreme_rows, Date, extreme_species, co_detected_species_high))
+  
+  # extreme days to remove (firework or biomass)  
+  rows_to_remove = 
+    unique(extreme_day_remove$day_extreme_rows)
+  # extreme days to keep (days with other source detected) 
+  rows_to_remain = 
+    unique(extreme_day_remain$day_extreme_rows)
+  # extreme days to replace (no source detected)
+  rows_to_replace = 
+    unique(extreme_day_replace$day_extreme_rows)
+  
+  rowNo_replace = length(rows_to_replace)
+  rowNo_remove = length(rows_to_remove)
+  rowNo_remain = length(rows_to_remain)
+  rowNo_after_remove = nrow(conc_site) - rowNo_remove
+  
+  # check if all rows with extreme(s) are classified
+  # rowNo_replace + rowNo_remove + rowNo_remain == nrow(day_extreme)
+  # length(unique(append(append(rows_to_remove, rows_to_remain), rows_to_replace))) == nrow(day_extreme)
+  
+  # combine for later check if the handling with extremes looks fine or not
+  extreme_events_remove = rbind(extreme_events_remove, extreme_day_remove)
+  extreme_events_remain = rbind(extreme_events_remain, extreme_day_remain)
+  extreme_events_replace = rbind(extreme_events_replace, extreme_day_replace)
+  
+  ##### Extremes 3 - use random-forest to interpolate extremes to be replaced #####
+  
+  day_extreme_replace = 
+    subset(day_extreme,
+           row_serial %in% rows_to_replace)
+  
+  # for each species column, update conc_site and species_NA_intp_site where day_extreme_replace is TRUE
+  for (species_col in species_columns) {
+    rows_to_update <- 
+      as.numeric(
+        day_extreme_replace$row_serial[
+          day_extreme_replace[[species_col]] == TRUE])
+    
+    conc_site[rows_to_update, (species_col) := NA]
+    # extra points that are from interpolation
+    species_NA_intp_site[rows_to_update, (species_col) := TRUE]
+  }
+  
+  ## log all value to avoid negative interpolation 
+  conc_site_noExe = conc_site[!as.integer(rows_to_remove), ]
+  
+  site_log = 
+    cbind(conc_site_noExe[, 1:3],
+          conc_site_noExe[, 4:ncol(conc_site_noExe)] %>% 
+            dplyr::select(where(is.numeric)) %>%
+            log())
+  
+  #interpolation with missForest, using random forest, option "variablewise = T"
+  site_intp_rf_mf = 
+    missForest(site_log[, ..species_columns], 
+               variablewise = T)
+  site_rf_conc = 
+    cbind(site_log[, 1:3], 
+          exp(site_intp_rf_mf$ximp))
+  
+  ##### Extremes 4 - remove rows that needs to be removed #####
+  species_NA_site = species_NA_intp_site[!as.integer(rows_to_remove), ]
+  species_fullMDL_site = species_fullMDL_site[!as.integer(rows_to_remove), ]
+  
+  #### set the MDL as the median across whole period
+  # median_mdl = 
+  #   species_fullMDL_site[, 
+  #                        lapply(.SD, median), 
+  #                        .SDcols = 3:ncol(species_fullMDL_site)]
+  # species_fullMDL_site =
+  #   cbind(select(species_fullMDL_site, SiteCode, Date), 
+  #         median_mdl[rep(1:nrow(median_mdl), 
+  #                        nrow(species_fullMDL_site)), ])
+  # 
+  summary(site_rf_conc$Date == species_NA_site$Date &
+            species_fullMDL_site$SiteCode == species_NA_site$SiteCode)
+  
+  ##### Uncertainty estimation  ##### 
+  
+  conc_above_mdl_site <- conc_above_mdl_site[!as.integer(rows_to_remove), ]
+  
+  summary(conc_above_mdl_site$Date == site_rf_conc$Date)
+  
+  # expand error_fraction file to one with same row number as concentration file
+  comp_ef <- 
+    comp_error_fraction[1][
+      rep(1, nrow(conc_above_mdl_site)), 
+      .SD] # .SD selects the data for each repetition.
+  
+  # estimate the uncertainty 
+  # EPA PMF5.0 user guide, page 16-17, function 5-1 & 5-2
+  conc_above_mdl_species = conc_above_mdl_site[, ..species_columns]
+  conc_rf_species = site_rf_conc[, ..species_columns]
+  species_MDL_site = species_fullMDL_site[, ..species_columns]
+  
+  conc_rf_pmf = 
+    conc_above_mdl_species * conc_rf_species +
+    (!conc_above_mdl_species) * species_MDL_site * 0.5
+  unc_rf_pmf = 
+    conc_above_mdl_species * (((species_MDL_site / 2)^2 + 
+                                 (comp_ef * conc_rf_species)^2)^0.5) +
+    (!conc_above_mdl_species) * 5/6 * species_MDL_site
+  
+  # conc_above_mdl_species[1:5, 4:10]; conc_rf_species[1:5, 4:10]; species_MDL_site[1:5, 4:10]; comp_ef[1:5, 4:10]
+  # conc_rf_pmf[1:5, 4:10]; unc_rf_pmf[1:5, 4:10]
+  
+  # PM2.5 unc
+  conc_rf_pmf$PM25 = site_rf_conc$PM25
+  unc_rf_pmf$PM25 = 3 * site_rf_conc$PM25
+  
+  # extra uncertainty for the interpolated points
+  species_NA_intp_unc = species_NA_site[, 4:ncol(species_NA_site)]
+  # species_NA_intp_unc[species_NA_intp_unc == TRUE] <- 1.5
+  species_NA_intp_unc[species_NA_intp_unc == TRUE] <- 4.5
+  species_NA_intp_unc[species_NA_intp_unc == FALSE] <- 1
+  
+  summary(names(unc_rf_pmf) == names(species_NA_intp_unc))
+  
+  unc_rf_pmf = unc_rf_pmf * species_NA_intp_unc
+  summary(unc_rf_pmf$PM25/conc_rf_pmf$PM25)
+  
+  # insert date info
+  conc_rf_pmf <- cbind(site_rf_conc[, 1:3], conc_rf_pmf) # site_rf_conc[, 1:4]
+  unc_rf_pmf <- cbind(site_rf_conc[, 1:3], unc_rf_pmf) # site_rf_conc[, 1:4]
+  
+  ##### Re-estimate signal-to-noise SNR after removing extremes #####
+  conc.col = ncol(conc_rf_pmf)
+  
+  # according to EPA PMF 5.0 User Guide.pdf, function 5-3 & 5-4 from page 23
+  conc_unc_diff_site = 
+    (conc_rf_pmf[, ..species_columns] - 
+       unc_rf_pmf[, ..species_columns])/
+    unc_rf_pmf[, ..species_columns] * conc_above_mdl_species
+  
+  conc_unc_diff_site$PM25 = -999
+  # conc_unc_diff_site[1:5, 4:10]
+  
+  # get the SNR signal-to-noise ratio 
+  snr_selected_site = 
+    colSums(conc_unc_diff_site)/
+    nrow(conc_unc_diff_site)
+  # convert the result to a one-row data.frame for later match
+  snr_selected_site = data.frame(t(snr_selected_site))  
+  
+  ##### Bad-weak-strong 1. Strict SNR & Strict MDL - selected #####
+  
+  # SWB, Strong, Weak, or Bad classification
+  
+  # estimate the percent of species-specific fration of above MDL
+  conc_rf_pmf_aboveMDL = data.frame(colSums(conc_above_mdl_species))
+  conc_rf_pmf_aboveMDL$CompName = row.names(conc_rf_pmf_aboveMDL)
+  names(conc_rf_pmf_aboveMDL)[1] = "above_MDL_count"
+  conc_rf_pmf_aboveMDL$Percent = 
+    conc_rf_pmf_aboveMDL$above_MDL_count * 100 / rowNo_after_remove
+  
+  # generate the weak & bad species based on the conc_vs_mdl 
+  site.species.weak.Pmdl = conc_rf_pmf_aboveMDL$CompName[
+    conc_rf_pmf_aboveMDL$Percent <= 50 &
+      conc_rf_pmf_aboveMDL$Percent > 20]
+  site.species.bad.Pmdl = conc_rf_pmf_aboveMDL$CompName[
+    conc_rf_pmf_aboveMDL$Percent <= 20]
+  # change to character
+  site.species.weak.Pmdl = as.character(site.species.weak.Pmdl)
+  site.species.bad.Pmdl = as.character(site.species.bad.Pmdl)
+  
+  # generate the weak & bad species based on SNR 
+  site.species.bad.snr = colnames(snr_selected_site)[which(
+    colSums(snr_selected_site) < 0.2)]
+  site.species.weak.snr = colnames(snr_selected_site)[which(
+    colSums(snr_selected_site) >= 0.2 &
+      colSums(snr_selected_site) < 2)]
+  
+  ###### Bad-weak-strong 3. other criteria ######
+  
+  # combine the "weak" & "bad" list
+  site.species.bad = append(site.species.bad.snr, 
+                            site.species.bad.Pmdl)
+
+  site.species.weak = append(site.species.weak.snr, 
+                             site.species.weak.Pmdl)
+
+  # remove PM25, which potentially exists in the weak/bad list
+  site.species.bad = site.species.bad[! site.species.bad %in% "PM25"]
+  # site.species.weak = site.species.weak[! site.species.weak %in% "PM25"]
+  
+  # if OC/EC/OPC is in bad, force remove to weak
+  oc.ec = c("EC", "EC1", "EC2", "EC3", 
+            "OC", "OC1", "OC2", 
+            "OC3", "OC4", "OP")
+  
+  oc.ec.bad = site.species.bad[site.species.bad %in% oc.ec]
+  site.species.bad = site.species.bad[! site.species.bad %in% oc.ec]
+  site.species.weak = append(site.species.weak, 
+                             oc.ec.bad)
+  
+  # if a species exist both in "bad" & "weak", define as "WEAK"
+  site.species.bad = site.species.bad[! (
+    site.species.bad %in% site.species.weak)]
+  
+  ##### For CSN
+  # add "S", "Na", and "K" into bad to exclude co-linear effects with SO4, Na+, K+
+  site.species.bad = append(c("S", "Na", "K"), 
+                            site.species.bad) 
+  # in case any of this three is in weak, if so, remove
+  site.species.weak = site.species.weak[! (
+    site.species.weak %in% c("S", "Na", "K"))]
+  
+  # ##### For IMPROVE
+  # # add "S into bad to exclude co-linear effects with SO4, Na+, K+
+  # site.species.bad = append(c("S"), 
+  #                              site.species.bad) 
+  # # in case "S  is in weak, if so, remove
+  # site.species.weak = site.species.weak[! (
+  #   site.species.weak %in% c("S"))]
+  
+  
+  # add Al, Mg, Na into weak, if there are not in bad, due to the lower reliability in XRF test
+  if("NaIon" %in% species_columns){
+    Al.Mg.weak = c("Al", "Mg")
+  } else {
+    Al.Mg.weak = c("Al", "Mg", "Na")
+  }
+  # determine if Al or Mg or Na is in bad, if so, remove the one in "Al.Mg.weak"
+  Al.Mg.weak = Al.Mg.weak[! (
+    Al.Mg.weak %in% site.species.bad)]
+  # add the rest in Al.Mg.weak to "weak"
+  site.species.weak = append(Al.Mg.weak, 
+                             site.species.weak) 
+  # In CSN, "Na", "K" were removed, and use Na+, K+ instead
+  
+  # remove the duplicated
+  # site.species.weak = site.species.weak[!duplicated(site.species.weak)]
+  
+  # remove the duplicated strings from the character vector
+  site.species.bad = unique(
+    unlist(
+      strsplit(
+        site.species.bad, " ")))
+  site.species.weak = unique(
+    unlist(
+      strsplit(
+        site.species.weak, " ")))
+  
+  ###### Bad-weak-strong 4. Distribution of values above MDL ######
+  # species stay in "bad" and related to higher Pmdl
+  site.species.bad.check = site.species.bad[
+    site.species.bad %in% 
+      site.species.bad.Pmdl]
+  
+  # remove those with >95% of value below MDL
+  site.species.bad.check = 
+    unique(
+      subset(conc_rf_pmf_aboveMDL, 
+             CompName %in% site.species.bad.check &
+               Percent > 5)$CompName)
+  
+  # site.species.bad.check = c("Ag", "Ca")
+  if(length(site.species.bad.check) > 0){
+    # files for those with above MDL concentrations
+    conc_rf_pmf_mdl = 
+      conc_rf_pmf[, 4:ncol(conc_rf_pmf)] * conc_above_mdl_species
+    
+    # subset those grouped as bad
+    conc_rf_pmf_bad = conc_rf_pmf_mdl %>%
+      select(all_of(site.species.bad.check))
+    
+    # replace 0 by NA
+    conc_rf_pmf_bad <-
+      data.frame(
+        apply(
+          conc_rf_pmf_bad, 
+          2, 
+          function(x) 
+            replace(x, x == 0, NA)))
+    
+    # for concentrations above MDL, check the 10th vs. 90th percentile ratio
+    # for some random comparison, r < 0.1 for strong species and < 0.2 for weak 
+    # or, change to compare mean vs. sd? if mean < sd, or if mean > sd, already
+    conc_rf_pmf_bad_mean = 
+      conc_rf_pmf_bad %>%
+      dplyr::summarise(
+        dplyr::across(
+          dplyr::everything(),
+          list(
+            p = ~mean(., na.rm = T)
+          )
+        ))
+    
+    conc_rf_pmf_bad_sd = 
+      conc_rf_pmf_bad %>%
+      dplyr::summarise(
+        dplyr::across(
+          dplyr::everything(),
+          list(
+            p = ~sd(., na.rm = T)
+          )
+        ))
+    
+    bad_sd_mean = conc_rf_pmf_bad_sd/conc_rf_pmf_bad_mean
+    colnames(bad_sd_mean) = site.species.bad.check
+    
+    # Detect the species for which the sd > mean
+    bad_comp <- which(colSums(bad_sd_mean > 1) > 0)
+    site.species.bad.remove <- colnames(bad_sd_mean)[bad_comp]
+    
+  } else{
+    site.species.bad.remove = NA
+  }
+  
+  # remove the species with very scatter distribution from bad and add it into weak 
+  site.species.bad = 
+    site.species.bad[
+      !(site.species.bad %in% 
+          site.species.bad.remove)]
+  
+  site.species.weak = 
+    append(site.species.weak, 
+           site.species.bad.remove)
+  site.species.weak = 
+    site.species.weak[
+      !is.na(site.species.weak)]
+  
+  # mark sites where PM25 is already "Weak" according to above criteria
+  original_PM_weak = "No"
+  if (sum(grepl("PM25", site.species.weak)) == 1)  {
+    site.species.weak = site.species.weak[! site.species.weak %in% "PM25"]
+    original_PM_weak = "Yes"
+  }
+  
+  # arrange in alphabetic order 
+  site.species.bad = sort(site.species.bad)
+  site.species.weak = sort(site.species.weak)
+  
+  site.species.weak = append(site.species.weak, "PM25")
+  site.species.strong = unique(
+    subset(conc_rf_pmf_aboveMDL, 
+           !(CompName %in% site.species.bad |
+               CompName %in% site.species.weak))$CompName)
+  site.species.strong = site.species.strong[! site.species.strong %in% "PM25"]
+  site.species.strong = as.character(site.species.strong)
+  
+  ##### Output 1:  GUI #####
+  # remove species marked as bad
+  conc_rf_pmf_gui <- conc_rf_pmf[, !site.species.bad, with=FALSE]
+  unc_rf_pmf_gui <- unc_rf_pmf[, !site.species.bad, with=FALSE]
+  conc_rf_pmf_gui$State = unc_rf_pmf_gui$State = 
+    conc_rf_pmf_gui$SiteCode = unc_rf_pmf_gui$SiteCode = NULL
+  
+  write.csv(conc_rf_pmf_gui,
+            file = file.path(
+              dropbox_path, GUI.site.folder, 
+              paste0(prefix, 
+                     site.serial, "_conc.csv")),
+            row.names = FALSE)
+  write.csv(unc_rf_pmf_gui,
+            file = file.path(
+              dropbox_path, GUI.site.folder, 
+              paste0(prefix, 
+                     site.serial, "_unc.csv")),
+            row.names = FALSE)
+  
+  
+  ######### output 2.1: non-GUI, conc & unc #########
+  
+  unc_rf_pmf_cmd = unc_rf_pmf_gui
+  conc_rf_pmf_cmd = conc_rf_pmf_gui
+  
+  # unc_rf_pmf_cmd[names(unc_rf_pmf_cmd) %in% site.species.weak] = 
+  #   3 * unc_rf_pmf_cmd[names(unc_rf_pmf_cmd) %in% site.species.weak]
+  unc_rf_pmf_cmd[, (site.species.weak) := 
+                   lapply(.SD, 
+                          function(x) 
+                            x * 3), 
+                 .SDcols = site.species.weak]
+  
+  # for PM2.5, set the uncertainty 3*3 times as much
+  # unc_rf_pmf_cmd$PM25 = 3 * unc_rf_pmf_cmd$PM25, done earlier
+  
+  # unc_rf_pmf_cmd[1:5, 1:10]; conc_rf_pmf_cmd[1:5, 1:10]
+  
+  # add info into column names before combination
+  names(conc_rf_pmf_cmd) = paste0("conc_", names(conc_rf_pmf_cmd))
+  names(unc_rf_pmf_cmd) = paste0("unc_", names(unc_rf_pmf_cmd))
+  
+  # summary(conc_rf_pmf_cmd$conc_Date == unc_rf_pmf_cmd$unc_Date)
+  
+  # combining conc & unc files
+  cmd_conc_unc = cbind(conc_rf_pmf_cmd, unc_rf_pmf_cmd)
+  
+  # Interleave columns of concentration and uncertainty files
+  ## generate a new vector to index the columns of cbind file
+  interleave.col.order <- 
+    rep(1:ncol(unc_rf_pmf_cmd), each = 2) + 
+    (0:1) * ncol(unc_rf_pmf_cmd)
+  
+  ## reorder the cbind file
+  # cmd_input_interleave = cmd_conc_unc[interleave.col.order] # for data.frame only
+  cmd_input_interleave = 
+    as.data.table(
+      as.matrix(
+        cmd_conc_unc)[, 
+                      interleave.col.order])
+  
+  # only keep one Date & cluster column
+  cmd_input_interleave$unc_Date = NULL
+  names(cmd_input_interleave)[1] = "Date"
+  # head(cmd_input_interleave)
+  
+  cmd_input_interleave = 
+    cmd_input_interleave[
+      with(cmd_input_interleave, 
+           order(Date)), ]
+  
+  write.csv(cmd_input_interleave, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix, site.serial, "_CMD.csv")),
+            row.names = FALSE)
+  
+  ###### output 2.2: non-GUI, weak, bad or strong ######
+  # get the corresponding row number
+  cmd_class_rowNo = 
+    as.integer(
+      row.names(
+        cmd_species_class_site[
+          cmd_species_class_site$serial.No == site.serial, ]))
+  
+  # assign values
+  cmd_species_class_site[cmd_class_rowNo, site.species.strong] <- 1
+  cmd_species_class_site[cmd_class_rowNo, site.species.weak] <- 0
+  cmd_species_class_site[cmd_class_rowNo, site.species.bad] <- NA
+  
+  cmd_species_class_site$sum.weak.good[cmd_class_rowNo] = 
+    length(site.species.weak) +
+    length(site.species.strong) 
+  
+  cmd_species_class_site$site.row[cmd_class_rowNo] = rowNo_after_remove
+  cmd_species_class_site$extreme_rowNo_remain[cmd_class_rowNo] = rowNo_remain
+  cmd_species_class_site$extreme_rowNo_replace[cmd_class_rowNo] = rowNo_replace
+  cmd_species_class_site$extreme_rowNo_remove[cmd_class_rowNo] = rowNo_remove
+  cmd_species_class_site$row_count_org[cmd_class_rowNo] = row_count_org
+  cmd_species_class_site$original_PM_weak[cmd_class_rowNo] = original_PM_weak
+  cmd_species_class_site$SiteCode = site_code
+  
+  # detect the species for None-GUI PMF, thus, weak and strong species
+  nonGUI_disp_species <- 
+    cmd_species_class_site[
+      cmd_class_rowNo, 
+      c(site.species.strong, site.species.weak)]
+  species.name.use = species.name[
+    species.name %in% 
+      c(site.species.strong, site.species.weak)]
+  
+  # add PM25
+  # species.name.use = append(species.name.use, "PM25")
+  
+  nonGUI_disp_species <- nonGUI_disp_species[, species.name.use]
+  cmd_species_class_site$style.weak.good[cmd_class_rowNo] <- 
+    paste0("/", nonGUI_disp_species, collapse = "")
+  # cmd_species_class_site[cmd_class_rowNo, ]
+  
+  write.csv(cmd_species_class_site, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "PMF_SWB_site.csv")),
+            row.names = FALSE)
+  
+  write.csv(extreme_events_remove, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "extreme_remove.csv")),
+            row.names = FALSE)
+  
+  write.csv(extreme_events_remain, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "extreme_remain.csv")),
+            row.names = FALSE)
+  
+  write.csv(extreme_events_replace, 
+            file = file.path(
+              dropbox_path, nonGUI.site.folder, 
+              paste0(prefix_swb, "extreme_replace.csv")),
+            row.names = FALSE)
+}
+
+
+#### Copy files to Dropbox ####
+
+# #### CSN, extreme, mean*25 as threshold of outlier
+# Clusterfolder <- "CSN_NoGUI_noIntp_25TimesMean_cluster" 
+Sitefolder = "CSN_NoGUI_noIntp_25TimesMean_Site"
+prefix = "CSN_noIntp_25timesMean_C_"
+
+# #### CSN, extreme, mean*15 as threshold of outlier
+# Clusterfolder <- "CSN_NoGUI_noIntp_15TimesMean_cluster" 
+Sitefolder = "CSN_NoGUI_noIntp_15TimesMean_site"
+prefix = "CSN_noIntp_15timesMean_C_"
+
+# dropbox_path = "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
+# cluster_folder = paste0(dropbox_path, "/", Clusterfolder)
+site_folder = paste0(dropbox_path, "/", Sitefolder)
+
+###### for cluster
+# create the destination folder if it does not exist
+if (!dir.exists(cluster_folder)) {
+  dir.create(cluster_folder, recursive = TRUE)
+}
+
+# cluster_files <- list.files(paste0(data.dir, "/", Clusterfolder), full.names = TRUE)
+# # copy each file to the destination folder
+# for (cluster_file in cluster_files) {
+#   file.copy(cluster_file, cluster_folder)
+# }
+
+###### for site
+# create the destination folder if it does not exist
+if (!dir.exists(site_folder)) {
+  dir.create(site_folder, recursive = TRUE)
+}
+
+site_files <- list.files(paste0(data.dir, "/", Sitefolder), full.names = TRUE)
+# copy each file to the destination folder
+for (site_file in site_files) {
+  file.copy(site_file, site_folder)
+}
+
+
+#### Dispersion Normalization ####
+
+##### VC for dispersion normalization, based on ERA5 data 
+
+dn_site_folder = paste0(site_folder, "_DN")
+
+dn_vc = fread("Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
+site_code_serial = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial$V1 = NULL
+
+dn_vc$V1 = NULL
+dn_vc$Date = as.Date(dn_vc$Date)
+dn_vc_use = select(dn_vc,
+                   Dataset, SiteCode, Date, VC_coef)
+dn_vc_use = 
+  dn_vc_use[
+    with(dn_vc_use,
+         order(Dataset, SiteCode, Date)), ]
+
+dn_vc_use_site = join(dn_vc_use, site_code_serial)
+dn_vc_use_site$serial.No =  
+  ifelse(dn_vc_use_site$serial.No < 100,
+         sprintf("%03d", dn_vc_use_site$serial.No),
+         as.character(dn_vc_use_site$serial.No))
+
+nongui_org_csvs <- 
+  list.files(file_folder, 
+             pattern = ".*CMD\\.csv$", full.names = TRUE)
+
+nongui_org_csvs <- 
+  list.files(file_folder, 
+             pattern = ".*[0-9]\\.csv$", full.names = TRUE)
+
+for (nongui_org_csv in nongui_org_csvs) { # [140:length(nongui_org_csvs)]
+  # site_serial = sub(".*_S_([0-9]+)_.*", "\\1", basename(nongui_org_csv))
+  site_serial = regmatches(basename(nongui_org_csv), 
+                           regexpr("(?<=_S_)(\\d{3})(?=_cmd)?", 
+                                   basename(nongui_org_csv), 
+                                   perl = TRUE))
+  nongui_conc_unc = read.csv(nongui_org_csv)
+  nongui_conc_unc$Date = as.Date(nongui_conc_unc$Date)
+  # nongui_conc_unc$Date = as.Date(nongui_conc_unc$Date, format = "%m/%d/%y")
+  head(nongui_conc_unc)
+  nongui_conc_unc$X = NULL
+  
+  site_dn_vc = 
+    select(
+      subset(dn_vc_use_site, serial.No == site_serial), 
+      Date, VC_coef)
+  site_dn_vc$Date = as.Date(site_dn_vc$Date)
+  
+  site_vc_mean = mean(site_dn_vc$VC_coef, na.rm = TRUE)
+  
+  # exclude potential removed dates
+  site_dn_vc = 
+    subset(site_dn_vc, Date %in% nongui_conc_unc$Date)
+  site_dn_vc = data.frame(site_dn_vc)
+  site_dn_vc = site_dn_vc[!duplicated(site_dn_vc), ] 
+  
+  nongui_conc_unc_dn = nongui_conc_unc
+  # DN for each cluster/site
+  for (col in names(nongui_conc_unc)) {
+    if (!(col %in% c("SiteCode", "Date", "State"))) {
+      nongui_conc_unc_dn[[col]] =
+        nongui_conc_unc[[col]] * site_dn_vc$VC_coef / site_vc_mean
+    }
+  }
+  
+  write.csv(nongui_conc_unc_dn, 
+            file.path(dn_file_folder, basename(nongui_org_csv)))
+}
+
+#### Explore the removed/replaced data ####
+extreme_remove = 
+  read.csv(file.path(
+    dropbox_path, nonGUI.site.folder, 
+    paste0(prefix_swb, "extreme_remove.csv")))
+
+extreme_replace = 
+  read.csv(file.path(
+    dropbox_path, nonGUI.site.folder, 
+    paste0(prefix_swb, "extreme_replace.csv")))
+freq_replace = data.frame(table(extreme_replace$extreme_species))
+names(freq_replace)[1] = "Species"
+
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+freq_replace = merge(freq_replace, species_class, all.x = TRUE)
+
+ggplot(freq_replace,
+       aes(x = reorder(Species, sequence))) +
+  geom_bar(aes(y = Freq), 
+           stat = "identity", width = 0.6, alpha = 0.8) +
+  scale_x_discrete(labels = function(x) format_variable(x)) +
+  xlab(format_variable("PM25 Species")) +
+  ylab(format_variable("Frequency")) + 
+  theme_bw() +
+  theme_text_speciesName
