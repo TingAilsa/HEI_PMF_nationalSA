@@ -16,6 +16,7 @@ library(data.table)
 library(dplyr)
 library(tidyr)
 library(plyr)
+library(ggthemes)
 library(ggplot2) 
 library(base)
 library(ggrepel)
@@ -109,6 +110,12 @@ dim(csn_daily)
 csn_daily = csn_daily[with(
   csn_daily, 
   order(SiteCode, Date)), ]
+
+csn_daily = species_col_reorder(species_daily)
+csn_daily = relocate(csn_daily, SiteCode, .before = Date)
+csn_daily = relocate(csn_daily, OP, .after = OC4)
+
+names(csn_daily)
 
 # write.csv(csn_daily, "CSN_RFinterpulated_combine_Csubgroup_2023.04.csv")
 write.csv(csn_daily, "CSN_RFinterpulated_combine_Csubgroup_2024.04.csv")
@@ -354,28 +361,198 @@ csn_aqs_pm$species.sum = csn_aqs_pm$PM25_Combine =
 # the reestimation will be combined when preparing GUI/nonGUI data
 write.csv(csn_aqs_pm, "CSN_concentration_AQS.PM_PMF_C-sub_2024.03.csv")
 
+##### CSN - MDL mostly based on pre-2015 #####
+csn_mdl = fread("CSN_MDL_monthly_2024.04.csv")
+csn_mdl$V1 = NULL
+csn_mdl = species_col_reorder(csn_mdl)
+csn_mdl = relocate(csn_mdl, SiteCode, .before = "year")
+names(csn_mdl)
+
+csn_mdl_till15 = subset(csn_mdl, year < 2016)
+csn_mdl_till15 = csn_mdl_till15[!(csn_mdl_till15$year == 2015 & csn_mdl_till15$month == 12), ]
+csn_mdl_till15$SiteCode = as.character(csn_mdl_till15$SiteCode)
+
+csn_mdl_till15_month_mean =
+  select(csn_mdl_till15, -year) %>%
+  group_by(SiteCode, month) %>% 
+  dplyr::summarize(
+    across(where(is.numeric), 
+           mean, na.rm = TRUE),
+    .groups = 'drop') %>%
+  ungroup()
+
+csn_mdl_till15_month_mean = 
+  csn_mdl_till15_month_mean[with(
+    csn_mdl_till15_month_mean, order(SiteCode, month)
+  ), ]
+
+csn_mdl_till15_month_median =
+  select(csn_mdl_till15, -year) %>%
+  group_by(SiteCode, month) %>% 
+  dplyr::summarize(
+    across(where(is.numeric), 
+           median, na.rm = TRUE),
+    .groups = 'drop') %>%
+  ungroup()
+
+csn_mdl_till15_month_median = 
+  csn_mdl_till15_month_median[with(
+    csn_mdl_till15_month_median, order(SiteCode, month)
+  ), ]
+
+####### calculate the correlation between corresponding species columns
+matrix_mdl_till15_month_median <- as.matrix(select(csn_mdl_till15_month_median, -SiteCode, -month, -ClIon))
+matrix_mdl_till15_month_mean <- as.matrix(select(csn_mdl_till15_month_mean, -SiteCode, -month, -ClIon))
+
+csn_mdl_till15_month_correl <-
+  sapply(seq.int(ncol(matrix_mdl_till15_month_median)), function(i) {
+  cor(matrix_mdl_till15_month_median[, i],
+      matrix_mdl_till15_month_mean[, i], 
+      use = "complete.obs")
+})
+
+species_names = names(csn_mdl_till15_month_median)[col_comp(csn_mdl_till15_month_median, "Ag", "PM25")]
+species_names = species_names[species_names != "ClIon"]
+csn_mdl_till15_cor =
+  data.frame(csn_mdl_till15_month_correl)
+colnames(csn_mdl_till15_cor)[1] = "correl"
+csn_mdl_till15_cor$Species = species_names
+  
+csn_mdl_till15_cor = relocate(csn_mdl_till15_cor, Species, .before = correl)
+summary(csn_mdl_till15_cor)
+
+ggplot(csn_mdl_till15_cor, aes(x = correl)) +
+  geom_histogram(bins = 50) +
+  xlim(0.75, 0.95) +
+  theme_base()
+
+####### plot the mean and median site-specific monthly MDL
+csn_mdl_till15_month_mean_long = 
+  csn_mdl_till15_month_mean %>%
+  pivot_longer(
+    cols = Ag:PM25,
+    names_to = c("Species"),
+    values_to = "MDL"
+    )
+csn_mdl_till15_month_mean_long$data = "mean"
+
+csn_mdl_till15_month_median_long = 
+  csn_mdl_till15_month_median %>%
+  pivot_longer(
+    cols = Ag:PM25,
+    names_to = c("Species"),
+    values_to = "MDL"
+  )
+csn_mdl_till15_month_median_long$data = "median"
+
+csn_mdl_till15_month_plot = 
+  rbind(csn_mdl_till15_month_mean_long, csn_mdl_till15_month_median_long)
+
+# position of ggtext
+csn_mdl_till15_month_plot_position =
+  ddply(csn_mdl_till15_month_plot, .(Species),
+        summarise,
+        y_position = quantile(MDL, 0.9),
+        x_position = 6.5)
+
+# plot
+ggplot(csn_mdl_till15_month_plot,
+       aes(month, MDL, color = data, shape = data)) +
+  geom_point(alpha = 0.3) +
+  facet_wrap(Species~. , scales = "free", ncol = 5) +
+  scale_y_continuous(limits = c(0, NA), 
+                     breaks = function(x) pretty(x, n = 3)) +  # reduce the number of breaks
+  scale_x_continuous(breaks = c(1, 3, 6, 9, 12)) +
+  scale_color_manual(values = c("#377eb8", "#ff7f00")) + # c("steelblue", "brown2"), c("#377eb8", "#ff7f00")
+  geom_text(data = csn_mdl_till15_month_plot_position, size = 3.8,
+            aes(x = x_position, y = y_position, label = Species), 
+            inherit.aes = FALSE) + 
+  theme_base() +
+  theme(
+    panel.grid = element_line(colour = "white"),
+    plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+    strip.background = element_blank(), strip.text = element_blank(),
+    legend.position = "bottom", legend.background = element_blank(),
+    legend.title = element_text(size = 0),
+    axis.text = element_text(size = 11, color = "grey25")
+  )
+
+##### check sites with only < 12-month of mdl
+species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2024.04.csv") 
+
+csn_mdl_till15_month_count = data.frame(table(csn_mdl_till15_month_median$SiteCode))
+names(csn_mdl_till15_month_count)[1] = "SiteCode"
+csn_mdl_till15_12monthLess = subset(csn_mdl_till15_month_count, Freq < 12)
+
+species_mdl_12monthLess_daily = 
+  subset(species_daily, 
+         SiteCode %in% unique(csn_mdl_till15_12monthLess$SiteCode))
+table(species_mdl_12monthLess_daily$SiteCode)
+# 120110034 530330030 
+#   683       310 
+# seems to have enough data for PMF analyses, keep
+
+#### for sites having no record pre 2016
+summary(unique(csn_mdl_till15_month_median$SiteCode) %in% unique(species_daily$SiteCode))
+summary(unique(species_daily$SiteCode) %in% unique(csn_mdl_till15_month_median$SiteCode))
+
+summary(unique(csn_mdl$SiteCode) %in% unique(species_daily$SiteCode))
+summary(unique(species_daily$SiteCode) %in% unique(csn_mdl$SiteCode))
+
+csn_mdl_from16 = subset(csn_mdl, year >= 2016)
+csn_mdl_from16 = 
+  subset(csn_mdl_from16, 
+         !(SiteCode %in% csn_mdl_till15_month_median$SiteCode) &
+           SiteCode %in% species_daily$SiteCode)
+
+csn_mdl_from16_median = 
+  select(csn_mdl_from16, -year) %>%
+  group_by(SiteCode, month) %>% 
+  dplyr::summarize(
+    across(where(is.numeric), 
+           median, na.rm = TRUE),
+    .groups = 'drop') %>%
+  ungroup()
+
+# use median values
+csn_mdl_month_median_use =
+  rbind(csn_mdl_till15_month_median, csn_mdl_from16_median)
+
+summary(unique(csn_mdl_month_median_use$SiteCode) %in% unique(species_daily$SiteCode))
+summary(unique(species_daily$SiteCode) %in% unique(csn_mdl_month_median_use$SiteCode))
+
+csn_mdl_month_median_use = species_col_reorder(csn_mdl_month_median_use)
+csn_mdl_month_median_use = 
+  relocate(csn_mdl_month_median_use, SiteCode, .before = month)
+write.csv(csn_mdl_month_median_use, "CSN_MDL_C-Sub_monthly_forPMF_2024.04.csv")
+
 ##### CSN & IMPROVE - concentration vs. MDL #####
 ## CSN
 # species_daily = fread("CSN_RFinterpulated_combine_2023.04.csv")
-# species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv") ## interpolation after AQS PM matching
-species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2024.04.csv") ## interpolation Before AQS PM matching
+# species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv") 
+species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2024.04.csv") 
 
 ## IMPROVE
 species_daily = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv")
 
 species_daily$V1 = NULL
 species_daily$Date = as.Date(species_daily$Date)
+names(species_daily)
 
 # get monthly MDL
 ### CSN
 # csn_mdl = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_MDL_monthly.csv")
 # csn_mdl = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_MDL_monthly_2023.02.27.csv")
-species_mdl = fread("CSN_MDL_C-Sub_monthly_2023.05.csv")
-species_mdl$V1 = species_mdl$Cl. = NULL # csn_mdl$OP = 
+# species_mdl = fread("CSN_MDL_C-Sub_monthly_2023.05.csv")
+
+# use site-specific either pre-2016 or post-2016 montly median MDL for the whole study period
+species_mdl = fread("CSN_MDL_C-Sub_monthly_forPMF_2024.04.csv")
 
 ### IMPROVE
 species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
+
 species_mdl$V1 = species_mdl$ClIon = NULL # imp_mdl$OP = 
+names(species_mdl)
 
 # reorder
 species_daily = species_daily[with(
@@ -385,87 +562,49 @@ species_daily = species_daily[with(
 # get year, month, for matching with monthly MDL
 species_daily_conc = species_daily
 
-species_daily_conc$State = NULL # species_daily_conc$Qualifier = NULL
 species_daily_conc$year = year(species_daily_conc$Date)
 species_daily_conc$month = month(species_daily_conc$Date)
 dim(species_daily_conc)
 
-# reorder the dataset for matching
-species_daily_conc = species_daily_conc[with(
-  species_daily_conc, 
-  order(SiteCode, Date)), ]
-species_mdl = species_mdl[with(
-  species_mdl, 
-  order(SiteCode, year, month)), ]
-
-#### check if columns from concentration & MDL datasets match
-# csn
-summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-2)] == 
-          colnames(species_mdl)[4:ncol(species_mdl)])
-
-# imp
-species_daily_conc$ammNO3 = species_daily_conc$ammSO4 = species_daily_conc$Cl. = 
-  species_daily_conc$NO2. = NULL
-
-species_daily_conc =
-  plyr::rename(species_daily_conc, 
-               c("PM2.5" = "PM25", 
-                 "SO4" = "SO4Ion",
-                 "NO3" = "NO3Ion",
-                 "K." = "KIon",
-                 "Na." = "NaIon",
-                 "NH4." = "NH4Ion"))
-
-species_mdl =
-  plyr::rename(species_mdl, 
-               c("PM2.5" = "PM25", 
-                 "SO4" = "SO4Ion",
-                 "NO3" = "NO3Ion",
-                 "K." = "KIon",
-                 "Na." = "NaIon",
-                 "NH4." = "NH4Ion"))
-
-# species_daily_conc = relocate(species_daily_conc, PM25, .after = Zr)
-summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc) - 2)] ==
-          colnames(species_mdl)[4:ncol(species_mdl)])
-species_daily_conc_reag = 
-  species_daily_conc[, 3:(ncol(species_daily_conc)-2)]
+# check if species order match
+species_col_conc = names(species_daily_conc)[col_comp(species_daily_conc, "Ag", "PM25")]
+species_col_mdl = names(species_mdl)[col_comp(species_mdl, "Ag", "PM25")]
+summary(species_col_conc == species_col_mdl)
 
 # reorder columns the dataset for matching
-setcolorder(species_daily_conc_reag, 
-            names(species_mdl[, 4:ncol(species_mdl)]))
-species_daily_conc = 
-  data.frame(species_daily_conc[, 1:2], 
-        species_daily_conc_reag,
-        species_daily_conc[, (ncol(species_daily_conc)-1):ncol(species_daily_conc)])
+species_mdl_reag = species_mdl[, ..species_col_mdl]
 
-summary(colnames(species_daily_conc)[3:(ncol(species_daily_conc)-3)] == 
-          colnames(species_mdl)[4:ncol(species_mdl)])
+setcolorder(species_mdl_reag, 
+            names(species_daily_conc[, ..species_col_conc]))
+species_mdl_use = 
+  data.frame(select(species_mdl, SiteCode, month), 
+             species_mdl_reag)
 
-dim(species_daily_conc)
-dim(species_mdl)
 
 # expand MDL file to daily measurement 
 # (in case of interpolation, not used original data directly)
 species_daily_conc_date = select(species_daily_conc, 
-                                 SiteCode, Date, year, month)
+                                 SiteCode, State, Date, year, month)
 species_daily_fullMDL = merge(species_daily_conc_date, 
-                              species_mdl, 
+                              species_mdl_use, 
                               all.x = T)
+
+# reorder columns the dataset for matching
+setcolorder(species_daily_fullMDL, 
+            names(species_daily_conc))
+
 dim(species_daily_conc_date)
+dim(species_daily_fullMDL)
+summary(names(species_daily_conc) == names(species_daily_fullMDL))
 
 # reorder rows the dataset for matching
 species_daily_fullMDL = species_daily_fullMDL[with(
   species_daily_fullMDL, 
   order(SiteCode, Date)), ]
 
-species_daily = species_daily[with(
-  species_daily, 
+species_daily_conc = species_daily_conc[with(
+  species_daily_conc, 
   order(SiteCode, Date)), ]
-
-# reorder columns the dataset for matching
-setcolorder(species_daily_fullMDL, 
-            names(species_daily_conc))
 
 species_daily_fullMDL$year = species_daily_fullMDL$month = 
   species_daily_conc$year = species_daily_conc$month = NULL
@@ -473,14 +612,12 @@ species_daily_fullMDL$year = species_daily_fullMDL$month =
 # double check if date & site match
 summary(species_daily_fullMDL$SiteCode == species_daily_conc$SiteCode)
 summary(species_daily_fullMDL$Date == species_daily_conc$Date)
-summary(colnames(species_daily_fullMDL) == colnames(species_daily_conc))
+summary(names(species_daily_fullMDL) == names(species_daily_conc))
 
 # compare concentration and MDL of a given component
 cols_to_extract <- setdiff(names(species_daily_conc), 
-                           c("SiteCode", "Date"))
-species_daily_conc$OP = NULL # remove later, keep OP
-setDT(species_daily_conc)
-setDT(species_daily_fullMDL)
+                           c("SiteCode", "Date", "State"))
+# species_daily_conc$OP = NULL # remove later, keep OP
 species_conc = species_daily_conc[, ..cols_to_extract]
 species_mdl = species_daily_fullMDL[, ..cols_to_extract]
 
@@ -499,7 +636,13 @@ dim(species_conc)
 dim(species_mdl)
 dim(species_conc_mdl)
 
-species_conc_mdl_Site = cbind(species_daily[, 1:3], species_conc_mdl)
+species_conc_mdl_Site = 
+  cbind(select(species_daily_conc, SiteCode, Date, State), 
+        species_conc_mdl)
+
+species_daily_fullMDL = 
+  cbind(select(species_daily_conc, SiteCode, Date, State), 
+        species_mdl)
 
 ####### For site & date match check, finished!
 species_conc_mdl_randomsite = subset(cbind(species_daily[, 1:3], 
@@ -529,10 +672,11 @@ species_conc_mdl_randomsite[1:3, 4:13]
 # write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.02.csv")
 # write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.03.csv")
 write.csv(species_conc_mdl_Site, "CSN_conc_vs_MDL_C-subgroup_corrected_2024.04.csv")
+write.csv(species_daily_fullMDL, "CSN_MDL_C-Sub_monthly_forPMF_expand_2024.04.csv")
 
-species_conc_mdl_Site = subset(species_conc_mdl_Site, !is.na(OP))
+# species_conc_mdl_Site = subset(species_conc_mdl_Site, !is.na(OP))
 
 # write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2023.csv")
 write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.csv")
-write.csv(species_conc_mdl_Site, "IMPROVE_interpulation_random-forest_2023.csv")
+
 
