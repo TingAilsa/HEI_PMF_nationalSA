@@ -2,7 +2,7 @@
 # rm(list=ls())
 
 ##set working directory
-setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_no_GUI/iniparams_templates")
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_non-GUI_files/iniparams_templates")
 getwd()
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/CSN_IMPROVE_comp"
 
@@ -19,17 +19,18 @@ library(stringr)
 #### A. create cluster & sub-factor folders for sites  ####
 
 # midfix = "15tMean_0unc"
+# midfix = "15TimesMean"
 # midfix = "15tMean"
 # midfix = "25TimesMean"
 # midfix = "noSeason99"
+# midfix = "15t1mdl0unc"
 
 dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
-# dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", "15TimesMean", "_Site")
 
 # create folder to hold the site-specific subfolders
-new_cluster_folder = paste0(data.dir, "/", "CSN_CMD_noCsub_", midfix, "_Site")
-dir.create(file.path(new_cluster_folder), showWarnings = FALSE)
+new_file_folder = paste0(data.dir, "/", "CSN_CMD_noCsub_", midfix, "_Site")
+dir.create(file.path(new_file_folder), showWarnings = FALSE)
 
 ###### post-process script updates, no longer needed
 # dropbox_sitedate = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site_SiteDate")
@@ -66,7 +67,7 @@ for (site_file in site_files) {
   site_cmd <- sub(".*_(S[_-]\\d+)_.*", "\\1", basename(site_file))
   
   # Create a new folder for site_cmd 
-  site_cmd_folder <- file.path(new_cluster_folder, site_cmd)
+  site_cmd_folder <- file.path(new_file_folder, site_cmd)
   
   if (!dir.exists(site_cmd_folder)) {
     dir.create(site_cmd_folder, recursive = TRUE)
@@ -110,7 +111,7 @@ for (site_file in site_files) {
 }
 
 
-# files_to_remove <- list.files(path = new_cluster_folder, pattern = "_CMD\\.csv$", recursive = TRUE, full.names = TRUE)
+# files_to_remove <- list.files(path = new_file_folder, pattern = "_CMD\\.csv$", recursive = TRUE, full.names = TRUE)
 # file.remove(files_to_remove)
 
 #### B1 start. read iniparams files  ####
@@ -125,20 +126,26 @@ factor.number.series = c(3:11)
 #### B2. edit and output new iniparams.txt ####
 
 ### 15TimesMean, CSN
-site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15TimesMean_Site")
-# name.prefix = "CSN_noCsub_15TimesMean_" # prefix in names for input/output files
-site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15tMean_0unc_Site")
-name.prefix = "CSN_noCsub_15tMean_0unc_"
-name.prefix.csv = "CSN_noCsub_15TimesMean_"
+site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
+site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_Site")
+name.prefix = "CSN_noCsub_15t1mdl0unc_"
+name.prefix.csv = "CSN_noCsub_15t1mdl0unc_"
+
+# ### 15TimesMean, CSN
+# site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15timesMean_PMF_SWB_site.csv")
+# # site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15TimesMean_Site")
+# # name.prefix = "CSN_noCsub_15TimesMean_" # prefix in names for input/output files
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15tMean_0unc_Site")
+# name.prefix = "CSN_noCsub_15tMean_0unc_"
+# name.prefix.csv = "CSN_noCsub_15TimesMean_"
 
 # ### 25TimesMean, CSN
-# site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
+# site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
 # site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_25TimesMean_Site")
 # name.prefix = "CSN_noCsub_25TimesMean_" # prefix in names for input/output files
 # 
 # ### 99thSeasonal, CSN
-# site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_99season_Site/CSN_noCsub_noSeason99_PMF_CMD_StrongWeakBad_Site.csv")
+# site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_noSeason99_PMF_CMD_StrongWeakBad_Site.csv")
 # site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_noSeason99_Site")
 # name.prefix = "CSN_noCsub_noSeason99_" # prefix in names for input/output files
 
