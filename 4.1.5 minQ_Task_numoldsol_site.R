@@ -105,7 +105,7 @@ write(lowest_Qm_task, paste0("CSN_C_", cluster_site_num, "_F_", factor_num, "_lo
 
 param_files <- paste0("iniparams_", 
                       c("BS", "DISP"), #, "before_dual", "BS_DISP"
-                      "_C_", cluster_site_num, 
+                      "_S_", cluster_site_num, 
                       "_F_", factor_num, 
                       ".txt")
 
