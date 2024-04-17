@@ -1264,6 +1264,7 @@ species_col_reorder = function(species_df) {
                               "NO3" = "NO3Ion",
                               "SO4" = "SO4Ion",
                               "NH4" = "NH4Ion",
+                              "NH4+" = "NH4Ion",
                               "K+" = "KIon",
                               "Na+" = "NaIon",
                               "NH4." = "NH4Ion",
