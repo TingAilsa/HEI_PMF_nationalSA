@@ -861,50 +861,54 @@ csn_mdl_before_2015 = subset(csn_mdl_use,
 csn_mdl_after_2015 = subset(csn_mdl_use, 
                             year > 2015)
 
-# variables not to be used for PMF
-csn_bfr_remove = c("EC1.unadjusted.88", "EC2.unadjusted.88", "EC3.unadjusted.88",  
-                   "OC1.unadjusted.88", "OC2.unadjusted.88", "OC3.unadjusted.88", "OC4.unadjusted.88",
-                   "OC1.88", "OC2.88", "OC3.88", "OC4.88",
-                   "EC1.88", "EC2.88", "EC3.88", 
-                   "OC1", "OC2", "OC3", "OC4",
-                   "EC1", "EC2", "EC3", 
-                   "EC.unadjusted.88", "EC.88", # "EC.TOR.unadjust.88"
-                   "OC.unadjusted.88", "OC", # "OC.TOR.unadjusted.88"
-                   "OPC.88", "OPC.unadjusted.88", # "OP.TOR.unadjusted.88"
-                   "EC.TOR.88", "OC.88", "OPC.TOR.88",
-                   "EC", "OC.unadjusted", "OPC",
-                   "Ag", "Ba", "Cd", "Ce", "Co", "Cs", "In", 
-                   "K+", "Na+", "NH4+", "Sb", "Sn", 
-                   "Rb", "Zr", "Cl-")
+# remove columns not to be used
+csn_bfr_remove = 
+  c("EC", "OC", "OP", 
+    "OC1", "OC2", "OC3", "OC4",
+    "EC1", "EC2", "EC3")
 
-csn_aft_remove = c("EC1.unadjusted.88", "EC2.unadjusted.88", "EC3.unadjusted.88",  
-                   "OC1.unadjusted.88", "OC2.unadjusted.88", "OC3.unadjusted.88", "OC4.unadjusted.88",
-                   "OC1.88", "OC2.88", "OC3.88", "OC4.88",
-                   "EC1.88", "EC2.88", "EC3.88", 
-                   "OC1", "OC2", "OC3", "OC4",
-                   "EC1", "EC2", "EC3", 
-                   "EC.unadjusted.88", "EC.TOR.unadjust.88", "EC.88",
-                   "OC.unadjusted.88", "OC.TOR.unadjusted.88", "OC", 
-                   "OPC.88", "OP.TOR.unadjusted.88", "OPC.unadjusted.88",
-                   "EC", "OC.unadjusted", "OPC",
-                   "Ag", "Ba", "Cd", "Ce", "Co", "Cs", "In", 
-                   "K+", "Na+", "NH4+", "Sb", "Sn", 
-                   "Rb", "Zr", "Cl-")
+csn_aft_remove = 
+  c("EC", "OC", "OP", 
+    "OC1", "OC2", "OC3", "OC4")
 
 csn_mdl_before_2015[ ,csn_bfr_remove] <- list(NULL)
 csn_mdl_after_2015[ ,csn_aft_remove] <- list(NULL)
 
+# rename columns to be used
+csn_mdl_before_2015 = plyr::rename(csn_mdl_before_2015, 
+                                c("EC1.unadjusted.88" = "EC1", 
+                                  "EC2.unadjusted.88" = "EC2",
+                                  "EC3.unadjusted.88" = "EC3",
+                                  "OC1.unadjusted.88" = "OC1",
+                                  "OC2.unadjusted.88" = "OC2", 
+                                  "OC3.unadjusted.88" = "OC3",
+                                  "OC4.unadjusted.88" = "OC4",
+                                  "Accept.PM2.5" = "PM25",
+                                  "EC.TOR.unadjust.88" = "EC", 
+                                  "OC.TOR.unadjusted.88" = "OC",
+                                  "OP.TOR.unadjusted.88" = "OP"))
+
+csn_mdl_after_2015 = plyr::rename(csn_mdl_after_2015, 
+                               c("OC1.88" = "OC1",
+                                 "OC2.88" = "OC2", 
+                                 "OC3.88" = "OC3",
+                                 "OC4.88" = "OC4",
+                                 "PM2.5RC" = "PM25",
+                                 "EC.TOR.88" = "EC", 
+                                 "OC.88" = "OC",
+                                 "OPC.TOR.88" = "OP"))
+
 # Accept.PM2.5 as PM concentrations before 2015, and PM2.5RC for after
-csn_mdl_before_2015$PM25 = csn_mdl_before_2015$Accept.PM2.5
-csn_mdl_after_2015$PM25 = csn_mdl_after_2015$PM2.5RC
 csn_mdl_before_2015$Accept.PM2.5 = csn_mdl_before_2015$PM2.5RC = 
   csn_mdl_after_2015$Accept.PM2.5 = csn_mdl_after_2015$PM2.5RC = NULL
 
-# reset colnames, OC/EC were selected based on test protocol
-colnames(csn_mdl_before_2015)[c(11, 19, 20)] = c("EC", "OC", "OP")
-# "EC.TOR.unadjust.88" "OC.TOR.unadjusted.88" "OP.TOR.unadjusted.88" used till 2015
-colnames(csn_mdl_after_2015)[c(11, 19, 20)] = c("EC", "OC", "OP")
-# "EC.TOR.88" "OC.88" "OPC.TOR.88" are used after 2015 
+# get shared colnames
+conc_common_cols <- intersect(names(csn_mdl_before_2015), 
+                              names(csn_mdl_after_2015))
+
+# Subset data frames using shared colnames
+csn_mdl_before_2015 <- csn_mdl_before_2015[, conc_common_cols]
+csn_mdl_after_2015 <- csn_mdl_after_2015[, conc_common_cols]
 
 # check if columns from data before & after 2015 match
 summary(colnames(csn_mdl_after_2015) == colnames(csn_mdl_before_2015))
@@ -915,8 +919,15 @@ summary(csn_mdl_combine)
 dim(csn_mdl_combine)
 sapply(csn_mdl_combine, class)
 
+# remove variables not needed for PMF (C-subgroups)
+csn_remove = c("OC.unadjusted.88", "EC.unadjusted.88", 
+               "OPC.unadjusted.88", "OC.unadjusted", "OPC", "OPC.88", "EC.88") # , "OP"
+csn_mdl_combine[ ,csn_remove] <- list(NULL)
+names(csn_mdl_combine)
+
 # get the median MDL of each year for each site
-csn_mdl_median_annual = csn_mdl_combine  %>% 
+csn_mdl_median_annual = 
+  csn_mdl_combine  %>% 
   group_by(SiteCode, year) %>%
   summarise_if(is.numeric,
     median, na.rm = T)
@@ -930,7 +941,8 @@ unique(csn_mdl_med_annual_NA$SiteCode)
 ### "132950002" "171190024" "20904101"  "390350065" "390350076" "560210100" "720210010"
 
 # detect sites of data with NA in MDL
-csn_mdl_median_site = csn_mdl_combine  %>% 
+csn_mdl_median_site =
+  csn_mdl_combine  %>% 
   group_by(SiteCode) %>%
   summarise_if(is.numeric,
                median, na.rm = T)
@@ -968,13 +980,15 @@ csn_mdl_final <- csn_mdl_final %>%
   mutate_if(is.character, as.numeric)
 summary(csn_mdl_final)
 
-# replace NAs for five sites having no MDL values with mean of all sites
+# replace NAs for five sites having no MDL values by means of all sites
 indx <- which(is.na(csn_mdl_final), arr.ind = T)
 csn_mdl_final[indx] <- colMeans(csn_mdl_final, na.rm = T)[indx[, 2]]
 csn_mdl_final$SiteCode = as.character(csn_mdl_final$SiteCode)
 
 # output MDL file
-write.csv(csn_mdl_final, "CSN_MDL_monthly.csv")
+# write.csv(csn_mdl_final, "CSN_MDL_monthly.csv")
+names(csn_mdl_final)
+write.csv(csn_mdl_final, "CSN_MDL_monthly_2024.04.csv")
 
 ##### 2.2 check POC repeatability (duplicated measurements) #####
 csn_data$Method = csn_data$Status = csn_data$Elevation = 
