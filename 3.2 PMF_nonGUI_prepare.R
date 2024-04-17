@@ -499,16 +499,20 @@ for( i in 1:25){
 OOB_comb_avg = fread("CSN_OOBerror_random-forest_for_PMF_2024.csv")
 miss_comb_avg = fread("CSN_Missing_Qualifier_interpolation_for_PMF_2024.csv")
 
-OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
-
 #### IMPROVE
 OOB_comb_avg = fread("IMPROVE_OOBerror_random-forest.csv")
 miss_comb_avg = fread("IMPROVE_Missing_Qualifier_interpolation_All.csv")
-OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
 
+
+OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
 
 OOB_comb_avg = species_col_reorder(OOB_comb_avg)
 miss_comb_avg = species_col_reorder(miss_comb_avg)
+
+OOB_comb_avg = relocate(OOB_comb_avg, SiteCode, .before = Ag)
+miss_comb_avg = relocate(miss_comb_avg, SiteCode, .before = Ag)
+names(OOB_comb_avg)
+names(miss_comb_avg)
 
 ########## read.2 concentration ##########
 # uncertainties would be re-estimated after removing and replacing the extreme data points
@@ -524,8 +528,6 @@ conc_pmf = fread("IMPROVE_PMF_C-subgroup_PM_corrected_2023.csv")
 
 conc_pmf$V1 = NULL #conc_pmf$Final.Decision = 
 nrow(conc_pmf)
-conc_pmf = species_col_reorder(conc_pmf)
-conc_pmf = relocate(conc_pmf, SiteCode, .before = Date)
 conc_pmf$Date = as.Date(conc_pmf$Date)
 names(conc_pmf)
 
@@ -592,11 +594,13 @@ dim(site_code_serial)
 all_sites = unique(conc_pmf$SiteCode)
 site_list = subset(site_code_serial,
                    SiteCode %in% all_sites)
-
+length(unique(site_list$serial.No))
 length(all_sites)
 
 all_sites[13] %in% site_code_serial$SiteCode # 60731018
-all_sites = all_sites[-13]
+site60731018 = subset(conc_pmf,SiteCode==60731018)
+all_sites = all_sites[all_sites != 60731018]
+
 ########## read.4 conc vs. MDL  ##########
 
 ### CSN
@@ -606,7 +610,7 @@ species_conc_above_mdl = fread("CSN_conc_vs_MDL_C-subgroup_corrected_2024.04.csv
 ### IMPROVE
 species_conc_above_mdl = fread("IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.csv")
 
-species_conc_above_mdl$V1 = species_conc_above_mdl$ClIon = NULL # imp_mdl$OP = 
+species_conc_above_mdl$V1 = NULL # imp_mdl$OP = 
 species_conc_above_mdl$Date = as.Date(species_conc_above_mdl$Date)
 
 species_conc_above_mdl = 
@@ -621,25 +625,22 @@ summary(species_conc_above_mdl$Date == conc_pmf$Date &
 ### CSN
 # csn_mdl = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_MDL_monthly.csv")
 # csn_mdl = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE/CSN_MDL_monthly_2023.02.27.csv")
-species_mdl = fread("CSN_MDL_C-Sub_monthly_2023.05.csv")
-species_mdl$V1 = species_mdl$Cl. = NULL
+species_daily_fullMDL = fread("CSN_MDL_C-Sub_monthly_forPMF_expand_2024.04.csv")
 
 ### IMPROVE
-species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
+species_daily_fullMDL = fread("IMPROVE_MDL_monthly_2023.csv")
 
-species_mdl$V1 = NULL # csn_mdl$OP = 
+species_daily_fullMDL$V1 = NULL # 
 
-conc_pmf_date = select(conc_pmf, SiteCode, Date, State)
-conc_pmf_date$year = year(conc_pmf_date$Date)
-conc_pmf_date$month = month(conc_pmf_date$Date)
-head(conc_pmf_date)
+species_daily_fullMDL$Date = as.Date(species_daily_fullMDL$Date)
 
 species_daily_fullMDL = 
-  merge(conc_pmf_date, species_mdl, all.x = T)
+  species_daily_fullMDL[with(
+    species_daily_fullMDL, 
+    order(SiteCode, Date)), ]
 
-species_daily_fullMDL$year = species_daily_fullMDL$month = NULL
-species_daily_fullMDL = species_col_reorder(species_daily_fullMDL)
-species_daily_fullMDL = relocate(species_daily_fullMDL, SiteCode, .before = Date)
+summary(species_daily_fullMDL$Date == conc_pmf$Date & 
+          species_daily_fullMDL$SiteCode == conc_pmf$SiteCode)
 
 ########## read.6 the marked Interpolated points  ##########
 
@@ -665,22 +666,16 @@ species_NA_intp =
 # double check if rows & columns match
 summary(species_NA_intp$SiteCode == conc_pmf$SiteCode)
 summary(species_NA_intp$Date == conc_pmf$Date)
-summary(names(species_NA_intp)[4:ncol(species_NA_intp)] == 
-          names(conc_pmf)[4:ncol(conc_pmf)])
-
-# cols_comp = col_comp(species_NA_intp, "Al", "PM25")
-# species_NA_intp$year = species_NA_intp$month = NULL
+summary(names(species_NA_intp) == names(conc_pmf))
 
 ########## read.7 excluding species not to be used  ##########
 
 OC.EC.sub = c("EC1", "EC2", "EC3", "OP",
               "OC1", "OC2", "OC3", "OC4")
 # species_exclude <- OC.EC.sub
-species_exclude <- c(OC.EC.sub, c("Ag", "K", "Na", "S")) # not used for SA, or colinearity
+species_exclude <- c(OC.EC.sub, c("Ag", "K", "Na", "S", "Zr", "ClIon")) # not used for SA, or colinearity
 
 conc_pmf[ , species_exclude] <- list(NULL)
-# unc_pmf[ , species_exclude] <- list(NULL)
-
 OOB_comb_avg[ , species_exclude] <- list(NULL)
 miss_comb_avg[ , species_exclude] <- list(NULL)
 species_conc_above_mdl[ , species_exclude] <- list(NULL)
@@ -715,15 +710,22 @@ species_source_groups =
        coal_burn = c("S", "SO4Ion", "EC", "OC", "As", "Se", "Pb", "Cl", "ClIon"), # Xie_2022_EP
        firework = c("K", "Pb", "Cu", "Sr", "As", "Ba", "Na", "KIon", "NaIon", "Mg", "MgIon", "OC", "EC", "NO3Ion", "SO4Ion"), # Phil, slides, natural relationships
        non_tailpipe = c("Fe", "Cu", "Zn", "Pb", "Mn", "Ba", "Sb", "Al", "Cr"), # Hasheminassab_2014_ACP, also , EC/OC gas/diesel; Nanjing_Zheng_2019; Park_STOTEN_2022_Beijing-Seoul
-       vehicle = c("OC", "EC", "Fe", "Zn", "NO3Ion") # Dai_2023_EP, Nanjing_Zheng_2019
+       vehicle = c("OC", "EC", "Fe", "Zn", "NO3Ion"), # Dai_2023_EP, Nanjing_Zheng_2019
+       heavy_metal_g1 = c("As", "Cu", "Pb", "Co"), # https://www.britannica.com/science
+       heavy_metal_g2 = c("Ce", "Cu", "Pb"), 
+       heavy_metal_g3 = c("Cs", "Al", "Si", "Rb"), 
+       heavy_metal_g4 = c("Fe", "Ni", "Co"), # heat-resistant metal
+       heavy_metal_g5 = c("In", "Bi", "Sn", "Pb"), # low melting alloys 
+       heavy_metal_g6 = c("Rb", "As", "Hg"), 
+       heavy_metal_g7 = c("Sb", "Cu", "Pb", "Hg")
   )
-
+ 
 
 ##### choose the Folder ##### 
 # ONLY apply this to SITEs, and combine site data if running the cluster analyses
 
 ###### define the subfolder to save cluster files
-dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
 
 # #### CSN, extreme, mean*25 as threshold of outlier, remove all above threshold
 # Clusterfolder <- "PMF_NoGUI_NoCsub_NoExtreme_cluster" ## if no OC EC subgroups, no extreme values
@@ -734,26 +736,31 @@ dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting
 # Clusterfolder <- "CSN_NoGUI_NoCsub_25TimesMean_cluster" ## if no OC EC subgroups, no extreme values
 # GUI.cluster.folder <- "CSN_GUI_NoCsub_25TimesMean_cluster"
 # prefix = "CSN_noCsub_25timesMean_C_"
+# 
+# #### CSN, extreme, mean*15 as threshold of outlier, remove those with high K, and replace those with single species high by median
+# nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15TimesMean_Site" ## if no OC EC subgroups, no extreme values 
+# GUI.site.folder <- "CSN_GUI_NoCsub_15TimesMean_Site"
+# prefix = "CSN_noCsub_15timesMean_S_"
+# 
+# #### CSN, extreme, mean*15, Median MDL, one MDL across whole period
+# nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15Times1MDL_Site" ## if no OC EC subgroups, no extreme values 
+# GUI.site.folder <- "CSN_GUI_NoCsub_15Times1MDL_Site"
+# prefix = "CSN_noCsub_15times1MDL_S_"
+# 
+# #### CSN, extreme, mean*15, uncertainty of the interpolated values, 4.5 times as high, earlier, 1.5 times
+# nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15Times45unc_Site" ## if no OC EC subgroups, no extreme values 
+# GUI.site.folder <- "CSN_GUI_NoCsub_15Times45unc_Site"
+# prefix = "CSN_noCsub_15Times45unc_S_"
+# 
+# #### CSN, extreme, mean*15, 4.5 times uncertainty for interpolated values, match AQS before interpolation
+# nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15t45uncAQS_Site" ## if no OC EC subgroups, no extreme values 
+# GUI.site.folder <- "CSN_GUI_NoCsub_15t45uncAQS_Site"
+# prefix = "CSN_noCsub_15t45uncAQS_S_"
 
-#### CSN, extreme, mean*15 as threshold of outlier, remove those with high K, and replace those with single species high by median
-nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15TimesMean_site" ## if no OC EC subgroups, no extreme values 
-GUI.site.folder <- "CSN_GUI_NoCsub_15TimesMean_site"
-prefix = "CSN_noCsub_15timesMean_S_"
-
-#### CSN, extreme, mean*15, Median MDL, one MDL across whole period
-nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15Times1MDL_site" ## if no OC EC subgroups, no extreme values 
-GUI.site.folder <- "CSN_GUI_NoCsub_15Times1MDL_site"
-prefix = "CSN_noCsub_15times1MDL_S_"
-
-#### CSN, extreme, mean*15, uncertainty of the interpolated values, 4.5 times as high, earlier, 1.5 times
-nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15Times45unc_site" ## if no OC EC subgroups, no extreme values 
-GUI.site.folder <- "CSN_GUI_NoCsub_15Times45unc_site"
-prefix = "CSN_noCsub_15Times45unc_S_"
-
-#### CSN, extreme, mean*15, 4.5 times uncertainty for interpolated values, match AQS before interpolation
-nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15t45uncAQS_site" ## if no OC EC subgroups, no extreme values 
-GUI.site.folder <- "CSN_GUI_NoCsub_15t45uncAQS_site"
-prefix = "CSN_noCsub_15t45uncAQS_S_"
+#### CSN, extreme, mean*15, MDL from either 2011.01-2015.11, or post-2016 median, 4.5 times uncertainty for interpolated values, match AQS before interpolation
+nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15t1mdl0unc_Site" ## if no OC EC subgroups, no extreme values 
+GUI.site.folder <- "CSN_GUI_NoCsub_15t1mdl0unc_Site"
+prefix = "CSN_noCsub_15t1mdl0unc_S_"
 
 # #### CSN, extreme, season 99th as threshold of outlier
 # Clusterfolder <- "CSN_NoGUI_NoCsub_99season_cluster"
@@ -768,6 +775,7 @@ prefix = "CSN_noCsub_15t45uncAQS_S_"
 ##### create Dataset/Folder to save results ##### 
 
 ###### create folder for out puts if not exist
+file.path(dropbox_path, GUI.site.folder)
 
 if (!dir.exists(file.path(dropbox_path, GUI.site.folder))) {
   dir.create(file.path(dropbox_path, GUI.site.folder))
@@ -806,6 +814,7 @@ cmd_species_class_site$Dataset = dataset
 
 cmd_species_class_site[, species_exclude] <- list(NULL)
 head(cmd_species_class_site)
+dim(cmd_species_class_site)
 
 ### Others
 # extreme_K = NULL
@@ -817,13 +826,13 @@ extreme_events_remove = extreme_events_remain = extreme_events_replace = NULL
 
 # all_sites[!(all_sites %in% OOB_comb_avg$SiteCode)]
 prefix_swb = sub("S_$", "", str_extract(prefix,  "^(.*?)S_"))
-prefix_swb = "CSN_noCsub_15t45uncAQS"
+# prefix_swb = "CSN_noCsub_15t45uncAQS"
 
 # avoid saving numeric as txt in csv files, if ending "options(scipen=0)"
 options(scipen=999)
 
 # extract concentration & uncertainty of single cluster for PMF
-for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[40], "261630001"
+for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[40] #, "261630001"
   
   # generate site.serial and corresponding datasets
   site.serial = site_list$serial.No[site_list$SiteCode == site_code]
@@ -885,7 +894,7 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   
   # write.csv(thresholds_TimesMean, "CSN_thresholds_25TimesMean.csv")
   # write.csv(thresholds_TimesMean, "CSN_site_thresholds_15TimesMean.csv")
-  write.csv(thresholds_TimesMean, "CSN_site_thresholds_AQSmatchFirst_15TimesMean.csv")
+  write.csv(thresholds_TimesMean, "CSN_site_thresholds_pre15MDL_AQSmatchFirst_15TimesMean.csv")
   
   ###### Extremes 1.2 - seasonal 99th STOP Using #####
   # already decide using the N times mean as threshold
@@ -1655,7 +1664,6 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
             row.names = FALSE)
 }
 
-
 #### Copy files to Dropbox ####
 
 # #### CSN, extreme, mean*25 as threshold of outlier
@@ -1696,6 +1704,11 @@ site_files <- list.files(paste0(data.dir, "/", Sitefolder), full.names = TRUE)
 for (site_file in site_files) {
   file.copy(site_file, site_folder)
 }
+
+#### Copy files to OneDrive for backup ####
+
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
+onedrive_path = "/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/pmf/inputs"
 
 
 #### Dispersion Normalization ####
