@@ -491,40 +491,78 @@ table(species_mdl_12monthLess_daily$SiteCode)
 # 120110034 530330030 
 #   683       310 
 # seems to have enough data for PMF analyses, keep
+# these two sites have the Val of that month, need to fill !!!!
 
 #### for sites having no record pre 2016
 summary(unique(csn_mdl_till15_month_median$SiteCode) %in% unique(species_daily$SiteCode))
 summary(unique(species_daily$SiteCode) %in% unique(csn_mdl_till15_month_median$SiteCode))
+unique(subset(species_daily, !(SiteCode %in% unique(csn_mdl_till15_month_median$SiteCode)))$SiteCode)
+# 11130003  60731022 180190010 320310031 340230011 380150003 420710012 490050007 540390020
+# sites with MDL missing from pre2016 based data, but have concentrations
 
 summary(unique(csn_mdl$SiteCode) %in% unique(species_daily$SiteCode))
 summary(unique(species_daily$SiteCode) %in% unique(csn_mdl$SiteCode))
+# above 9 sites have MDL from post-2016
 
 csn_mdl_from16 = subset(csn_mdl, year >= 2016)
 csn_mdl_from16 = 
   subset(csn_mdl_from16, 
          !(SiteCode %in% csn_mdl_till15_month_median$SiteCode) &
            SiteCode %in% species_daily$SiteCode)
+unique(csn_mdl_from16$SiteCode)
+# 11130003 60731022 180190010 320310031 340230011 380150003 420710012 490050007 540390020  
 
-csn_mdl_from16_median = 
-  select(csn_mdl_from16, -year) %>%
-  group_by(SiteCode, month) %>% 
-  dplyr::summarize(
-    across(where(is.numeric), 
-           median, na.rm = TRUE),
-    .groups = 'drop') %>%
-  ungroup()
+# csn_mdl_from16_median = 
+#   select(csn_mdl_from16, -year) %>%
+#   group_by(SiteCode, month) %>% 
+#   dplyr::summarize(
+#     across(where(is.numeric), 
+#            median, na.rm = TRUE),
+#     .groups = 'drop') %>%
+#   ungroup()
+ 
+
+# use the median of csn_mdl_till15_month_median for these 9 sites
+csn_mdl_till15_month_median_overall = 
+    select(csn_mdl_till15_month_median, -SiteCode) %>%
+    group_by(month) %>%
+    dplyr::summarize(
+      across(where(is.numeric),
+             median, na.rm = TRUE),
+      .groups = 'drop') %>%
+    ungroup()
+
+csn_mdl_from16_sitedate = 
+  select(csn_mdl_from16, SiteCode, month)
+csn_mdl_from16_sitedate =
+  csn_mdl_from16_sitedate[!duplicated(csn_mdl_from16_sitedate), ]
+
+csn_mdl_from16_15based = merge(csn_mdl_from16_sitedate, 
+                               csn_mdl_till15_month_median_overall)  
+csn_mdl_from16_15based = 
+  relocate(csn_mdl_from16_15based, month, .after = SiteCode)
 
 # use median values
 csn_mdl_month_median_use =
-  rbind(csn_mdl_till15_month_median, csn_mdl_from16_median)
+  rbind(csn_mdl_till15_month_median, csn_mdl_from16_15based)
 
 summary(unique(csn_mdl_month_median_use$SiteCode) %in% unique(species_daily$SiteCode))
 summary(unique(species_daily$SiteCode) %in% unique(csn_mdl_month_median_use$SiteCode))
 
+# reorder & rename columns
 csn_mdl_month_median_use = species_col_reorder(csn_mdl_month_median_use)
 csn_mdl_month_median_use = 
   relocate(csn_mdl_month_median_use, SiteCode, .before = month)
+names(csn_mdl_month_median_use)
+
+csn_mdl_till15_month_median_overall = species_col_reorder(csn_mdl_till15_month_median_overall)
+csn_mdl_till15_month_median_overall = 
+  relocate(csn_mdl_till15_month_median_overall, SiteCode, .before = month)
+names(csn_mdl_till15_month_median_overall)
+
+sum(duplicated(select(csn_mdl_month_median_use, SiteCode, month)))
 write.csv(csn_mdl_month_median_use, "CSN_MDL_C-Sub_monthly_forPMF_2024.04.csv")
+write.csv(csn_mdl_till15_month_median_overall, "CSN_MDL_C-Sub_monthly_2015base.csv")
 
 ##### CSN & IMPROVE - concentration vs. MDL #####
 ## CSN
@@ -547,6 +585,8 @@ names(species_daily)
 
 # use site-specific either pre-2016 or post-2016 montly median MDL for the whole study period
 species_mdl = fread("CSN_MDL_C-Sub_monthly_forPMF_2024.04.csv")
+species_mdl_till2015 = fread("CSN_MDL_C-Sub_monthly_2015base.csv")
+species_mdl_till2015$V1 = species_mdl_till2015$ClIon = NULL
 
 ### IMPROVE
 species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
@@ -559,35 +599,81 @@ species_daily = species_daily[with(
   species_daily, 
   order(SiteCode, Date)), ]
 
-# get year, month, for matching with monthly MDL
+# get month, for matching with monthly MDL
 species_daily_conc = species_daily
-
-species_daily_conc$year = year(species_daily_conc$Date)
 species_daily_conc$month = month(species_daily_conc$Date)
 dim(species_daily_conc)
 
-# check if species order match
-species_col_conc = names(species_daily_conc)[col_comp(species_daily_conc, "Ag", "PM25")]
-species_col_mdl = names(species_mdl)[col_comp(species_mdl, "Ag", "PM25")]
-summary(species_col_conc == species_col_mdl)
-
 # reorder columns the dataset for matching
+species_col_mdl = names(species_mdl)[col_comp(species_mdl, "Ag", "PM25")]
+species_col_conc = names(species_daily_conc)[col_comp(species_daily_conc, "Ag", "PM25")]
 species_mdl_reag = species_mdl[, ..species_col_mdl]
+species_mdl_till2015_reag = species_mdl_till2015[, ..species_col_mdl]
 
 setcolorder(species_mdl_reag, 
+            names(species_daily_conc[, ..species_col_conc]))
+setcolorder(species_mdl_till2015_reag, 
             names(species_daily_conc[, ..species_col_conc]))
 species_mdl_use = 
   data.frame(select(species_mdl, SiteCode, month), 
              species_mdl_reag)
+species_mdl_till2015_use = 
+  data.frame(select(species_mdl_till2015, month), 
+             species_mdl_till2015_reag)
 
+# check if species order match
+species_col_mdl_use = names(species_mdl_use)[col_comp(species_mdl_use, "Ag", "PM25")]
+summary(species_col_conc == species_col_mdl_use)
 
 # expand MDL file to daily measurement 
 # (in case of interpolation, not used original data directly)
 species_daily_conc_date = select(species_daily_conc, 
-                                 SiteCode, State, Date, year, month)
+                                 SiteCode, State, Date, month)
+species_daily_conc_date$month = as.integer(species_daily_conc_date$month)
+unique(subset(species_mdl_use, !(SiteCode %in% unique(species_daily$SiteCode)))$SiteCode)
+# 132950002 GA 150030010 HI  20900034 AK 220150008 LA 370670022 NC 
+# 530530031 WA 540390011 WV 560210100 WY 60850005 CA, not included in species daily
 species_daily_fullMDL = merge(species_daily_conc_date, 
-                              species_mdl_use, 
-                              all.x = T)
+                              species_mdl_use,
+                              all.x = TRUE)
+
+####### deal with NA for the two sites of < 12 month MDL, fill based on its own median of pre-2015 records
+# reorder rows the dataset for estimation
+summary(species_daily_fullMDL) 
+species_daily_fullMDL = species_daily_fullMDL[with(
+  species_daily_fullMDL, 
+  order(SiteCode, Date)), ]
+
+# subset dataset including only sites with missing MDL
+species_mdl_withNA =
+  subset(species_daily_fullMDL, 
+         SiteCode %in% 
+           unique(subset(species_daily_fullMDL, is.na(Al))$SiteCode))
+site_na_mdls = unique(species_mdl_withNA$SiteCode)
+
+# site-specific median
+species_mdl_withNA_median = 
+  select(species_mdl_withNA, -State, -Date, -month) %>%
+  group_by(SiteCode) %>%
+  dplyr::summarize(
+    across(where(is.numeric),
+           median, na.rm = TRUE),
+    .groups = 'drop') %>%
+  ungroup()
+
+species_mdl_NA_sitedate =
+  select(subset(species_daily_fullMDL, is.na(Al)),
+         SiteCode, Date, State, month, Al)
+summary(species_mdl_NA_sitedate)
+
+species_mdl_NAreplace =
+  merge(select(species_mdl_NA_sitedate, -Al),
+        species_mdl_withNA_median)
+species_mdl_NAreplace$month = NULL
+
+species_daily_fullMDL$month = species_daily_conc$month = NULL
+species_daily_fullMDL =
+  rbind(na.omit(species_daily_fullMDL), species_mdl_NAreplace)
 
 # reorder columns the dataset for matching
 setcolorder(species_daily_fullMDL, 
@@ -606,9 +692,6 @@ species_daily_conc = species_daily_conc[with(
   species_daily_conc, 
   order(SiteCode, Date)), ]
 
-species_daily_fullMDL$year = species_daily_fullMDL$month = 
-  species_daily_conc$year = species_daily_conc$month = NULL
-
 # double check if date & site match
 summary(species_daily_fullMDL$SiteCode == species_daily_conc$SiteCode)
 summary(species_daily_fullMDL$Date == species_daily_conc$Date)
@@ -619,49 +702,35 @@ cols_to_extract <- setdiff(names(species_daily_conc),
                            c("SiteCode", "Date", "State"))
 # species_daily_conc$OP = NULL # remove later, keep OP
 species_conc = species_daily_conc[, ..cols_to_extract]
-species_mdl = species_daily_fullMDL[, ..cols_to_extract]
+species_mdl_only = species_daily_fullMDL[, ..cols_to_extract]
 
-species_conc_mdl = data.frame(Map(">", species_conc, species_mdl))
+species_conc_mdl = data.frame(Map(">", species_conc, species_mdl_only))
 setDT(species_conc_mdl)
 
 species_conc[1:3, 1:10]
-species_mdl[1:3, 1:10]
+species_mdl_only[1:3, 1:10]
 species_conc_mdl[1:3, 1:10]
 
 # check variable class & dataset dimenssion
 sapply(species_conc, class)
-sapply(species_mdl, class)
+sapply(species_mdl_only, class)
 sapply(species_conc_mdl, class)
 dim(species_conc)
-dim(species_mdl)
+dim(species_mdl_only)
 dim(species_conc_mdl)
 
 species_conc_mdl_Site = 
   cbind(select(species_daily_conc, SiteCode, Date, State), 
         species_conc_mdl)
 
-species_daily_fullMDL = 
-  cbind(select(species_daily_conc, SiteCode, Date, State), 
-        species_mdl)
-
 ####### For site & date match check, finished!
-species_conc_mdl_randomsite = subset(cbind(species_daily[, 1:3], 
-                                           species_conc_mdl), 
-                                     SiteCode == "60371103") # "BADL1", "60371103"
-species_mdl_randomsite = subset(species_daily_fullMDL, 
-                                SiteCode == "60371103")
-species_conc_randomsite = subset(species_daily_conc, 
-                                 SiteCode == "60371103")
+species_conc_mdl_randomsite = subset(species_conc_mdl_Site, SiteCode == "60371103") # "BADL1", "60371103"
+species_mdl_only_randomsite = subset(species_daily_fullMDL, SiteCode == "60371103")
+species_conc_randomsite = subset(species_daily_conc, SiteCode == "60371103")
 
-conc_pmf_randomsite = species_conc_mdl_randomsite[, 4:ncol(species_conc_mdl_randomsite)] * 
-  species_conc_randomsite[, 3:ncol(species_conc_randomsite)] +
-  (!species_conc_mdl_randomsite[, 4:ncol(species_conc_mdl_randomsite)]) * 
-  species_mdl_randomsite[, 3:ncol(species_mdl_randomsite)] * 0.5
-conc_pmf_randomsite_check = subset(conc_pmf, SiteCode == "60371103")
-
-conc_pmf_randomsite[1:3, 1:10]
-conc_pmf_randomsite_check[1:3, 4:13]
 species_conc_mdl_randomsite[1:3, 4:13]
+species_mdl_only_randomsite[1:3, 4:13]
+species_conc_randomsite[1:3, 4:13]
 
 ####### For site & date match check, finished!
 

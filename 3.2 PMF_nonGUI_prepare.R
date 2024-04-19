@@ -513,6 +513,8 @@ OOB_comb_avg = relocate(OOB_comb_avg, SiteCode, .before = Ag)
 miss_comb_avg = relocate(miss_comb_avg, SiteCode, .before = Ag)
 names(OOB_comb_avg)
 names(miss_comb_avg)
+summary(OOB_comb_avg)
+summary(miss_comb_avg)
 
 ########## read.2 concentration ##########
 # uncertainties would be re-estimated after removing and replacing the extreme data points
@@ -536,6 +538,7 @@ conc_pmf =
   conc_pmf[with(
   conc_pmf, 
   order(SiteCode, Date)), ]
+summary(miss_comb_avg)
 
 ########## read.3 test uncertainty, error_fraction  ##########
 
@@ -548,6 +551,8 @@ comp_error_fraction = species_col_reorder(comp_error_fraction)
 comp_error_fraction$EC3 = comp_error_fraction$EC2 = comp_error_fraction$EC1 = comp_error_fraction$EC
 comp_error_fraction$OC4 = comp_error_fraction$OC3 = comp_error_fraction$OC2 = comp_error_fraction$OC1 = comp_error_fraction$OC
 comp_error_fraction$OP = comp_error_fraction$EC
+
+summary(comp_error_fraction)
 
 ########## read.4 site_code_serial  ##########
 
@@ -620,6 +625,8 @@ species_conc_above_mdl =
 
 summary(species_conc_above_mdl$Date == conc_pmf$Date & 
           species_conc_above_mdl$SiteCode == conc_pmf$SiteCode)
+summary(species_conc_above_mdl)
+a = subset(species_conc_above_mdl, is.na(Al))
 
 ########## read.5 mdl  ##########
 ### CSN
@@ -700,7 +707,7 @@ species_source_groups =
        fugtive_dust = c("Ti", "K", "KIon"), # Kotchenruther_2016_AE
        sec_nitrate = c("NH4Ion", "NO3Ion"),
        sulfate = c("NH4Ion", "SO4Ion"),
-       fresh_sea_salt = c("NaIon", "ClIon", "Na", "Cl", "Sr", "Br"), #Louie_2005_STE
+       fresh_sea_salt = c("NaIon", "ClIon", "Na", "Cl", "Sr", "Br"), #Louie_2005_STE, Hadley_2017_AE
        aged_sea_salt = c("SO4Ion", "NO3Ion", "Mg", "MgIon", "NaIon", "ClIon", "Na", "Cl", "NO3Ion"),
        galvanizing = c("Pb", "Zn"), # Dai_2023_EP
        ferros_metal = c("Fe", "Zn", "Mn"), # Yang_2023_Atmosphere
@@ -831,8 +838,14 @@ prefix_swb = sub("S_$", "", str_extract(prefix,  "^(.*?)S_"))
 # avoid saving numeric as txt in csv files, if ending "options(scipen=0)"
 options(scipen=999)
 
+
+# supplement sites with only data from 2016 or lack 12 months of MDL untill 2015, included in new datasets
+site_from2016_lack15mdl = 
+  c(11130003, 60731022, 180190010, 320310031, 340230011, 
+    380150003, 420710012, 490050007, 540390020, 120110034, 530330030)
+
 # extract concentration & uncertainty of single cluster for PMF
-for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$SiteCode)[40] #, "261630001"
+for( site_code in unique(site_list$SiteCode)){ # site_from2016_lack15mdl,  # site_code = unique(site_list$SiteCode)[40] #, "261630001"
   
   # generate site.serial and corresponding datasets
   site.serial = site_list$serial.No[site_list$SiteCode == site_code]
@@ -895,6 +908,7 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   # write.csv(thresholds_TimesMean, "CSN_thresholds_25TimesMean.csv")
   # write.csv(thresholds_TimesMean, "CSN_site_thresholds_15TimesMean.csv")
   write.csv(thresholds_TimesMean, "CSN_site_thresholds_pre15MDL_AQSmatchFirst_15TimesMean.csv")
+  # write.csv(thresholds_TimesMean, "CSN_site_thresholds_pre15MDL_AQSmatchFirst_15TimesMean_supple.csv")
   
   ###### Extremes 1.2 - seasonal 99th STOP Using #####
   # already decide using the N times mean as threshold
@@ -1642,25 +1656,25 @@ for( site_code in unique(site_list$SiteCode)){ # site_code = unique(site_list$Si
   write.csv(cmd_species_class_site, 
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
-              paste0(prefix_swb, "PMF_SWB_site.csv")),
+              paste0(prefix_swb, "PMF_SWB_site.csv")), # PMF_SWB_site_supple.csv
             row.names = FALSE)
   
   write.csv(extreme_events_remove, 
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
-              paste0(prefix_swb, "extreme_remove.csv")),
+              paste0(prefix_swb, "extreme_remove.csv")), # extreme_remove_supple.csv
             row.names = FALSE)
   
   write.csv(extreme_events_remain, 
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
-              paste0(prefix_swb, "extreme_remain.csv")),
+              paste0(prefix_swb, "extreme_remain.csv")), # extreme_remain_supple.csv
             row.names = FALSE)
   
   write.csv(extreme_events_replace, 
             file = file.path(
               dropbox_path, nonGUI.site.folder, 
-              paste0(prefix_swb, "extreme_replace.csv")),
+              paste0(prefix_swb, "extreme_replace.csv")), # extreme_replace_supple.csv
             row.names = FALSE)
 }
 

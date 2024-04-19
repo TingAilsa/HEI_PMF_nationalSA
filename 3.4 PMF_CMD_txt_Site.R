@@ -127,6 +127,7 @@ factor.number.series = c(3:11)
 
 ### 15TimesMean, CSN
 site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
+site_sum = subset(read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site_supple.csv")), !is.na(PM25)) # sites only data from 2016, or lack 12-month MDL till 2015.11
 site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_Site")
 name.prefix = "CSN_noCsub_15t1mdl0unc_"
 name.prefix.csv = "CSN_noCsub_15t1mdl0unc_"
@@ -161,6 +162,9 @@ site_sum_serial = site_sum_serial[with(site_sum_serial, order(serial.No)), ]
 site_folder <- list.dirs(site_folder_pathway, recursive = FALSE, full.names = TRUE)
 site_folder_use <- basename(site_folder)
 
+site_folder_use = paste0("S_", site_sum$serial.No )
+
+#### B2.1 start the loop for iniparams.txt ####
 for(site_serial in site_folder_use){
   # site_serial = site_folder_use[1]
   
