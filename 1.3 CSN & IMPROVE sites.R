@@ -838,9 +838,16 @@ csn_data$MDL.not.neg = replace(csn_data$MDL.not.neg,
 # get the montly average MDL for each site
 csn_mdl = ddply(csn_data, .(SiteCode, CompName, year, month), 
                 summarise,
-                MDL = mean(MDL.not.neg, na.rm = T))
+                MDL = mean(MDL.not.neg, na.rm = T),
+                Val = mean(Val, na.rm = T))
 csn_data$MDL.not.neg = NULL
+summary(csn_mdl) # till this step, no NA in Val, but NA in MDL
 
+# check the two sites 120110034 & 530330030 detected in 3.1 that lack MDL of a given month
+csn_mdl_NA = subset(csn_mdl, is.na(MDL))
+csn_mdl_2s = subset(csn_mdl, SiteCode %in% c(120110034, 530330030))
+
+csn_mdl$Val = NULL
 csn_mdl$site.date = paste(csn_mdl$SiteCode, csn_mdl$year, csn_mdl$month)
 csn_mdl_gathered = select(csn_mdl, CompName, MDL, site.date)
 
@@ -925,6 +932,14 @@ csn_remove = c("OC.unadjusted.88", "EC.unadjusted.88",
 csn_mdl_combine[ ,csn_remove] <- list(NULL)
 names(csn_mdl_combine)
 
+
+csn_mdl_2s_comb = subset(csn_mdl_combine, SiteCode %in% c(120110034, 530330030))
+csn_mdl_2s_comb = 
+  csn_mdl_2s_comb[with(
+    csn_mdl_2s_comb, 
+    order(SiteCode, year, month)), ]
+csn_mdl_2s_comb$PM25 = 0
+
 # get the median MDL of each year for each site
 csn_mdl_median_annual = 
   csn_mdl_combine  %>% 
@@ -968,8 +983,8 @@ csn_mdl_final = csn_mdl_final[with(csn_mdl_final,
 csn_mdl_cb_1 = subset(csn_mdl_annual_combine, SiteCode == "132950002")
 csn_mdl_fl_1 = subset(csn_mdl_final, SiteCode == "132950002")
 summary(rownames(csn_mdl_cb_1) == rownames(csn_mdl_fl_1) )
-View(csn_mdl_cb_1)
-View(csn_mdl_fl_1)
+# View(csn_mdl_cb_1)
+# View(csn_mdl_fl_1)
 
 # replace NAs for two sites having MDL values with annual median
 csn_mdl_final[is.na(csn_mdl_final)] = csn_mdl_annual_combine[is.na(csn_mdl_final)]
