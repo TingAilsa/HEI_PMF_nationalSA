@@ -31,7 +31,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_25
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_25TimesMean/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -48,7 +48,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -66,7 +66,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -76,6 +76,23 @@ data.prefix = "CSN_noCsub_15tMean_0unc_"
 pm.prefix = "CSN_noCsub_15TimesMean_"
 disp.prefix = "CSN_"
 
+#### 1.4 CSN 15t1mdl0unc noCsub, overall uncertainty = 0% #### 
+
+##set working directory
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISPres1/")
+data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISP_BS_sum/"
+
+site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+noCsub_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_Site"
+data.prefix = "CSN_noCsub_15t1mdl0unc_"
+pm.prefix = "CSN_noCsub_15t1mdl0unc_"
+disp.prefix = "CSN_"
+
 #### 1.N shared process #### 
 
 site_info_all = plyr::rename(
@@ -83,6 +100,7 @@ site_info_all = plyr::rename(
   c("K." = "KIon",
     "Na." = "NaIon", 
     "NH4." = "NH4Ion",
+    "NH4+" = "NH4Ion",
     "NO3" = "NO3Ion",
     "SO4" = "SO4Ion",
     "PM25" = "PM2.5"))
@@ -240,6 +258,9 @@ for (site.serial in site_serial_Nos) { # 1:25
           paste0(pm.prefix, "S_", site.serial, "_CMD.csv")), #"_CMD.csv", ".csv"
         header = T)
       site_date_PM_species$X = NULL
+      
+      start.date = site_date_PM_species$Date[1]
+      end.date = site_date_PM_species$Date[nrow(site_date_PM_species)]
       
       site_date_PM_species_conc <- 
         site_date_PM_species %>%
@@ -430,6 +451,11 @@ for (site.serial in site_serial_Nos) { # 1:25
       lm_beta_plot = merge(ts_PM_lm_beta, main_source)
       base_ts_conc_long_plot = merge(base_ts_conc_long, main_source)
       
+      # reorder the file 
+      ts_conc_plot = 
+        ts_conc_plot[with(ts_conc_plot,
+                          order(Date, Factor)), ]
+      
       # match overall contribution based on normalized data with that from mass concentration
       lm_beta_plot = merge(lm_beta_plot, base_conc_fraction)
       lm_beta_plot$Fractrion_conc_based = 100 * lm_beta_plot$Fractrion_conc_based
@@ -560,10 +586,11 @@ for (site.serial in site_serial_Nos) { # 1:25
         geom_bar(aes(y = Concentration, fill = Factor_source), 
                  stat = "identity", width = 0.6, alpha = 0.8) +
         # Point plot for transformed Percent
-        geom_point(aes(y = exp(Trans.Percent)), color = "grey25", shape = 15) +
+        geom_point(aes(y = exp(Trans.Percent)), 
+                   color = "grey25", shape = 15, size = 1) +
         geom_errorbar(aes(ymin = exp(Trans.Percent.down), 
                           ymax = exp(Trans.Percent.up)), 
-                      width = 0.4, color = "grey25") +
+                      width = 0.3, color = "grey25") +
         facet_grid(Factor ~ ., switch = "y") +
         ggtitle(paste0(paste0(disp.prefix, site.serial.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
@@ -641,8 +668,8 @@ for (site.serial in site_serial_Nos) { # 1:25
         ggplot(daily_plot_use, 
                aes(x = Date, y = Concentration, 
                    group = Factor_source, color = Factor_source)) + # group = 1
-        geom_line(aes(group = group), linewidth = 0.3, alpha = 0.8) +
-        geom_point(size = 1.2) +
+        geom_line(aes(group = group), linewidth = 0.3, alpha = 0.6) +
+        geom_point(size = 0.7) +
         labs(x = "Date", y = format_variable("Concentration µg/m3")) +
         facet_grid(Factor ~., scales = "free_y") +
         scale_y_continuous(limits = c(0, NA), 
@@ -734,6 +761,64 @@ for (site.serial in site_serial_Nos) { # 1:25
       
       # month_conc_plot
       
+      #### year_month
+      # get year & month
+      base_ts_conc_ym_conc = ts_conc_plot
+      base_ts_conc_ym_conc$Year = year(base_ts_conc_ym_conc$Date)
+      base_ts_conc_ym_conc$Month = month(base_ts_conc_ym_conc$Date)
+      # check the output
+      # select(subset(base_ts_conc_ym_conc, 
+      #               Factor == "Factor2" & Year == 2016 & Month == 2),
+      #        Date, Concentration, Year, Month, Factor_source)
+      
+      # estimate the concentration by year-month group
+      base_ts_conc_ym_conc = 
+        base_ts_conc_ym_conc %>%
+        dplyr::group_by(Factor, Year, Month) %>%
+        dplyr::summarise(
+          conc_med = quantile(Concentration, 0.5),  
+          conc_up = quantile(Concentration, 0.95), 
+          conc_down = quantile(Concentration, 0.05), 
+          # drops the grouping so the result is ungrouped
+          .groups = 'drop')
+      
+      # get the Year_Month date
+      base_ts_conc_ym_conc = 
+        base_ts_conc_ym_conc %>%
+        mutate(Year_Month = 
+                 as.Date(
+                   paste(Year, Month, "01", sep = "-")))
+      head(base_ts_conc_ym_conc)
+      
+      # plot the change
+      ym_conc_plot <-
+        ggplot(base_ts_conc_ym_conc, 
+               aes(x = Year_Month, 
+                   y = conc_med, 
+                   group = Factor, color = Factor)) + # group = 1
+        geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
+                      width = 0.15) +
+        geom_point(size = 1.2) +
+        # the preset format_variable function, for sub-/super- scripts
+        labs(x = "Date", y = format_variable("Concentration µg/m3")) +
+        facet_grid(Factor ~., scales = "free_y") +
+        # pretty function, y start from 0, and 3 breaks
+        scale_y_continuous(limits = c(0, NA), 
+                           breaks = function(x) pretty(x, n = 3)) + 
+        # Setting breaks every Month  
+        # scale_x_date(date_labels = "%Y-%m", date_breaks = "3 Month") + 
+        scale_color_npg() + # ggsci
+        theme_base() +
+        theme(
+          panel.grid = element_line(colour = "white"),
+          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+          strip.background = element_blank(), strip.text = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5),
+          legend.position = "none"
+        )
+      
+      # ym_conc_plot
+
       #### Overall factor percent Normalize_contri #### 
       # lm_beta_plot_use = subset(lm_beta_plot, Source.No != "F")
       lm_beta_plot_use = lm_beta_plot
@@ -805,7 +890,7 @@ for (site.serial in site_serial_Nos) { # 1:25
               axis.title.x = element_text(color="grey25", size = 22, angle = 180, hjust = 0.5),
               axis.title.y = element_text(color="grey25", size = 0, angle = -90, vjust = -1))
       
-      ####### Pairs: between-factor scattor & correlation & summary form #######
+      ####### G-space plot, pairs: between-factor scattor & correlation & summary form #######
       
       # Use captured pch and col outside the function 
       point_char = 19
@@ -847,7 +932,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       correl_r_p_summary = rbind(correl_r_p_summary, correl_r_p)
       
       # Pair plotting
-      pdf(paste0(name.prefix, "factor_pairs.pdf"))
+      pdf(paste0(name.prefix, "G-space.pdf"))
       
       # par(oma = c(4, 4, 6, 10), mar = c(4, 4, 2, 2)) 
       pairs(base_ts_nmContri_spread[, 1:factor.No], 
@@ -913,6 +998,10 @@ for (site.serial in site_serial_Nos) { # 1:25
           sd_obs = sd(conc_obs), 
           mean_pmf = mean(conc_predict), 
           sd_pmf = sd(conc_predict))
+      
+      # extract info for PM2.5
+      RMSE_PM2.5 = pred_obs_compare$RMSE[pred_obs_compare$Species == "PM2.5"]
+      R2_PM2.5 = pred_obs_compare$R2[pred_obs_compare$Species == "PM2.5"]
       
       ### time-series plotting
       pred_obs_species_conc = 
@@ -1156,9 +1245,11 @@ for (site.serial in site_serial_Nos) { # 1:25
       ####### output data summary #######
       
       base_oneFactor = data.frame(Dataset = disp.prefix, serial.No = site.serial, Factor = factor.No, 
+                                  start_date = start.date, end_date = end.date,
                                   median_PMF_PM2.5 = median_PMF_PM2.5, 
                                   median_obs_PM2.5 = median_obs_PM2.5, 
                                   cor_PMF.obs_PM = cor.PMF.obs.PM,
+                                  RMSE_PM2.5 = RMSE_PM2.5, R2_PM2.5 = R2_PM2.5, 
                                   Correlation.lm.conc.fraction = cor.two.fraction.contri,
                                   Qmin = lowest_Qm, Qmin_task_No = lowest_Qm_taskNo, 
                                   Q.exp = Q.exp, Q.true = Q.true, Q.robust = Q.robust,
@@ -1187,12 +1278,13 @@ for (site.serial in site_serial_Nos) { # 1:25
       
       ####### Output files #######
       
-      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_conc_plot, width = 6, height = 7.5)
-      ggsave(paste0(name.prefix, "month.pdf"), plot = month_conc_plot, width = 6, height = 7.5)
-      ggsave(paste0(name.prefix, "annual.pdf"), plot = annual_conc_plot, width = 6, height = 7.5)
+      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_conc_plot, width = 4.8, height = 6)
+      ggsave(paste0(name.prefix, "month.pdf"), plot = month_conc_plot, width = 4.8, height = 6)
+      ggsave(paste0(name.prefix, "annual.pdf"), plot = annual_conc_plot, width = 4.8, height = 6)
+      ggsave(paste0(data.pre, factor.no, "_year_month_conc.pdf"), plot = ym_conc_plot, width = 4.8, height = 6)
       ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri, width = 9, height = 5)
       ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
-      ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 7, height = 7.5, 
+      ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 5.8, height = 6, 
              device = cairo_pdf) # device = cairo_pdf, save the special fonts (super-/sub- script) in pdf
       ggsave(paste0(name.prefix, "Q_Qexp.pdf"), plot = Q_Qexp_plot, width = 9, height = 5, 
              device = cairo_pdf) # download xquartz for use of device = cairo_pdf.
@@ -1269,16 +1361,29 @@ for (site.serial in site_serial_Nos) { # 1:25
 setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/")
 getwd()
 
-site_info_all = read.csv("CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
+# 15timesMean
+# site_info_all = read.csv("CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_CMD_StrongWeakBad_Site.csv")
+# PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
+
+# 15t1mdl0unc
+site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISPres1/CSN_noCsub_15t1mdl0unc_base_DISP_summary.csv")
+
+# geographic info
 site_geo = read.csv("CSN_IMPROVE_ownPC/CSN_site_info.csv")
 site_geoid = read.csv("CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_cluster_traffic = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/County_cluster_traffic_info.csv")
 
-PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
-  
+# site serial
+site_code_serial = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
+site_code_serial$V1 = NULL
+site_serial_info = subset(site_code_serial,
+                          serial.No %in% site_info_all$serial.No)
+dim(site_serial_info)
+
 site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X = PMF_base_summary$X = NULL
 
-site_serial = select(site_info_all, 
+site_serial = select(site_serial_info, 
                      SiteCode, serial.No)
 site_geoid = select(site_geoid,
                     SiteCode, geoid)
@@ -1287,8 +1392,11 @@ col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
 site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
 
 site_census = merge(site_serial, site_geo)
+site_census$SiteCode = as.character(site_census$SiteCode)
+
 site_census = merge(site_census, site_geoid, all.x = TRUE)
 site_census = merge(site_census, site_cluster_traffic, all.x = TRUE)
+# sapply(site_census, class)
 
 site_census_pmf = merge(summary_base, cty_cluster_traffic, all.x = TRUE)
 
