@@ -24,6 +24,7 @@ library(stringr)
 # midfix = "25TimesMean"
 # midfix = "noSeason99"
 # midfix = "15t1mdl0unc"
+# midfix = "15t1mdl0unc_DN"
 
 dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
@@ -125,12 +126,18 @@ factor.number.series = c(3:11)
 
 #### B2. edit and output new iniparams.txt ####
 
-### 15TimesMean, CSN
-site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
-site_sum = subset(read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site_supple.csv")), !is.na(PM25)) # sites only data from 2016, or lack 12-month MDL till 2015.11
-site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_Site")
-name.prefix = "CSN_noCsub_15t1mdl0unc_"
-name.prefix.csv = "CSN_noCsub_15t1mdl0unc_"
+### 15TimesMean, 0 extra uncertainty, monthly MDL, CSN, Dispersion Normalization
+site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_DN_Site")
+name.prefix = "CSN_noCsub_15t1mdl0unc_DN_"
+name.prefix.csv = "CSN_noCsub_15t1mdl0unc_DN_"
+
+### 15TimesMean, 0 extra uncertainty, monthly MDL, CSN
+# site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
+# site_sum = subset(read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site_supple.csv")), !is.na(PM25)) # sites only data from 2016, or lack 12-month MDL till 2015.11
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_Site")
+# name.prefix = "CSN_noCsub_15t1mdl0unc_"
+# name.prefix.csv = "CSN_noCsub_15t1mdl0unc_"
 
 # ### 15TimesMean, CSN
 # site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15timesMean_PMF_SWB_site.csv")
