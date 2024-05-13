@@ -19,14 +19,19 @@ data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
 
 #### 1. Prepare & merge info for manual source assignment ####
 
-# extra 5% uncertainty
-data_use = "CSN_Site_15TimesMean"
-data.pre = "CSN_noCsub_15TimesMean_"
-
+# # extra 5% uncertainty
+# data_use = "CSN_Site_15TimesMean"
+# data.pre = "CSN_noCsub_15TimesMean_"
+# 
+# # 0 uncertainty
+# data_use = "CSN_Site_15tMean_0unc"
+# data.pre = "CSN_noCsub_15tMean_0unc_"
 
 # 0 uncertainty
-data_use = "CSN_Site_15tMean_0unc"
-data.pre = "CSN_noCsub_15tMean_0unc_"
+data_use = "CSN_Site_15t1mdl0unc"
+data.pre = "CSN_noCsub_15t1mdl0unc_"
+
+dir_path <- paste0("PMF_NonGUI/", data_use, "/base_DISPres1")
 
 time = Sys.Date()
 
@@ -35,9 +40,8 @@ csv.series <- c("source_profile.csv", "overall.csv", "daily.csv", "annual.csv", 
 
 ###### 1.1. overall contribution, merge & transform, FINISHED ######
 
-dir_path <- paste0("PMF_NonGUI/", data_use, "/base_DISPres1")
-
 csv_overall_list <- list.files(dir_path, pattern = ".*overall\\.csv$", full.names = TRUE)
+
 csv_overall <- 
   do.call(
     rbind, 
@@ -59,7 +63,34 @@ remaining_columns <-
 csv_overall <- 
   csv_overall[, c(adjusted_columns, remaining_columns)]
 
-write.csv(csv_overall, paste0(data_use, "_overall.csv"))
+# write.csv(csv_overall, paste0(data_use, "_overall.csv"))
+write.csv(csv_overall, paste0(data_use, "_overall", time, ".csv"))
+
+#### monthly contri
+csv_month_list <- list.files(dir_path, pattern = ".*month\\.csv$", full.names = TRUE)
+
+csv_month <- 
+  do.call(
+    rbind, 
+    (lapply(
+      csv_month_list, 
+      read.csv)))
+csv_month$Dataset = "CSN"
+csv_month$X = NULL
+
+# reoder the columns
+# get the rest of the column names, excluding those already in desired_order
+adjusted_columns <- c("Dataset", "site.serial", "Factor.No", "Factor", 
+                      "Factor_source", "Year", "Month", "Concentration")
+remaining_columns <- 
+  setdiff(
+    names(csv_month), 
+    adjusted_columns)
+
+csv_month <- 
+  csv_month[, c(adjusted_columns, remaining_columns)]
+
+write.csv(csv_month, paste0(data_use, "_month", ".csv"))
 
 # transform the Assigned source data, results into one line for each Dataset-site.serial-Factor.No group
 overall_sourceAssigned = subset(csv_overall, Source.No != "F")
@@ -144,12 +175,23 @@ write.csv(tans_toAssign, paste0(data_use, "_Source_to_assign_reorder.csv"))
 
 dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 
-site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv"))
+# site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv"))
+site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15t1mdl0unc_site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
+
 site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
+site_geo$SiteCode = as.character(site_geo$SiteCode)
+
 site_geoid = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv"))
 
 cty_cluster_traffic = read.csv("results_R_data/County_cluster_traffic_info.csv")
 
+# site serial
+site_code_serial = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
+site_code_serial$X = NULL
+site_serial_info = subset(site_code_serial, serial.No %in% site_info_all$serial.No)
+dim(site_serial_info)
+
+# PMF performance direct summary
 PMF_base_summary = read.csv(
   paste0(dir_path, "/", data.pre, "base_DISP_summary.csv")
 )
@@ -160,22 +202,24 @@ tans_toAssign = read.csv(paste0(data_use, "_Source_to_assign_reorder.csv"))
 site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X = 
   PMF_base_summary$X = tans_sourceAssigned$X = tans_toAssign$X = NULL
 
+site_serial = select(site_serial_info, SiteCode, serial.No)
+site_serial$SiteCode = as.character(site_serial$SiteCode)
+site_geoid = select(site_geoid, SiteCode, geoid)
+
 # edit before merge
 names(PMF_base_summary)[3] = "Factor.No"
 PMF_base_summary$Dataset = gsub("^(.*)_.*$", "\\1", PMF_base_summary$Dataset)
 
-site_geoid = select(site_geoid, SiteCode, geoid)
-site_serial = select(site_info_all, SiteCode, serial.No)
-
 # repeat to match factor number
 site_serial_factor = site_serial[rep(1:nrow(site_serial), each = 9), ]
-site_serial_factor$Factor.No = 3:11
+site_serial_factor$Factor.No = rep(3:11, nrow(site_serial))
 
 col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
                    "countyns", "namelsad", "county_name", "geoid")
 site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
 
 # merge all listed files, all.x = TRUE
+# make sure all listed files are data.frame or all are data.table, otherwise, error in Reduce
 list_site_census_source_assign = 
   list(site_serial, site_geo, site_geoid, site_cluster_traffic, 
        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
@@ -211,6 +255,7 @@ site_census_source_assign =
 # in case of dup
 site_census_source_assign$DUP =
   duplicated(site_census_source_assign[, 2:3])
+summary(site_census_source_assign$DUP)
 site_census_source_assign = 
   relocate(site_census_source_assign, DUP, .before = "Dataset")
 site_census_source_assign =
@@ -220,6 +265,7 @@ site_census_source_assign =
 write.csv(site_census_source_assign, 
           paste0(data_use, "_PMF_source_census_", time, ".csv"))
 # "CSN_Site_15TimesMean_PMF_source_census_2024-03-15.csv"
+# "CSN_Site_15t1mdl0unc_PMF_source_census_2024-04-19.csv"
 
 # data_use = "CSN_Site_15TimesMean"
 # site_census_source_assign = site_census_source_assign_5unc
@@ -376,8 +422,8 @@ ggplot(species_perf_0,
 
 ####  0. Source assignment results ####
 
-overall_Assigned = read.csv("results_R_data/Decided_SA.csv")
-org_assigned = read.csv("results_R_data/Source_assigned.csv")
+# overall_Assigned = read.csv("results_R_data/Decided_SA.csv")
+# org_assigned = read.csv("results_R_data/Source_assigned.csv")
 overall_Assigned$X = org_assigned$X = NULL
 
 # there might be some changes in the original manual assign (Source_assigned.csv)
@@ -446,7 +492,7 @@ process_file <- function(file_path) {
 
 lapply(file_paths, process_file)
 
-#### 1.0 generate corresponding daily site SA results ####
+#### 1.0 generate corresponding daily site SA results 2023.12 ####
 
 #csn_cluster = read.csv("/Users/TingZhang/Downloads/CSN_RF_cluster5training.csv")
 #colnames(csn_cluster)[2] = "Cluster"
@@ -475,23 +521,23 @@ colnames(combined_month)[7]
 colnames(combined_month)[7] = "Source_reference"
 # combined_month <- combined_month %>% rename(Source_reference = Factor_source)  
 
-month_source_assign = merge(combined_month, source_only_assign, all.x = T)
-month_source_assign$Source_use = month_source_assign$final_assign
-unique(month_source_assign$Source_use)
-unique(month_source_assign$Source_reference)
+month_source_cleaning = merge(combined_month, source_only_assign, all.x = T)
+month_source_cleaning$Source_use = month_source_cleaning$final_assign
+unique(month_source_cleaning$Source_use)
+unique(month_source_cleaning$Source_reference)
  
-month_source_assign$Source_use[grepl("Vehicle + biomass", month_source_assign$Source_use, fixed = T)] = "Vehic_Biom"
-month_source_assign$Source_use[grepl("Soil", month_source_assign$Source_use, fixed = T)] = "F9-Soil/Dust"
-month_source_assign$Source_use[grepl("Vehicle", month_source_assign$Source_use, fixed = T)] = "F1-Vehicle"
-month_source_assign$Source_use[grepl("Biomass", month_source_assign$Source_use, fixed = T)] = "F8-Biomass"
-month_source_assign$Source_use[month_source_assign$Source_use == "Industry 2"] = "F10-Industries_2"
-month_source_assign$Source_use[grepl("Industry", month_source_assign$Source_use, fixed = T)] = "F5-Industry"
-month_source_assign$Source_use[grepl("Aged sea", month_source_assign$Source_use, fixed = T)] = "F4-Aged Sea Salt"
-month_source_assign$Source_use[grepl("Fresh Sea", month_source_assign$Source_use, fixed = T)] = "F6-Fresh Sea Salt"
-month_source_assign$Source_use[grepl("peline", month_source_assign$Source_use, fixed = T)] = "F7-Non-Tailpipe"
+month_source_cleaning$Source_use[grepl("Vehicle + biomass", month_source_cleaning$Source_use, fixed = T)] = "Vehic_Biom"
+month_source_cleaning$Source_use[grepl("Soil", month_source_cleaning$Source_use, fixed = T)] = "F9-Soil/Dust"
+month_source_cleaning$Source_use[grepl("Vehicle", month_source_cleaning$Source_use, fixed = T)] = "F1-Vehicle"
+month_source_cleaning$Source_use[grepl("Biomass", month_source_cleaning$Source_use, fixed = T)] = "F8-Biomass"
+month_source_cleaning$Source_use[month_source_cleaning$Source_use == "Industry 2"] = "F10-Industries_2"
+month_source_cleaning$Source_use[grepl("Industry", month_source_cleaning$Source_use, fixed = T)] = "F5-Industry"
+month_source_cleaning$Source_use[grepl("Aged sea", month_source_cleaning$Source_use, fixed = T)] = "F4-Aged Sea Salt"
+month_source_cleaning$Source_use[grepl("Fresh Sea", month_source_cleaning$Source_use, fixed = T)] = "F6-Fresh Sea Salt"
+month_source_cleaning$Source_use[grepl("peline", month_source_cleaning$Source_use, fixed = T)] = "F7-Non-Tailpipe"
 
 ## For those not included in the results, manually assign
-source_na = subset(month_source_assign, is.na(Source_use))
+source_na = subset(month_source_cleaning, is.na(Source_use))
 source_na_unique = 
   ddply(source_na,
         .(Main_Species, Source_reference, Cluster.No, Factor.No, Factor, 
@@ -500,41 +546,168 @@ source_na_unique =
         Contribution = median(Contribution))
 
 # Identify the rows where 'Source_use' does not contain "Factor" and 'final_assign' is NA
-rows_to_update <- !grepl("Factor", month_source_assign$Source_reference, fixed = TRUE) &
-  is.na(month_source_assign$final_assign)
-unique(month_source_assign[rows_to_update,]$Source_reference)
+rows_to_update <- !grepl("Factor", month_source_cleaning$Source_reference, fixed = TRUE) &
+  is.na(month_source_cleaning$final_assign)
+unique(month_source_cleaning[rows_to_update,]$Source_reference)
 # Assign 'Source_reference' values to 'Source_use' for these rows
-month_source_assign$Source_use[rows_to_update] <- month_source_assign$Source_reference[rows_to_update]
+month_source_cleaning$Source_use[rows_to_update] <- month_source_cleaning$Source_reference[rows_to_update]
 
-rows_to_update_2 <- grepl("Si Al Ti Fe", month_source_assign$Main_Species, fixed = TRUE) &
-  is.na(month_source_assign$Source_use)
-View(month_source_assign[rows_to_update_2,])
-unique(month_source_assign[rows_to_update_2,]$Source_reference)
-month_source_assign$Source_use[rows_to_update_2] <- "F9-Soil/Dust"
+rows_to_update_2 <- grepl("Si Al Ti Fe", month_source_cleaning$Main_Species, fixed = TRUE) &
+  is.na(month_source_cleaning$Source_use)
+View(month_source_cleaning[rows_to_update_2,])
+unique(month_source_cleaning[rows_to_update_2,]$Source_reference)
+month_source_cleaning$Source_use[rows_to_update_2] <- "F9-Soil/Dust"
 
 # convert those not assigned to "F10-Industries_2"
-source_not_assign = subset(month_source_assign, is.na(Source_use))
+source_not_assign = subset(month_source_cleaning, is.na(Source_use))
 unique(source_not_assign$Main_Species)
 
-month_source_assign$Source_use[is.na(month_source_assign$Source_use)] = "F10-Industries_2"
+month_source_cleaning$Source_use[is.na(month_source_cleaning$Source_use)] = "F10-Industries_2"
 
-write.csv(month_source_assign, "Decided_monthly_SA_2024.01.csv")
+write.csv(month_source_cleaning, "Decided_monthly_SA_2024.01.csv")
 
 # combine two or more industry sources
-month_assign_industry_combine = month_source_assign
+month_assign_industry_combine = month_source_cleaning
 month_assign_industry_combine$Source_use[month_assign_industry_combine$Source_use == "F10-Industries_2"] = "F5-Industry"
 
 ### TO BE FINISHED
 
 #### check the result for single cluster
 select.cluster = 1
-month_source_assign_1c = subset(month_source_assign,
+month_source_cleaning_1c = subset(month_source_cleaning,
                                 Cluster.No == select.cluster)
-source_1c_contri = ddply(month_source_assign_1c,
+source_1c_contri = ddply(month_source_cleaning_1c,
                          .(Source_use),
                          summarise,
                          Contribution = mean(Contribution, na.rm = T))
 summary(source_1c_contri)
+
+#### 1.0 daily site SA results 2024.04 ####
+
+source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-04.csv")
+source_org$X = NULL
+names(source_org)
+
+source_org_long = 
+  source_org %>%
+  pivot_longer(
+    cols = starts_with("assigned"),  # selects all columns that start with 'assigned'
+    names_to = c(".value", "number"), # '.value' helps in splitting column names based on a pattern
+    names_pattern = "assigned_(.*)_(\\d+)$"  # Regex to split the column names into 'assigned_Source', 'assigned_Species', 'assigned_Fraction', and a group number
+  )
+# View(source_org_long)
+
+# remove the mixed for now
+source_org_long = na.omit(source_org_long)
+
+source_org_long = 
+  subset(source_org_long, 
+         !(Source %in% 
+           c("F8-Biomass + F3-Vehicle", "F3-Vehicle + F9-Soil/Dust")))
+
+# rename some sources
+source_org_long$Source[source_org_long$Source == "F3-Vehicle"] = "F1-Vehicle"
+source_org_long$Source[source_org_long$Source == "F10-Ship"] = "F1-Vehicle"
+source_org_long$Source[source_org_long$Source == "Non-tailpipe"] = "F7-Non-tailpipe"
+
+source_org_long$Source[source_org_long$Source == ""] = "F7-Industry"
+source_org_long$Source[source_org_long$Source == "F7-Industry"] = "F5-Industry"
+
+source_org_long = plyr::rename(source_org_long, 
+                          c("Factor" = "Factor_source",
+                            "Source" = "Source_aftermanual"))
+
+unique(source_org_long$Source_aftermanual)
+unique(source_org_long$Factor_source)
+
+# get fraction numeric
+source_org_long$Fraction_nm = as.numeric(sub("%", "", source_org_long$Fraction))
+source_org_long$Fraction = NULL
+summary(source_org_long$Fraction_nm)
+
+# combine with monthly concentration contribution
+month_source = read.csv("CSN_Site_15t1mdl0unc_month.csv")
+month_source$X = NULL
+names(month_source)[2] = "serial.No"
+head(month_source)
+unique(month_source$Factor_source)
+
+summary(unique(source_org_long$Factor_source) %in% unique(month_source$Factor_source))
+summary(unique(month_source$Factor_source) %in% unique(source_org_long$Factor_source))
+#"Factor10", "Factor11"
+
+source_org_long$site_factor = 
+  paste(source_org_long$serial.No, source_org_long$Factor.No)
+month_source$site_factor = 
+  paste(month_source$serial.No, month_source$Factor.No)
+source_org_long = data.frame(source_org_long)
+
+month_source_cleaning = 
+  merge(source_org_long, month_source, 
+        by = c("Dataset", "serial.No", "Factor.No", "Factor_source", "site_factor"))
+dim(month_source_cleaning)
+dim(source_org_long)
+dim(month_source)
+summary(unique(month_source_cleaning$Factor_source) %in% unique(source_org_long$Factor_source))
+month_source_cleaning$site_factor = NULL
+
+# reorder
+month_source_cleaning = 
+  month_source_cleaning[with(month_source_cleaning,
+    order(serial.No, Factor.No, Source_aftermanual, Year, Month)), ]
+
+month_source_cleaning = 
+  relocate(month_source_cleaning, Source_aftermanual, .after = Factor.No)
+
+# Check those main_species not match with Species column, from re-assign
+month_source_specie_not_match =
+  subset(month_source_cleaning,
+         Main_Species != Species)
+month_source_specie_not_match$Summary.Row.No = 
+  month_source_specie_not_match$Longitude = month_source_specie_not_match$Latitude = 
+  month_source_specie_not_match$geoid = month_source_specie_not_match$state_name = 
+  month_source_specie_not_match$start_date = month_source_specie_not_match$end_date = NULL
+# after checking, finding the unmatch is when two factors were assigned to the same source during auto-assignment
+# thus, remove
+
+month_source_cleaning = subset(month_source_cleaning,
+                               Main_Species == Species)
+dim(month_source_cleaning)
+month_source_cleaning$Species = NULL
+
+# rename sources, and Aged & Fresh sea salt to Sea Salt
+month_source_cleaning$Source_use = month_source_cleaning$Source_aftermanual
+
+replacement_sourcename <- 
+  c("F7-Non-tailpipe" = "F4-Non-tailpipe",
+    "F6-Fresh Sea Salt" = "F6-Sea Salt",
+    "F4-Aged Sea Salt" = "F6-Sea Salt",
+    "F8-Biomass" = "F7-Biomass",
+    "F9-Soil/Dust" = "F8-Soil/Dust")
+
+month_source_cleaning <- 
+  month_source_cleaning %>%
+  mutate(Source_use = 
+           ifelse(Source_use %in% names(replacement_sourcename), 
+                  replacement_sourcename[Source_use], 
+                  Source_use))
+
+# in manual assign, for cases of >1 factors assigned to the same source
+# Get the average
+month_source_assign <- 
+  month_source_cleaning %>%
+  group_by_at(vars(-Fraction_nm, -Concentration, -Factor_source, 
+                   -Source_reference, -Source_aftermanual, -number, 
+                   -Factor, -Source.No, -Main_Species)) %>%
+  dplyr::summarise(
+    Fraction_nm = mean(Fraction_nm, na.rm = TRUE),
+    Concentration = mean(Concentration, na.rm = TRUE),
+    .groups = "drop")
+dim(month_source_assign)
+
+
+write.csv(month_source_cleaning, paste0(data_use, "_montly_source_assigned_with_2factor_to_one.csv"))
+write.csv(month_source_assign, paste0(data_use, "_montly_source_assigned.csv"))
 
 #### 4. plotting - data preparation ####
 
@@ -543,6 +716,10 @@ library(ggsci)
 library(gganimate)
 
 color_npg = pal_npg("nrc")(10)
+
+# monthly assigned source
+month_source_assign = read.csv("CSN_Site_15t1mdl0unc_montly_source_assigned.csv")
+month_source_assign$X = NULL
 
 # generate the US county boundary data
 us_cty_bdr = USAboundaries::us_counties()
@@ -559,15 +736,17 @@ us_cty_bdr <- us_cty_bdr[!(us_cty_bdr$state_abbr %in% c( 'HI', 'AK', "AS", "GU",
 us_states = USAboundaries::us_states()
 us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
 
-cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
-cty_rural_urban$X = cty_rural_urban$X.1 = NULL
-cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ] 
+# GPS assigned earlier
+# cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+# cty_rural_urban$X = cty_rural_urban$X.1 = NULL
+# cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ] 
+# 
+# month_contri_gps = merge(month_source_assign, 
+#                          cty_rural_urban,
+#                          by = "SiteCode",
+#                          all.x = T)
 
-month_contri_gps = merge(month_source_assign, 
-                         cty_rural_urban,
-                         by = "SiteCode",
-                         all.x = T)
-
+month_contri_gps = month_source_assign
 
 month_contri_gps$geoid = ifelse(month_contri_gps$geoid < 10000, 
                                  paste0("0", month_contri_gps$geoid), 
@@ -582,23 +761,27 @@ Year_aggregated <- ddply(month_source_gps,
                          summarise,
                          Longitude = mean(Longitude),
                          Latitude = mean(Latitude),
-                         Contribution = mean(Contribution))
+                         Concentration = mean(Concentration))
 
 year_month_aggregated <- ddply(month_source_gps, 
                                .(Dataset.x, SiteCode, Year, Month, Source_use), 
                                summarise,
                                Longitude = mean(Longitude),
                                Latitude = mean(Latitude),
-                               Contribution = mean(Contribution))
+                               Concentration = mean(Concentration))
 
 month_aggregated <- ddply(month_source_gps, .(Dataset.x, SiteCode, Month, Source_use), summarise,
                           Longitude = mean(Longitude),
                           Latitude = mean(Latitude),
-                          Contribution = mean(Contribution))
+                          Concentration = mean(Concentration))
 
-write.csv(Year_aggregated, "Annual_site_source_contribuion_CSN_2024.01.csv")
-write.csv(year_month_aggregated, "Year-month_site_source_contribuion_CSN_2024.01.csv")
-write.csv(month_aggregated, "Month_site_source_contribuion_CSN_2024.01.csv")
+# write.csv(Year_aggregated, "Annual_site_source_contribuion_CSN_2024.01.csv")
+# write.csv(year_month_aggregated, "Year-month_site_source_contribuion_CSN_2024.01.csv")
+# write.csv(month_aggregated, "Month_site_source_contribuion_CSN_2024.01.csv")
+
+write.csv(Year_aggregated, paste0(data_use, "_Annual_source_2024.04.csv")) # "CSN_Site_15t1mdl0unc_Annual_source_2024.04.csv"
+write.csv(year_month_aggregated, paste0(data_use, "_Year-month_source_2024.04.csv")) # "CSN_Site_15t1mdl0unc_Year-month_source_2024.04.csv"
+write.csv(month_aggregated, paste0(data_use, "_Month_source_2024.04.csv")) # "CSN_Site_15t1mdl0unc_Month_source_2024.04.csv"
 
 #### 4.2 mapping - annual & map ####
 
@@ -608,8 +791,12 @@ color_npg = pal_npg("nrc")(10)
 
 ####### data-1, averages of the PMF outputs
 
-Year_aggregated = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/Annual_site_source_contribuion_CSN_2024.01.csv")
-month_aggregated = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/Month_site_source_contribuion_CSN_2024.01.csv")
+# Year_aggregated = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/Annual_site_source_contribuion_CSN_2024.01.csv")
+# month_aggregated = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/Month_site_source_contribuion_CSN_2024.01.csv")
+
+Year_aggregated = read.csv("CSN_Site_15t1mdl0unc_Annual_source_2024.04.csv")
+month_aggregated = read.csv("CSN_Site_15t1mdl0unc_Month_source_2024.04.csv")
+
 Year_aggregated$X = month_aggregated$X = NULL
 
 Year_aggregated_use = subset(Year_aggregated, 
@@ -618,101 +805,101 @@ Year_aggregated_use = subset(Year_aggregated,
 Month_aggregated_use = subset(month_aggregated, 
                               !(Source_use %in% c("F10-Industries_2", "Vehic_Biom")))
 
-site_no_source <- 
-  Year_aggregated_use %>%
-  group_by(Source_use) %>%
-  dplyr::summarise(Unique_SiteCode_No = n_distinct(SiteCode))
+# site_no_source <- 
+#   Year_aggregated_use %>%
+#   group_by(Source_use) %>%
+#   dplyr::summarise(Unique_SiteCode_No = n_distinct(SiteCode))
 
 ####### data-2, estimates from linear regression based on PMF outputs
 
-site_gps = read.csv("CSN_GPS.csv")
-source_contribution = read.csv("CSN_Site_source_contribution_overall_annual_month_2024.01.csv")
-source_contribution$X = NULL
-source_contribution = merge(source_contribution, site_gps)
-colnames(source_contribution)[3]
-source_contribution$Source_use = source_contribution$Source
-
-source_contribution <- source_contribution %>%
-  mutate(Source_use = case_when(
-    Source == "F1_Vehicle"     ~ "F1-Vehicle",
-    Source == "F2_SecNitrate"  ~ "F2-Secondary Nitrate",
-    Source == "F3_SecSulfate"  ~ "F3-Secondary Sulfate",
-    Source == "F4_AgedSeaSalt" ~ "F4-Aged Sea Salt",
-    Source == "F5_Industry" ~ "F5-Industry",
-    Source == "F6_FreshSeaSalt" ~ "F6-Fresh Sea Salt",
-    Source == "F7_NonTailpipe" ~ "F7-Non-Tailpipe",
-    Source == "F8_Biomass" ~ "F8-Biomass",
-    Source == "F9_SoilDust" ~ "F9-Soil/Dust",
-    TRUE                       ~ Source_use  # Keep existing value for other cases
-  ))
-
-Year_aggregated_use = subset(source_contribution, 
-                             Period %in% 2011:2020)
-colnames(Year_aggregated_use)[ncol(Year_aggregated_use)-3] = "Year"
-Year_aggregated_use$Contribution = Year_aggregated_use$Source.concentration
-Year_aggregated_use$Year = as.integer(Year_aggregated_use$Year)
-
-Month_aggregated_use = subset(source_contribution, 
-                              !(Period %in% 2011:2020 | Period == "overall"))
-Month_aggregated_use$Contribution = Month_aggregated_use$Source.concentration
-Month_aggregated_use$Month = 
-  as.integer(
-    format(
-      as.Date(
-        paste0(Month_aggregated_use$Period, "-01"), 
-        format = "%Y-%m-%d"), 
-      format = "%m"))
-
-overall_contri = subset(source_contribution, Period == "overall")
-overall_contri$Contribution = overall_contri$Source.concentration
-
-site_no_source <- 
-  Year_aggregated_use %>%
-  group_by(Source_use) %>%
-  dplyr::summarise(Unique_SiteCode_No = n_distinct(SiteCode))
+# site_gps = read.csv("CSN_GPS.csv")
+# source_contribution = read.csv("CSN_Site_source_contribution_overall_annual_month_2024.01.csv")
+# source_contribution$X = NULL
+# source_contribution = merge(source_contribution, site_gps)
+# colnames(source_contribution)[3]
+# source_contribution$Source_use = source_contribution$Source
+# 
+# source_contribution <- source_contribution %>%
+#   mutate(Source_use = case_when(
+#     Source == "F1_Vehicle"     ~ "F1-Vehicle",
+#     Source == "F2_SecNitrate"  ~ "F2-Secondary Nitrate",
+#     Source == "F3_SecSulfate"  ~ "F3-Secondary Sulfate",
+#     Source == "F4_AgedSeaSalt" ~ "F4-Aged Sea Salt",
+#     Source == "F5_Industry" ~ "F5-Industry",
+#     Source == "F6_FreshSeaSalt" ~ "F6-Fresh Sea Salt",
+#     Source == "F7_NonTailpipe" ~ "F7-Non-Tailpipe",
+#     Source == "F8_Biomass" ~ "F8-Biomass",
+#     Source == "F9_SoilDust" ~ "F9-Soil/Dust",
+#     TRUE                       ~ Source_use  # Keep existing value for other cases
+#   ))
+# 
+# Year_aggregated_use = subset(source_contribution, 
+#                              Period %in% 2011:2020)
+# colnames(Year_aggregated_use)[ncol(Year_aggregated_use)-3] = "Year"
+# Year_aggregated_use$Contribution = Year_aggregated_use$Source.concentration
+# Year_aggregated_use$Year = as.integer(Year_aggregated_use$Year)
+# 
+# Month_aggregated_use = subset(source_contribution, 
+#                               !(Period %in% 2011:2020 | Period == "overall"))
+# Month_aggregated_use$Contribution = Month_aggregated_use$Source.concentration
+# Month_aggregated_use$Month = 
+#   as.integer(
+#     format(
+#       as.Date(
+#         paste0(Month_aggregated_use$Period, "-01"), 
+#         format = "%Y-%m-%d"), 
+#       format = "%m"))
+# 
+# overall_contri = subset(source_contribution, Period == "overall")
+# overall_contri$Contribution = overall_contri$Source.concentration
+# 
+# site_no_source <- 
+#   Year_aggregated_use %>%
+#   group_by(Source_use) %>%
+#   dplyr::summarise(Unique_SiteCode_No = n_distinct(SiteCode))
 
 ###### 4.2.1. annual, month, box & trend plot ######
 
 ########### Overall, only for data-2 for now
 
-# histgram - each source
-
-ggplot(subset(overall_contri, Contribution>0), 
-       # aes(x = Source.percent)) + # , fill = Source_use
-        aes(x = Contribution)) + # , fill = Source_use
-  geom_histogram(alpha = 0.6, bins = 30) +
-  facet_wrap(~ Source_use, ncol = 3) +
-  # labs(x = "Percent Contribution  %", y = "Count") +
-  labs(x = format_variable("Contribution  µg/m3"), y = "Count") +
-  theme_minimal() +
-  theme(legend.position = "none",
-        strip.background = element_blank(), 
-        strip.text = element_text(color="grey25", size = 15, vjust=0), # facet title
-        axis.title.x = element_text(color="grey25", size = 18, vjust=0), 
-        axis.title.y = element_text(color="grey25", size = 18, vjust=1),
-        plot.margin = unit(c(2,1,2, 2), "lines"),
-        axis.text.x = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5, vjust = 0.5), 
-        axis.text.y = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5))
-
-overall_contri_sum = 
-  ddply(overall_contri, .(Source_use), summarise,
-        mean = round(mean(Contribution), 3), 
-        sd = round(sd(Contribution), 3), 
-        median = round(median(Contribution), 3), 
-        p99th = round(quantile(Contribution, 0.99), 3), 
-        p1th = round(quantile(Contribution, 0.01), 3))
-
-export_table(overall_contri_sum, format = "md")
-
-overall_percent_sum = 
-  ddply(overall_contri, .(Source_use), summarise,
-        mean = round(mean(Source.percent), 3), 
-        sd = round(sd(Source.percent), 3), 
-        median = round(median(Source.percent), 3), 
-        p99th = round(quantile(Source.percent, 0.99), 3), 
-        p1th = round(quantile(Source.percent, 0.01), 3))
-
-export_table(overall_percent_sum, format = "md")
+# # histgram - each source
+# 
+# ggplot(subset(overall_contri, Contribution>0), 
+#        # aes(x = Source.percent)) + # , fill = Source_use
+#         aes(x = Contribution)) + # , fill = Source_use
+#   geom_histogram(alpha = 0.6, bins = 30) +
+#   facet_wrap(~ Source_use, ncol = 3) +
+#   # labs(x = "Percent Contribution  %", y = "Count") +
+#   labs(x = format_variable("Contribution  µg/m3"), y = "Count") +
+#   theme_minimal() +
+#   theme(legend.position = "none",
+#         strip.background = element_blank(), 
+#         strip.text = element_text(color="grey25", size = 15, vjust=0), # facet title
+#         axis.title.x = element_text(color="grey25", size = 18, vjust=0), 
+#         axis.title.y = element_text(color="grey25", size = 18, vjust=1),
+#         plot.margin = unit(c(2,1,2, 2), "lines"),
+#         axis.text.x = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5, vjust = 0.5), 
+#         axis.text.y = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5))
+# 
+# overall_contri_sum = 
+#   ddply(overall_contri, .(Source_use), summarise,
+#         mean = round(mean(Contribution), 3), 
+#         sd = round(sd(Contribution), 3), 
+#         median = round(median(Contribution), 3), 
+#         p99th = round(quantile(Contribution, 0.99), 3), 
+#         p1th = round(quantile(Contribution, 0.01), 3))
+# 
+# export_table(overall_contri_sum, format = "md")
+# 
+# overall_percent_sum = 
+#   ddply(overall_contri, .(Source_use), summarise,
+#         mean = round(mean(Source.percent), 3), 
+#         sd = round(sd(Source.percent), 3), 
+#         median = round(median(Source.percent), 3), 
+#         p99th = round(quantile(Source.percent, 0.99), 3), 
+#         p1th = round(quantile(Source.percent, 0.01), 3))
+# 
+# export_table(overall_percent_sum, format = "md")
 
 ########### Annual
 
@@ -724,8 +911,8 @@ middle_position =
 
 # boxplot - annual
 ggplot(subset(Year_aggregated_use, 
-              Contribution < quantile(Contribution, 0.995)),
-       aes(as.factor(Year), Contribution),
+              Concentration < quantile(Concentration, 0.995)),
+       aes(as.factor(Year), Concentration),
        color = Source_use) +
   geom_boxplot(aes(color = Source_use), 
                outlier.shape = NA, 
@@ -734,12 +921,12 @@ ggplot(subset(Year_aggregated_use,
               width = 0.15, alpha = 0.15)+
   facet_grid(Source_use ~.) + # , scales = "free_y"
   # ylim(0,4) +
-  scale_y_continuous(breaks = c(0, 1, 2)) +
+  scale_y_continuous(breaks = c(0, 2, 4)) +
   # scale_x_discrete(breaks = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020)) +
-  xlab("Year") +
+  labs(x = "Year", y = format_variable("Concentration µg/m3")) +
   scale_color_manual(values = color_npg) + # color_npg[-c(1, 5, 7)]
   geom_text(data = middle_position, size = 5,
-            aes(x = Year, y = 2, label = Source_use), 
+            aes(x = Year, y = 3, label = Source_use), 
             inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
   theme_bw() +
   theme(panel.grid = element_line(colour = "white"),
@@ -756,11 +943,11 @@ ggplot(subset(Year_aggregated_use,
 # histgram - each source
 
 ggplot(subset(Year_aggregated_use, 
-              Contribution > 0), 
-       aes(x = Contribution)) + # , fill = Source_use
+              Concentration > 0), 
+       aes(x = Concentration)) + # , fill = Source_use
   geom_histogram(alpha = 0.6, bins = 30) +
   facet_wrap(~ Source_use, ncol = 3) +
-  labs(x = format_variable("Contribution  µg/m3"), y = "Count") +
+  labs(x = format_variable("Concentration  µg/m3"), y = "Count") +
   theme_minimal() +
   theme(legend.position = "none",
         strip.background = element_blank(), 
@@ -771,15 +958,15 @@ ggplot(subset(Year_aggregated_use,
         axis.text.x = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5, vjust = 0.5), 
         axis.text.y = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5))
   
-annual_contribution_source = 
+annual_Concentration_source = 
   ddply(Year_aggregated_use, .(Source_use), summarise,
-        mean = round(mean(Contribution), 3), 
-        sd = round(sd(Contribution), 3), 
-        median = round(median(Contribution), 3), 
-        p975th = round(quantile(Contribution, 0.975), 3), 
-        p025th = round(quantile(Contribution, 0.025), 3))
+        mean = round(mean(Concentration), 3), 
+        sd = round(sd(Concentration), 3), 
+        median = round(median(Concentration), 3), 
+        p975th = round(quantile(Concentration, 0.975), 3), 
+        p025th = round(quantile(Concentration, 0.025), 3))
 
-export_table(annual_contribution_source, format = "md")
+export_table(annual_Concentration_source, format = "md")
   
   
 # ribbon range figure
@@ -787,9 +974,9 @@ Year_aggregated_summary =
   ddply(Year_aggregated_use, 
         .(Source_use, Year),
         summarise,
-        Lower = quantile(Contribution, 0.0025),
-        Median = median(Contribution),
-        Upper = quantile(Contribution, 0.9975))
+        Lower = quantile(Concentration, 0.0025),
+        Median = median(Concentration),
+        Upper = quantile(Concentration, 0.9975))
 Year_aggregated_summary$Year = as.integer(Year_aggregated_summary$Year)
 
 ggplot(Year_aggregated_summary, 
@@ -798,7 +985,7 @@ ggplot(Year_aggregated_summary,
   geom_point() +
   scale_x_continuous(breaks = c(2011, 2014, 2017)) + 
   #scale_y_continuous(limits = c(0, 4), breaks = c(0, 2, 4)) +  # Set y-axis limits and breaks
-  labs(y = "Contribution") + #  µg/m^3
+  labs(x = "Year", y = format_variable("Concentration µg/m3")) +
   scale_color_manual(values = color_npg) +
   geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.2, color = NA) +
   facet_wrap(~ Source_use, ncol = 3) +
@@ -820,13 +1007,13 @@ middle_position =
                length(unique(Month_aggregated_use$Source_use))),
     Source_use = unique(Month_aggregated_use$Source_use))
 
-contri_range1 <- quantile(Month_aggregated_use$Contribution, 
+contri_range1 <- quantile(Month_aggregated_use$Concentration, 
                           c(0.025, 0.975), na.rm = T)
 
 ggplot(subset(Month_aggregated_use, 
-              Contribution < contri_range1[2] &
-                Contribution > contri_range1[1]),
-       aes(as.factor(Month), Contribution),
+              Concentration < contri_range1[2] &
+                Concentration > contri_range1[1]),
+       aes(as.factor(Month), Concentration),
        color = Source_use) +
   geom_boxplot(aes(color = Source_use), 
                outlier.shape = NA, 
@@ -838,7 +1025,7 @@ ggplot(subset(Month_aggregated_use,
   scale_y_continuous(breaks = c(0,1,2)) +
   # scale_y_continuous(breaks = c(-20, 0, 20)) +
   # scale_x_discrete(breaks = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020)) +
-  xlab("Month") +
+  labs(x = "Month", y = format_variable("Concentration µg/m3")) +
   scale_color_manual(values = color_npg) + # color_npg[-c(1, 5, 7)]
   geom_text(data = middle_position, size = 5,
             aes(x = Month, y = 2.5, label = Source_use), 
@@ -857,10 +1044,10 @@ ggplot(subset(Month_aggregated_use,
 # histgram - each source
 
 ggplot(subset(Month_aggregated_use), 
-       aes(x = Contribution)) + # , fill = Source_use
+       aes(x = Concentration)) + # , fill = Source_use
   geom_histogram(alpha = 0.6, bins = 30) +
   facet_wrap(~ Source_use, ncol = 3) +
-  labs(x = format_variable("Contribution  µg/m3"), y = "Count") +
+  labs(x = format_variable("Concentration  µg/m3"), y = "Count") +
   theme_minimal() +
   theme(legend.position = "none",
         strip.background = element_blank(), 
@@ -871,15 +1058,15 @@ ggplot(subset(Month_aggregated_use),
         axis.text.x = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5, vjust = 0.5), 
         axis.text.y = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5))
 
-month_contribution_source = 
+month_Concentration_source = 
   ddply(Month_aggregated_use, .(Source_use), summarise,
-        mean = round(mean(Contribution, na.rm = T), 3), 
-        sd = round(sd(Contribution, na.rm = T), 3), 
-        median = round(median(Contribution, na.rm = T), 3), 
-        p99th = round(quantile(Contribution, 0.99, na.rm = T), 3), 
-        p1th = round(quantile(Contribution, 0.01, na.rm = T), 3))
+        mean = round(mean(Concentration, na.rm = T), 3), 
+        sd = round(sd(Concentration, na.rm = T), 3), 
+        median = round(median(Concentration, na.rm = T), 3), 
+        p99th = round(quantile(Concentration, 0.99, na.rm = T), 3), 
+        p1th = round(quantile(Concentration, 0.01, na.rm = T), 3))
 
-export_table(month_contribution_source, format = "md")
+export_table(month_Concentration_source, format = "md")
 
 # ribbon range figure
 
@@ -887,9 +1074,9 @@ Month_aggregated_summary =
   ddply(Month_aggregated_use, 
         .(Source_use, Month),
         summarise,
-        Lower = quantile(Contribution, 0.0025, na.rm = T),
-        Median = median(Contribution, na.rm = T),
-        Upper = quantile(Contribution, 0.9975, na.rm = T))
+        Lower = quantile(Concentration, 0.0025, na.rm = T),
+        Median = median(Concentration, na.rm = T),
+        Upper = quantile(Concentration, 0.9975, na.rm = T))
 
 
 ggplot(Month_aggregated_summary, 
@@ -898,7 +1085,7 @@ ggplot(Month_aggregated_summary,
   geom_point() +
   scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11)) + 
   #scale_y_continuous(limits = c(0, 4), breaks = c(0, 2, 4)) +  # Set y-axis limits and breaks
-  labs(y = "Contribution") + #  µg/m^3
+  labs(x = "Month", y = format_variable("Concentration µg/m3")) +
   scale_color_manual(values = color_npg) +
   geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.2, color = NA) +
   facet_wrap(~ Source_use, ncol = 3) +
@@ -915,49 +1102,49 @@ ggplot(Month_aggregated_summary,
 
 ###### 4.2.2. Spatial distribution of Changes between 2011 & 2020 - Absolute difference ######
 
-# Load the dplyr package
-library(dplyr)
-
-# Filter the dataset for the years 2011 and 2019
-annual_source_selectd <- Year_aggregated %>% 
-  filter(Year %in% c(2011, 2019))
-
-contribution_diff <- 
-  annual_source_selectd %>%
-  dplyr::group_by(Source_use, SiteCode) %>%
-  dplyr::summarise(
-    diff_contribution = ifelse(n() > 1, diff(Contribution), NA),
-    Longitude = last(Longitude),
-    Latitude = last(Latitude),
-    # geoid = last(geoid),
-    # state_abbr = last(state_abbr),
-    # geometry = last(geometry),
-    .groups = 'drop'  # This will automatically ungroup the data
-  )
-
-
-contribution_diff = subset(contribution_diff, 
-                           !(Source_use %in% c("F10-Industries_2", "Vehic_Biom")))
-
-# Create the plot
-ggplot() +
-  geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
-  geom_point(data = subset(source9_diff_map, 
-                           !is.na(diff_contribution)), 
-             aes(x = Longitude, y = Latitude, 
-                 color = diff_contribution),
-             size = 2.5, alpha = 0.8) +
-  scale_color_gradient2(low = color_npg[2], 
-                        high = color_npg[8], 
-                        midpoint = 0) +
-  coord_sf(datum = NA) +
-  facet_wrap(~ Source_use, 
-             labeller = labeller(Source_use = 
-                                   as_labeller(as.character, 
-                                               default = label_value))) +
-  theme_minimal() +
-  theme(panel.background = element_blank(),
-        strip.text = element_text(color = "black", size = 16))
+# # Load the dplyr package
+# library(dplyr)
+# 
+# # Filter the dataset for the years 2011 and 2019
+# annual_source_selectd <- Year_aggregated %>% 
+#   filter(Year %in% c(2011, 2019))
+# 
+# Concentration_diff <- 
+#   annual_source_selectd %>%
+#   dplyr::group_by(Source_use, SiteCode) %>%
+#   dplyr::summarise(
+#     diff_Concentration = ifelse(n() > 1, diff(Concentration), NA),
+#     Longitude = last(Longitude),
+#     Latitude = last(Latitude),
+#     # geoid = last(geoid),
+#     # state_abbr = last(state_abbr),
+#     # geometry = last(geometry),
+#     .groups = 'drop'  # This will automatically ungroup the data
+#   )
+# 
+# 
+# Concentration_diff = subset(Concentration_diff, 
+#                            !(Source_use %in% c("F10-Industries_2", "Vehic_Biom")))
+# 
+# # Create the plot
+# ggplot() +
+#   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
+#   geom_point(data = subset(source9_diff_map, 
+#                            !is.na(diff_Concentration)), 
+#              aes(x = Longitude, y = Latitude, 
+#                  color = diff_Concentration),
+#              size = 2.5, alpha = 0.8) +
+#   scale_color_gradient2(low = color_npg[2], 
+#                         high = color_npg[8], 
+#                         midpoint = 0) +
+#   coord_sf(datum = NA) +
+#   facet_wrap(~ Source_use, 
+#              labeller = labeller(Source_use = 
+#                                    as_labeller(as.character, 
+#                                                default = label_value))) +
+#   theme_minimal() +
+#   theme(panel.background = element_blank(),
+#         strip.text = element_text(color = "black", size = 16))
 
 
 ###### 4.2.3. Spatial distribution of Changes between 2011 & 2020 - Slope ######
@@ -983,7 +1170,7 @@ slope_diff <-
   Year_aggregated_use_slope %>%
   group_by(SiteCode, Source_use, Longitude, Latitude) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope(cur_data(), "Year", "Contribution")
+    diff_slope = get_slope(cur_data(), "Year", "Concentration")
     ) %>%
   ungroup()
 
@@ -1021,7 +1208,7 @@ slope_diff = merge(slope_diff, source_site_count)
 # Create the plot
 slope_range1 <- quantile(slope_diff$diff_slope, c(0.0025, 0.9975))
 slope_range1 <- c(-0.6, 0.6)
-slope_range1 <- c(-0.3, 0.3)
+slope_range1 <- c(-0.4, 0.4)
 
 ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
@@ -1030,10 +1217,11 @@ ggplot() +
                  color = diff_slope),
              size = 2.5, alpha = 0.8) +
   scale_color_gradient2(limits = slope_range1,
-                        low = color_npg[2], 
-                        mid = "ivory", # cornsilk1, honeydew
-                        high = color_npg[8], 
-                        midpoint = 0) +
+                        low = "#2CA02C",  
+                        mid = "ivory",  
+                        high = "#D62728", 
+                        midpoint = 0,
+                        oob = scales::squish) + # oob = scales::squish, show the extreme values outside of range.
   # guides(color=guide_legend(title="Slope: µg/m3")) + 
   coord_sf(datum = NA) +
   facet_wrap(~ source_site_count, 
@@ -1218,10 +1406,10 @@ annual_singleSource =
          Source_use == "F3-Secondary Sulfate")
 col_singleSource = "purple"
 
-annual_singleSource = 
-  subset(annual_source_gps, 
-         Source_use == "F4-Aged Sea Salt")
-col_singleSource = "green"
+# annual_singleSource = 
+#   subset(annual_source_gps, 
+#          Source_use == "F4-Aged Sea Salt")
+# col_singleSource = "green"
 
 annual_singleSource = 
   subset(annual_source_gps, 
@@ -1230,17 +1418,17 @@ col_singleSource = "orange"
 
 annual_singleSource = 
   subset(annual_source_gps, 
-         Source_use == "F6-Fresh Sea Salt")
+         Source_use == "F6-Sea Salt")
 col_singleSource = "cyan"
 
 annual_singleSource = 
   subset(annual_source_gps, 
-         Source_use == "F8-Biomass")
+         Source_use == "F7-Biomass")
 col_singleSource = "pink"
 
 annual_singleSource = 
   subset(annual_source_gps, 
-         Source_use == "F9-Soil/Dust")
+         Source_use == "F8-Soil/Dust")
 col_singleSource = "brown"
 
 
@@ -1251,7 +1439,7 @@ annual_singleSource_region = merge(annual_singleSource, state_regions)
 annual_singleSource_region_contri = 
   annual_singleSource_region %>%
   group_by(region) %>%
-  dplyr::summarize(Contribution = mean(Contribution)) 
+  dplyr::summarize(Concentration = mean(Concentration)) 
 annual_singleSource_region_contri$geometry = NULL  
 
 regions_dissolved_annual_singleSource =
@@ -1270,12 +1458,12 @@ singleSource_allSites =
 # temporal trends for each region
 
 annual_singleSource_region_plot = 
-  ddply(subset(annual_singleSource_region, Contribution>0), 
+  ddply(subset(annual_singleSource_region, Concentration>0), 
         .(region, Year),
         summarise,
-        med.contri = median(Contribution),
-        up.contri = quantile(Contribution, 0.975),
-        down.contri = quantile(Contribution, 0.025),
+        med.contri = median(Concentration),
+        up.contri = quantile(Concentration, 0.975),
+        down.contri = quantile(Concentration, 0.025),
         Longitude = last(Longitude),
         Latitude = last(Latitude),
         geoid = last(geoid),
@@ -1295,7 +1483,7 @@ singleSource_map_center <-
   geom_sf(data = us_states_region, 
           fill = NA, color = "lightgrey") +  # Fill color for states without border
   geom_sf(data = regions_dissolved_annual_singleSource, 
-          aes(fill = Contribution), 
+          aes(fill = Concentration), 
           color = "white", lwd = 2, alpha = 0.5) +  # Thicker borders for regions
   geom_point(data = singleSource_allSites, 
              aes(x = Longitude, y = Latitude),
@@ -1309,7 +1497,7 @@ singleSource_map_center <-
   theme(legend.position = "bottom") +
   theme_map() +
   guides(fill = guide_legend(override.aes = list(alpha = 0.5),
-                             title=format_variable("Contribution \n (µg/m3)"))) +
+                             title=format_variable("Concentration \n (µg/m3)"))) +
   theme(legend.position = c(0.85, 0.1),  # legend.position="none"
         legend.text = element_text(size = 12), 
         # legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
@@ -1329,7 +1517,7 @@ annual_singleSource_list_plots <-
       scale_x_continuous(breaks = c(2011, 2014, 2017, 2020)) +
       scale_y_continuous(limits = c(0, max.contri.singleSource)) +  # Set y-axis limits
       labs(title = unique(x$region),
-           y = "Contribution") +
+           y = format_variable("Concentration µg/m3")) +
       theme_classic() +
       theme(strip.background = element_blank(),
             plot.title = element_text(hjust = 0.5, vjust = -2),
@@ -1416,7 +1604,7 @@ for(source.type in unique(month_source_gps$Source_use)){
     ggplot() +
     geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
     geom_point(data = month_source_plot, 
-               aes(x = Longitude, y = Latitude, color = Contribution, group = interaction(Year, Month)), 
+               aes(x = Longitude, y = Latitude, color = Concentration, group = interaction(Year, Month)), 
                size = 4, alpha = 0.8) +
     scale_alpha_continuous(range = c(0.1, 0.99), guide = "legend") +
     scale_color_gradient(low = "white", high = color_npg[2]) +
@@ -1439,7 +1627,7 @@ for(source.type in unique(month_source_gps$Source_use)){
     ggplot() +
     geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
     geom_point(data = Year_aggregated_ani, 
-               aes(x = Longitude, y = Latitude, color = Contribution, group = Year), 
+               aes(x = Longitude, y = Latitude, color = Concentration, group = Year), 
                size = 4, alpha = 0.8) +
     scale_alpha_continuous(range = c(0.1, 0.99), guide = "legend") +
     scale_color_gradient(low = "white", high = color_npg[2]) +
@@ -1458,7 +1646,7 @@ for(source.type in unique(month_source_gps$Source_use)){
     ggplot() +
     geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
     geom_point(data = month_aggregated_ani, 
-               aes(x = Longitude, y = Latitude, color = Contribution, group = Month), 
+               aes(x = Longitude, y = Latitude, color = Concentration, group = Month), 
                size = 4, alpha = 0.8) +
     scale_alpha_continuous(range = c(0.1, 0.99), guide = "legend") +
     scale_color_gradient(low = "white", high = color_npg[2]) +
@@ -1497,7 +1685,7 @@ ggplot(threh_K,
        aes(x = Above_thresholds_K)) +
   geom_histogram() +
   facet_grid(.~Method) +
-  labs(x = format_variable("K Contribution above Thresholds  µg/m3"), y = "Count") +
+  labs(x = format_variable("K Concentration above Thresholds  µg/m3"), y = "Count") +
   theme_minimal() +
   theme(legend.position = "none",
         strip.background = element_blank(), 
