@@ -1729,72 +1729,168 @@ onedrive_path = "/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUnive
 
 ##### VC for dispersion normalization, based on ERA5 data 
 
-dn_site_folder = paste0(site_folder, "_DN")
+#### data to be normalized
+# Sitefolder = "CSN_NoGUI_NoCsub_15TimesMean"
+Sitefolder = "CSN_NoGUI_NoCsub_15t1mdl0unc"
 
+# define the folder of output results
+dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
+file_folder = paste0(dropbox_path, "/", Sitefolder)
+
+# create folder for new data
+dn_site_folder = paste0(Sitefolder, "_DN_Site")
+
+file.path(dropbox_path, dn_site_folder)
+if (!dir.exists(file.path(dropbox_path, dn_site_folder))) {
+  dir.create(file.path(dropbox_path, dn_site_folder))
+}
+
+# read dispersion normalization data
 dn_vc = fread("Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
 site_code_serial = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial$V1 = NULL
 
+# get VC coefficient
+# here, the VC_coef is already the VC_daily/VC_mean, but some days have been removed
+# thus, we re-estimated the VC_coef for each site
 dn_vc$V1 = NULL
 dn_vc$Date = as.Date(dn_vc$Date)
-dn_vc_use = select(dn_vc,
-                   Dataset, SiteCode, Date, VC_coef)
-dn_vc_use = 
-  dn_vc_use[
-    with(dn_vc_use,
+
+# reorder the dataframe
+dn_vc = 
+  dn_vc[
+    with(dn_vc,
          order(Dataset, SiteCode, Date)), ]
 
-dn_vc_use_site = join(dn_vc_use, site_code_serial)
-dn_vc_use_site$serial.No =  
-ifelse(dn_vc_use_site$serial.No < 100,
-       sprintf("%03d", dn_vc_use_site$serial.No),
-       as.character(dn_vc_use_site$serial.No))
+dn_vc_site = join(dn_vc, site_code_serial)
+dn_vc_site$serial.No =  
+ifelse(dn_vc_site$serial.No < 100,
+       sprintf("%03d", dn_vc_site$serial.No),
+       as.character(dn_vc_site$serial.No))
 
+# list all files used for DN
 nongui_org_csvs <- 
   list.files(file_folder, 
              pattern = ".*CMD\\.csv$", full.names = TRUE)
 
-nongui_org_csvs <- 
-  list.files(file_folder, 
-             pattern = ".*[0-9]\\.csv$", full.names = TRUE)
+# nongui_org_csvs <- 
+#   list.files(file_folder, 
+#              pattern = ".*[0-9]\\.csv$", full.names = TRUE)
 
+# create a file to store updated VC_coef (after removing some days of records)
+site_vc_all = NULL
+
+# conduct DN
 for (nongui_org_csv in nongui_org_csvs) { # [140:length(nongui_org_csvs)]
   # site_serial = sub(".*_S_([0-9]+)_.*", "\\1", basename(nongui_org_csv))
-  site_serial = regmatches(basename(nongui_org_csv), 
+  file_name = basename(nongui_org_csv)
+  dn_file_name = paste0(sub("\\..*", "", file_name), "_DN.csv")
+  site_serial = regmatches(file_name, 
                            regexpr("(?<=_S_)(\\d{3})(?=_cmd)?", 
-                                   basename(nongui_org_csv), 
+                                   file_name, 
                                    perl = TRUE))
   nongui_conc_unc = read.csv(nongui_org_csv)
   nongui_conc_unc$Date = as.Date(nongui_conc_unc$Date)
   # nongui_conc_unc$Date = as.Date(nongui_conc_unc$Date, format = "%m/%d/%y")
-  head(nongui_conc_unc)
+  # head(nongui_conc_unc)
   nongui_conc_unc$X = NULL
   
-  site_dn_vc = 
-    select(
-      subset(dn_vc_use_site, serial.No == site_serial), 
-      Date, VC_coef)
-  site_dn_vc$Date = as.Date(site_dn_vc$Date)
-  
-  site_vc_mean = mean(site_dn_vc$VC_coef, na.rm = TRUE)
-  
+  # extract VC for the site
+  site_dn_vc = subset(dn_vc_site, serial.No == site_serial) 
+    
   # exclude potential removed dates
   site_dn_vc = 
     subset(site_dn_vc, Date %in% nongui_conc_unc$Date)
   site_dn_vc = data.frame(site_dn_vc)
   site_dn_vc = site_dn_vc[!duplicated(site_dn_vc), ] 
   
-  nongui_conc_unc_dn = nongui_conc_unc
+  # date format
+  site_dn_vc$Date = as.Date(site_dn_vc$Date)
+  
+  # estimated VC mean of the whole study period
+  site_vc_mean = mean(site_dn_vc$VC.daily, na.rm = TRUE)
+  
+  # update the VC_coef
+  site_dn_vc$VC.mean = site_vc_mean
+  site_dn_vc$VC_coef = site_dn_vc$VC.daily/site_dn_vc$VC.mean
+  
   # DN for each cluster/site
+  nongui_conc_unc_dn = nongui_conc_unc
   for (col in names(nongui_conc_unc)) {
+    # normalize each column in turn
     if (!(col %in% c("SiteCode", "Date", "State"))) {
       nongui_conc_unc_dn[[col]] =
-        nongui_conc_unc[[col]] * site_dn_vc$VC_coef / site_vc_mean
+        nongui_conc_unc[[col]] * site_dn_vc$VC_coef
     }
   }
   
   write.csv(nongui_conc_unc_dn, 
-            file.path(dn_file_folder, basename(nongui_org_csv)))
+            file.path(dropbox_path, dn_site_folder, dn_file_name),
+            row.names = FALSE)
+  
+  # Upated VC coefficient file
+  site_vc_all = rbind(site_vc_all, site_dn_vc)
+  
+  write.csv(site_vc_all, 
+            file.path(dropbox_path, dn_site_folder, 
+                      "Nearest_ERA5_Wind_BLH_VC_CSN_2024.05.csv"),
+            row.names = FALSE)
 }
+
+
+#### map the spatial distribution of VC_coefficient
+library(usmap)
+library(USAboundaries)
+
+site_geoid = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+site_geoid$X = NULL
+site_geoid = site_geoid[!duplicated(site_geoid), ] 
+site_vc_all_plot = site_vc_all[!duplicated(site_vc_all), ] 
+dim(site_vc_all_plot)
+
+geoid_dn_coef = 
+  join(site_vc_all_plot, 
+        select(site_geoid, 
+               Dataset, SiteCode, Longitude, Latitude, geoid, RuralUrban, state_abbr))
+dim(geoid_dn_coef)
+
+geoid_dn_coef$year = year(geoid_dn_coef$Date)
+geoid_dn_coef$month = month(geoid_dn_coef$Date)
+
+geoid_dn_coef = 
+  geoid_dn_coef %>%
+  mutate(year_month = 
+           as.Date(
+             paste(year, month, "01", sep = "-")))
+head(geoid_dn_coef)
+
+ggplot(geoid_dn_coef,
+       aes(x = as.factor(year_month), y = VC_coef)) +
+  geom_boxplot() +
+  theme_minimal()
+
+ggplot(geoid_dn_coef,
+       aes(x = as.factor(Date), y = VC_coef)) +
+  geom_boxplot() +
+  theme_minimal()
+ 
+sapply(geoid_dn_coef, class)
+site_geoid_dn_coef = 
+  geoid_dn_coef %>% 
+  group_by(state_abbr, SiteCode) %>%
+  dplyr::summarise(
+    VC_coef_median = median (VC_coef),
+    VC_coef_mean = mean (VC_coef),
+    Longitude = median (Longitude),
+    Latitude = median (Latitude),
+    geoid = median (geoid))
+
+UScounty <- map_data("county")
+ggplot(site_geoid_dn_coef, 
+       aes(Longitude, Latitude, color= VC_coef_median)) + 
+  geom_polygon(data=UScounty, aes(x=long, y=lat, group=group),
+               color="lightgrey", fill="white", alpha = 0.4) +
+  geom_point(size = 2, alpha = 0.6) +
+  theme_void()
 
 #### Explore the removed/replaced data ####
 extreme_remove = 
