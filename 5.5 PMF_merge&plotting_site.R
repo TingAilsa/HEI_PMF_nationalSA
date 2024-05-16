@@ -711,7 +711,13 @@ write.csv(month_source_assign, paste0(data_use, "_montly_source_assigned.csv"))
 
 #### 4. plotting - data preparation ####
 
+# # many packages disappers, reinstall via devtools, and github user link
+# install.packages("devtools")
+# devtools::install_github("ropensci/USAboundaries") # , force = TRUE, reinstall even with current version 
+# devtools::install_github("ropensci/USAboundariesData") 
+
 library(USAboundaries)
+library(USAboundariesData)
 library(ggsci)
 library(gganimate)
 
@@ -1170,7 +1176,8 @@ slope_diff <-
   Year_aggregated_use_slope %>%
   group_by(SiteCode, Source_use, Longitude, Latitude) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope(cur_data(), "Year", "Concentration")
+    diff_slope = get_slope(cur_data(), "Year", "Concentration"),
+    .groups = "drop"
     ) %>%
   ungroup()
 
@@ -1237,6 +1244,32 @@ ggplot() +
         # legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
         legend.title = element_text(size = 16))
 
+
+ggplot() +
+  geom_sf(data = us_states, 
+          fill = "grey96", alpha = 0.8,
+          color = "grey55", linewidth = 0.6) +
+  geom_point(data = subset(slope_diff, Source_use == "F1-Vehicle"), 
+             aes(x = Longitude, y = Latitude, 
+                 color = diff_slope),
+             size = 5, alpha = 0.8) +
+  scale_color_gradient2(limits = slope_range1,
+                        low = "#2CA02C",  
+                        mid = "ivory",  
+                        high = "#D62728", 
+                        midpoint = 0,
+                        oob = scales::squish) + # oob = scales::squish, show the extreme values outside of range.
+  # guides(color=guide_legend(title="Slope: µg/m3")) + 
+  coord_sf(datum = NA) +
+  theme_minimal() +
+  theme(panel.background = element_blank(),
+        strip.text = element_text(color = "black", size = 16),
+        strip.text.y = element_text(size = 10), 
+        legend.text = element_text(size = 14), 
+        # legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
+        legend.title = element_text(size = 16))
+
+
 slope_range2 <- quantile(slope_diff$diff_slope, c(0.0005, 0.9995))
 slope_range2 <- c(-2, 2)
 
@@ -1258,6 +1291,7 @@ ggplot() +
   theme_minimal() +
   theme(panel.background = element_blank(),
         strip.text = element_text(color = "black", size = 16))
+
 
 
 #### 4.3 Spatial & temporal (annual) ####
