@@ -20,6 +20,7 @@ library(extrafont)
 library(purrr)
 library(patchwork)
 library(Metrics)
+library(gridExtra)
 
 ####### 1. Read & process other files to use ####### 
 
@@ -40,6 +41,7 @@ noCsub_noExtreme = "CSN_NoGUI_NoCsub_25TimesMean_Site"
 data.prefix = "CSN_noCsub_25TimesMean_"
 pm.prefix = "CSN_noCsub_25TimesMean_"
 disp.prefix = "CSN_"
+csv.suffix = "_CMD.csv"
 
 #### 1.2 CSN 15TimesMean noCsub, overall uncertainty = 5% #### 
 
@@ -57,7 +59,7 @@ noCsub_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
 data.prefix = "CSN_noCsub_15TimesMean_"
 pm.prefix = "CSN_noCsub_15TimesMean_"
 disp.prefix = "CSN_"
-
+csv.suffix = "_CMD.csv"
 
 #### 1.3 CSN 15TimesMean noCsub, overall uncertainty = 0% #### 
 
@@ -75,6 +77,7 @@ noCsub_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
 data.prefix = "CSN_noCsub_15tMean_0unc_"
 pm.prefix = "CSN_noCsub_15TimesMean_"
 disp.prefix = "CSN_"
+csv.suffix = "_CMD.csv"
 
 #### 1.4 CSN 15t1mdl0unc noCsub, overall uncertainty = 0% #### 
 
@@ -92,6 +95,25 @@ noCsub_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_Site"
 data.prefix = "CSN_noCsub_15t1mdl0unc_"
 pm.prefix = "CSN_noCsub_15t1mdl0unc_"
 disp.prefix = "CSN_"
+csv.suffix = "_CMD.csv"
+
+#### 1.5 CSN 15t1mdl0unc noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
+
+##set working directory
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc_DN/base_DISPres1/")
+data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc_DN/base_DISP_BS_sum/"
+
+site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+noCsub_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_DN_Site"
+data.prefix = "CSN_noCsub_15t1mdl0unc_DN_"
+pm.prefix = "CSN_noCsub_15t1mdl0unc_"
+disp.prefix = "CSN_"
+csv.suffix = "_CMD_DN.csv"
 
 #### 1.N shared process #### 
 
@@ -144,8 +166,8 @@ correl_r_p_summary = NULL
 summary_base = NULL
 pred_obs_compare_summary = NULL
 
-for (site.serial in site_serial_Nos) { # 1:25
-  for (factor.No in 3:11) { # 5:11
+for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9]
+  for (factor.No in 3:11) { # 5:11, # factor.No = 8
     
     # site.serial.factor.pre = paste0("C_", site.serial, "_F_", factor.No, "_")
     site.serial.factor.pre = paste0("S_", site.serial, "_F_", factor.No, "_")
@@ -234,6 +256,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       
       # get concentration fraction contribution of each species
       base_percent = conc_percent_contri(base_contri)
+      names(base_percent)[1] = "Species"
       
       base_conc_plot = gather(base_contri,
                               "Factor", 
@@ -255,13 +278,16 @@ for (site.serial in site_serial_Nos) { # 1:25
       site_date_PM_species = read.csv(
         file.path(
           source_cmd_pm,
-          paste0(pm.prefix, "S_", site.serial, "_CMD.csv")), #"_CMD.csv", ".csv"
+          paste0(pm.prefix, "S_", site.serial, csv.suffix)), 
         header = T)
       site_date_PM_species$X = NULL
+      
+      site_date_PM_species$Date = as.Date(site_date_PM_species$Date)
       
       start.date = site_date_PM_species$Date[1]
       end.date = site_date_PM_species$Date[nrow(site_date_PM_species)]
       
+      ## extract concentrations & uncertainties
       site_date_PM_species_conc <- 
         site_date_PM_species %>%
         # remove columns with "unc_" in their names
@@ -276,6 +302,7 @@ for (site.serial in site_serial_Nos) { # 1:25
         # rename columns that start with "unc_"
         rename_with(~gsub("^unc_", "", .x), starts_with("unc_"))
       
+      ## rename the columns
       site_date_PM_species_conc = plyr::rename(
         site_date_PM_species_conc, 
         c("K." = "KIon",
@@ -364,32 +391,50 @@ for (site.serial in site_serial_Nos) { # 1:25
           values_to = "Concentration"
         )
       
-      # Get annual and seasonal contributions
-      base_ts_conc_long <- 
+      # Get annual and monthly contributions
+      base_ts_conc_long$Year = year(base_ts_conc_long$Date)
+      base_ts_conc_long$Month = month(base_ts_conc_long$Date)
+
+      # get the Year_Month date
+      base_ts_conc_long = 
         base_ts_conc_long %>%
-        mutate(Year = year(Date),
-               Season = case_when(
-                 month(Date) %in% c(12, 1, 2) ~ "Winter",
-                 month(Date) %in% c(3, 4, 5) ~ "Spring",
-                 month(Date) %in% c(6, 7, 8) ~ "Summer",
-                 month(Date) %in% c(9, 10, 11) ~ "Fall"
-               ),
-               Month = month(Date))
+        mutate(Year_Month = 
+                 as.Date(
+                   paste(Year, Month, "01", sep = "-")))
+      head(base_ts_conc_long)
       
-      ts_annual_conc = ddply(base_ts_conc_long, 
-                             .(Year, Factor), # SiteCode, 
-                             summarise,
-                             Concentration = median(Concentration))
       
-      ts_season_conc = ddply(base_ts_conc_long, 
-                             .(Season, Factor), #SiteCode, 
-                             summarise,
-                             Concentration = median(Concentration))
+      #### time-series Fraction contribution estimation
+      base_day_conc = base_ts_conc_all
+      base_day_conc$Serial.No = base_day_conc$PM2.5 = NULL
+      base_day_conc = relocate(base_day_conc, Date, .before = Factor1)
       
-      ts_month_conc = ddply(base_ts_conc_long, 
-                            .(Year, Month, Factor), #SiteCode,
-                            summarise,
-                            Concentration = median(Concentration))
+      # get daily fraction contribution
+      base_day_percent = conc_percent_contri(base_day_conc)
+      names(base_day_percent)[1] = "Date"
+      
+      # get year & month
+      base_day_percent$Year = year(base_day_percent$Date)
+      base_day_percent$Month = month(base_day_percent$Date)
+      
+      # get the Year_Month date
+      base_day_percent = 
+        base_day_percent %>%
+        mutate(Year_Month = 
+                 as.Date(
+                   paste(Year, Month, "01", sep = "-")))
+      # head(base_day_percent)
+      
+      # convert the df for plotting
+      base_day_percent_plot = 
+        base_day_percent %>%
+        pivot_longer(
+          cols = Factor1:Factor.serial[factor.No],
+          names_to = c("Factor"),
+          values_to = "Percent"
+        )
+      head(base_day_percent_plot)
+      
       
       ####### Extract DISP info from PMF CMD, and validation results #######
       
@@ -398,17 +443,43 @@ for (site.serial in site_serial_Nos) { # 1:25
       disp_up_conc = disp_analysis(disp_output)$disp_up
       disp_down_conc$Species = disp_up_conc$Species = site.weak.strong
       
-      disp_down_percent = conc_percent_contri(disp_down_conc)
-      disp_down_percent_plot = gather(disp_down_percent,
-                                      "Factor", 
-                                      "Percent.down", 
-                                      -Species)
+      # mean concentration from DISP
+      disp_mean_conc = (disp_down_conc[, 2:(factor.No+1)] + disp_up_conc[, 2:(factor.No+1)])/2
+      disp_mean_conc$Species = disp_down_conc$Species
       
-      disp_up_percent = conc_percent_contri(disp_up_conc)
-      disp_up_percent_plot = gather(disp_up_percent,
+      # relocate the column
+      disp_mean_conc = relocate(disp_mean_conc, Species, .before = Factor1)
+      
+      # convert the df for plotting
+      disp_down_conc_plot = gather(disp_down_conc,
+                                      "Factor", 
+                                      "disp_conc_down", 
+                                      -Species)
+      disp_up_conc_plot = gather(disp_up_conc,
                                     "Factor", 
-                                    "Percent.up", 
+                                    "disp_conc_up", 
                                     -Species)
+      disp_mean_conc_plot = gather(disp_mean_conc,
+                                    "Factor", 
+                                    "disp_conc_mean", 
+                                    -Species)
+      
+      
+      # # DISP fraction contribution
+      # disp_down_percent = conc_percent_contri(disp_down_conc)
+      # names(disp_down_percent)[1] = "Species"
+      # disp_down_percent_plot = gather(disp_down_percent,
+      #                                 "Factor", 
+      #                                 "Percent.down", 
+      #                                 -Species)
+      # 
+      # disp_up_percent = conc_percent_contri(disp_up_conc)
+      # names(disp_up_percent)[1] = "Species"
+      # disp_up_percent_plot = gather(disp_up_percent,
+      #                               "Factor", 
+      #                               "Percent.up", 
+      #                               -Species)
+      
       
       # DISP results - overall validation of results
       disp.error.code = disp_analysis(disp_output)[[1]]
@@ -435,7 +506,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       # merge datasets for source profile plotting
       base_disp_conc_to_merge <- 
         list(base_conc_plot, base_percent_plot, 
-             disp_down_percent_plot, disp_up_percent_plot, 
+             disp_down_conc_plot, disp_mean_conc_plot, disp_up_conc_plot, 
              species_class, main_source)
       
       conc_percent_bsDisp <- 
@@ -443,17 +514,19 @@ for (site.serial in site_serial_Nos) { # 1:25
           merge(x, y), 
           base_disp_conc_to_merge)
       
-      # match time-series normalized contribution data with source info
+      # match time-series contribution data with source info
       ts_conc_plot = merge(base_ts_conc_long, main_source)
-      ts_annual_conc = merge(ts_annual_conc, main_source)
-      ts_season_conc = merge(ts_season_conc, main_source)
-      ts_month_conc = merge(ts_month_conc, main_source)
+      base_day_percent_plot = merge(base_day_percent_plot, main_source)
+      
       lm_beta_plot = merge(ts_PM_lm_beta, main_source)
       base_ts_conc_long_plot = merge(base_ts_conc_long, main_source)
       
       # reorder the file 
       ts_conc_plot = 
         ts_conc_plot[with(ts_conc_plot,
+                          order(Date, Factor)), ]
+      base_day_percent_plot = 
+        base_day_percent_plot[with(base_day_percent_plot,
                           order(Date, Factor)), ]
       
       # match overall contribution based on normalized data with that from mass concentration
@@ -464,6 +537,70 @@ for (site.serial in site_serial_Nos) { # 1:25
                                          lm_beta_plot$Fractrion_conc_based,
                                          method = "pearson")$estimate
       
+      ####### Base, concentration & fraction contributions at different time scales #######
+      
+      ### Concentration contributions
+      
+      ## somehow quantile estimate via data.frame not work!!! change to data.table to estimate
+      # Convert to data.table
+      base_ts_conc_long_dt <- as.data.table(ts_conc_plot)
+      
+      # Summarize using data.table, getting concentrations contribution at different time scales
+      ts_annual_conc <- 
+        base_ts_conc_long_dt[, .(
+          Concentration = quantile(Concentration, 0.5),
+          conc_up = quantile(Concentration, 0.95),
+          conc_down = quantile(Concentration, 0.05)
+        ), 
+        by = .(Factor, Year, Main_Species, Source_reference, Source.No, Factor_source)]
+      
+      ts_month_conc <- 
+        base_ts_conc_long_dt[, .(
+          Concentration = quantile(Concentration, 0.5),
+          conc_up = quantile(Concentration, 0.95),
+          conc_down = quantile(Concentration, 0.05)
+        ), 
+        by = .(Factor, Month, Main_Species, Source_reference, Source.No, Factor_source)]
+      
+      ts_year_month_conc <- 
+        base_ts_conc_long_dt[, .(
+          Concentration = quantile(Concentration, 0.5),
+          conc_up = quantile(Concentration, 0.95),
+          conc_down = quantile(Concentration, 0.05)
+        ), 
+        by = .(Factor, Year_Month, Main_Species, Source_reference, Source.No, Factor_source)]
+      
+      ### Percent
+      base_day_percent_dt = as.data.table(base_day_percent_plot)
+      
+      # annual percent & CI
+      ts_annual_fraction = 
+        base_day_percent_dt[, .(
+          Percent = quantile(Percent, 0.5),
+          percent_up = quantile(Percent, 0.95),
+          percent_down = quantile(Percent, 0.05)
+        ), 
+        by = .(Factor, Year, Main_Species, Source_reference, Source.No, Factor_source)]
+      head(ts_annual_fraction)
+      
+      # monthly percent & CI
+      ts_month_fraction = 
+        base_day_percent_dt[, .(
+          Percent = quantile(Percent, 0.5),
+          percent_up = quantile(Percent, 0.95),
+          percent_down = quantile(Percent, 0.05)
+        ), 
+        by = .(Factor, Month, Main_Species, Source_reference, Source.No, Factor_source)]
+      
+      # year_month percent & CI
+      ts_year_month_fraction = 
+        base_day_percent_dt[, .(
+          Percent = quantile(Percent, 0.5),
+          percent_up = quantile(Percent, 0.95),
+          percent_down = quantile(Percent, 0.05)
+        ), 
+        by = .(Factor, Year_Month, Main_Species, Source_reference, Source.No, Factor_source)]
+
       ####### Number of Factor & Factor_source #######
       Factor_source_count = 
         ddply(ts_annual_conc, 
@@ -508,34 +645,29 @@ for (site.serial in site_serial_Nos) { # 1:25
         mutate(across(Concentration:Percent.up, 
                       ~replace(., . == 0, 1e-10)))
       
-      # Convert percent values to make the scale pattern similar to log Normalize_contri
-      # conc_percent_bsDisp_use$LogConcentration <- log10(conc_percent_bsDisp_use$Concentration)
-      conc_percent_bsDisp_use$Trans.Percent = 
-        trans_log(conc_percent_bsDisp_use$Percent, log(1e-00), log(1e-05))
-      conc_percent_bsDisp_use$Trans.Percent.down = 
-        trans_log(conc_percent_bsDisp_use$Percent.down, log(1e-00), log(1e-05))
-      conc_percent_bsDisp_use$Trans.Percent.up = 
-        trans_log(conc_percent_bsDisp_use$Percent.up, log(1e-00), log(1e-05))
+      ##### Convert percent values to make the scale pattern similar to log concentration
+      # set the Percent == 0 to a low value before log
+      conc_percent_bsDisp_use$Percent[conc_percent_bsDisp_use$Percent == 0] = 1e-05
+      
+      # define the breakpoints and corresponding values in percent and exponent values
+      percent_values <- c(100, 80, 60, 40, 20, 0)
+      exponent_values <- c(1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05)
+      # exponent_values <- c(1e+01, 1e-00, 1e-01, 1e-02, 1e-03, 1e-04)
+      
+      # get the mapped percent
+      conc_percent_bsDisp_use$MappedPercent  = 
+        map_percent_to_exponent(percent_values, 
+                                exponent_values, 
+                                conc_percent_bsDisp_use$Percent)
+      
+      # check the value range
+      # summary(
+      #   select(conc_percent_bsDisp_use, 
+      #          MappedPercent, Percent, Concentration, 
+      #          disp_conc_mean, disp_conc_down, disp_conc_up))
       
       #### Step trying to identify the trans for sec.axis
-      #numbers = 60
-      #trans.num = log(numbers + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
-      #trans.num = trans_log(numbers, log(1e-05))
-      #y.values = exp(trans.num)
-      #trans.y = log(y.values + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
-      #trans.y = trans_log(y.values, log(1e-05))
-      
-      #log(exp(log(c(1e-10, 10, 20, 50, 100) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
-      #log(exp(log(c(min(conc_percent_bsDisp_use$Percent), max(conc_percent_bsDisp_use$Percent)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)) + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05)
-      
-      
-      # Correcting any inverted values
-      inverted_rows <- conc_percent_bsDisp_use$Trans.Percent.up < conc_percent_bsDisp_use$Trans.Percent.down
-      # Swapping the values using a temporary variable
-      temp <- conc_percent_bsDisp_use$Trans.Percent.up[inverted_rows]
-      conc_percent_bsDisp_use$Trans.Percent.up[inverted_rows] <- conc_percent_bsDisp_use$Trans.Percent.down[inverted_rows]
-      conc_percent_bsDisp_use$Trans.Percent.down[inverted_rows] <- temp
-      
+
       # find the middle position of the factor/source names on x-axis
       middle_positions <- 
         conc_percent_bsDisp_use %>%
@@ -562,20 +694,11 @@ for (site.serial in site_serial_Nos) { # 1:25
                      Factor, Factor_source))
       middle_positions = merge(middle_positions, bs_map_fraction_source)
       
-      ### Mark on figure
-      # middle_positions$Factor_source_contr = 
-      #   paste0(middle_positions$Factor_source, ", ", 
-      #          "nm_contri ", middle_positions$Factor_nm_contr, ", ",
-      #          "conc_fr ", middle_positions$Factor_conc_fr)
+      ### Mark on figure, ggtext
       middle_positions$Factor_source_contr = 
         paste0(middle_positions$Factor_source, ", ", 
                "conc_fr ", middle_positions$Factor_conc_fr,
                ", BS_map ", middle_positions$BS_map_fra)
-
-      # Set the breaks
-      y_breaks = c(1, 6, 16, 41, 101)
-      trans_y_breaks = trans_log(y_breaks, log(1e-00), log(1e-05))
-      log_breaks = trans_log(exp(trans_y_breaks), log(1e-00), log(1e-05))
 
       # Create the plot
       source_profile <- 
@@ -586,12 +709,30 @@ for (site.serial in site_serial_Nos) { # 1:25
         geom_bar(aes(y = Concentration, fill = Factor_source), 
                  stat = "identity", width = 0.6, alpha = 0.8) +
         # Point plot for transformed Percent
-        geom_point(aes(y = exp(Trans.Percent)), 
-                   color = "grey25", shape = 15, size = 1) +
-        geom_errorbar(aes(ymin = exp(Trans.Percent.down), 
-                          ymax = exp(Trans.Percent.up)), 
+        geom_point(aes(y = MappedPercent, group =1), 
+                   color = "grey25", shape = 15, size = 1.5) +
+        geom_point(aes(y = disp_conc_mean), 
+                   color = "grey25", shape = 1, size = 1.5) +
+        geom_errorbar(aes(ymin = disp_conc_down, 
+                          ymax = disp_conc_up), 
                       width = 0.3, color = "grey25") +
         facet_grid(Factor ~ ., switch = "y") +
+        scale_y_continuous(
+          name = format_variable("Concentration µg/m3"),
+          breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01, 1e-00, 1e+01),
+          # "", only show the break but not text on y axis
+          labels = c(expression(10^"-5"), expression(""), 
+                     expression(10^"-3"), expression(""), 
+                     expression(10^"-1"), expression(""), expression(10^"1")),
+          sec.axis = sec_axis(
+            # set the trans the same as the main y axis
+            transform = ~., 
+            breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01, 1e+00),
+            name = "Explained Variance %",
+            labels = c(0, "", 40, "", 80, "")
+          ),
+          transform = mylog_trans(base=10, from=-5),
+          limits = c(1E-5, max(conc_percent_bsDisp$Concentration))) +
         ggtitle(paste0(paste0(disp.prefix, site.serial.factor.pre), # "\n",
                        ", Error.Code = ", disp.error.code, 
                        ", DISP.Qdrop = ", disp.qdrop, 
@@ -599,29 +740,12 @@ for (site.serial in site_serial_Nos) { # 1:25
                        "Estimated Q.true = ", Q.true,
                        ", Q.robust = ", Q.robust,
                        ", nonGUI.Qmin = ", lowest_Qm)) + 
-        scale_y_continuous(
-          name = format_variable("Concentration µg/m3"),
-          # limits = c(1e-05, max(conc_percent_bsDisp$Concentration)),
-          breaks = c(1e-05, 1e-04, 1e-03, 1e-02, 1e-01, 1e-00),
-          labels = c(expression(10^"-5"), expression(10^"-4"), 
-                     expression(10^"-3"), expression(10^"-2"), 
-                     expression(10^"-1"), expression(10^"0")), # label_scientific(),
-          sec.axis = sec_axis(
-            # trans = ~ log(. + 1) / log(100) * (log(1e-01) - log(1e-05)) + log(1e-05), # when uplimit is log(1e-01)
-            trans = ~ (log(. + 1)) / log(101) * (log(1e-01) - log(1e-05)) + log(1e-05),
-            name = "% of Species",
-            breaks = log_breaks,
-            labels = c(0, 5, 15, 40, 100)
-          ),
-          trans = mylog_trans(base=10, from=-5),
-          limits = c(1E-5, max(conc_percent_bsDisp$Concentration))
-        ) +
         scale_fill_npg() +
         xlab(format_variable("PM25 Species")) +
         ylab(format_variable("Concentration µg/m3")) +
         scale_x_discrete(labels = function(x) format_variable(x)) +
         geom_text(data = middle_positions, size = 4,
-                  aes(x = Species, y = 1e-01, label = Factor_source_contr), 
+                  aes(x = Species, y = 5e-01, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
         theme_bw() +
         theme_text_speciesName +
@@ -635,11 +759,15 @@ for (site.serial in site_serial_Nos) { # 1:25
       # source_profile
       
       
-      #### Time-series factor percent Normalize_contri #### 
+      #### Time-series concentration contribution #### 
       
       #### Daily
       # daily_plot_use = subset(ts_conc_plot, Source.No != "F")
       daily_plot_use = ts_conc_plot
+      
+      # set date break for daily & year_month figure
+      start_year <- as.Date(paste0(year(start.date), "-01-01"))  
+      end_year <- as.Date(paste0(year(end.date), "-12-31"))  
       
       # set gap in figure if no data for >15 days
       daily_plot_use <- 
@@ -659,7 +787,8 @@ for (site.serial in site_serial_Nos) { # 1:25
               summarise,
               text_y_day = quantile(Concentration, 0.997),
               text_y_mon = quantile(Concentration, 0.55),
-              text_y_yr = quantile(Concentration, 0.55))
+              text_y_yr = quantile(Concentration, 0.55),
+              text_y_yr_mon = quantile(Concentration, 0.95))
       
       middle_positions_ts = 
         merge(middle_positions, text_y_position)
@@ -674,6 +803,9 @@ for (site.serial in site_serial_Nos) { # 1:25
         facet_grid(Factor ~., scales = "free_y") +
         scale_y_continuous(limits = c(0, NA), 
                            breaks = function(x) pretty(x, n = 3)) + # y start from 0, and number of breaks, pretty function
+        scale_x_date(
+          breaks = seq(from = start_year, to = end_year, by = "6 month"),
+          date_labels = ("%Y-%m")) +
         scale_color_npg() +
         geom_text(data = middle_positions_ts, size = 4,
                   aes(x = middle_day, y = text_y_day, label = Factor_source_contr), 
@@ -681,8 +813,11 @@ for (site.serial in site_serial_Nos) { # 1:25
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
           plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
           strip.background = element_blank(), strip.text = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5),
           legend.position = "none"
         )
       
@@ -692,7 +827,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       # annual_plot_use = subset(ts_annual_conc, Source.No != "F")
       annual_plot_use = ts_annual_conc
       
-      annual_conc_plot <- 
+      year_conc_plot <- 
         #  ggplot(subset(annual_plot_use,
         #                SiteCode = unique(annual_plot_use$SiteCode)[2]), 
         ggplot(annual_plot_use,
@@ -700,7 +835,8 @@ for (site.serial in site_serial_Nos) { # 1:25
                    group = Factor_source, color = Factor_source)) +
         labs(x = "Year", y = format_variable("Concentration µg/m3")) +
         facet_grid(Factor ~., scales = "free_y") +
-        geom_line(linewidth = 0.3, alpha = 0.4)+
+        geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
+                      width = 0.15) +
         geom_point(size = 1.5, alpha = 0.8) +
         scale_x_continuous(breaks = 
                              pretty(annual_plot_use$Year, # pretty{base}
@@ -715,22 +851,19 @@ for (site.serial in site_serial_Nos) { # 1:25
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
           plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
           strip.background = element_blank(), strip.text = element_blank(),
           legend.position = "none"
         )
       
-      # annual_conc_plot
-      
+      # year_conc_plot
+         
       #### Month
       # month_plot_use = subset(ts_month_conc, Source.No != "F")
       month_plot_use = ts_month_conc
-      month_plot_use =  ddply(month_plot_use, 
-                              .(Month, Factor, Main_Species, # SiteCode, 
-                                Source_reference, Source.No, Factor_source),
-                              summarise,
-                              Concentration = median(Concentration))
-      
+
       month_conc_plot <- 
         #  ggplot(subset(month_plot_use,
         #                SiteCode = unique(month_plot_use$SiteCode)[2]), 
@@ -739,7 +872,8 @@ for (site.serial in site_serial_Nos) { # 1:25
                    group = Factor_source, color = Factor_source)) +
         labs(x = "Month", y = format_variable("Concentration µg/m3")) +
         facet_grid(Factor ~., scales = "free_y") +
-        geom_line(linewidth = 0.3, alpha = 0.4)+
+        geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
+                      width = 0.15) +
         geom_point(size = 1.5, alpha = 0.8) +
         scale_x_continuous(breaks = 
                              pretty(month_plot_use$Month, # pretty{base}
@@ -748,12 +882,14 @@ for (site.serial in site_serial_Nos) { # 1:25
         scale_y_continuous(limits = c(0, NA), 
                            breaks = function(x) pretty(x, n = 3)) + 
         geom_text(data = middle_positions_ts, size = 4,
-                  aes(x = middle_month, y = text_y_mon, label = Factor_source_contr), 
+                  aes(x = 6, y = text_y_mon, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
         scale_color_npg() +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
           plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
           strip.background = element_blank(), strip.text = element_blank(),
           legend.position = "none"
@@ -762,39 +898,13 @@ for (site.serial in site_serial_Nos) { # 1:25
       # month_conc_plot
       
       #### year_month
-      # get year & month
-      base_ts_conc_ym_conc = ts_conc_plot
-      base_ts_conc_ym_conc$Year = year(base_ts_conc_ym_conc$Date)
-      base_ts_conc_ym_conc$Month = month(base_ts_conc_ym_conc$Date)
-      # check the output
-      # select(subset(base_ts_conc_ym_conc, 
-      #               Factor == "Factor2" & Year == 2016 & Month == 2),
-      #        Date, Concentration, Year, Month, Factor_source)
-      
-      # estimate the concentration by year-month group
-      base_ts_conc_ym_conc = 
-        base_ts_conc_ym_conc %>%
-        dplyr::group_by(Factor, Year, Month) %>%
-        dplyr::summarise(
-          conc_med = quantile(Concentration, 0.5),  
-          conc_up = quantile(Concentration, 0.95), 
-          conc_down = quantile(Concentration, 0.05), 
-          # drops the grouping so the result is ungrouped
-          .groups = 'drop')
-      
-      # get the Year_Month date
-      base_ts_conc_ym_conc = 
-        base_ts_conc_ym_conc %>%
-        mutate(Year_Month = 
-                 as.Date(
-                   paste(Year, Month, "01", sep = "-")))
-      head(base_ts_conc_ym_conc)
+      base_ts_conc_ym_conc = ts_year_month_conc
       
       # plot the change
       ym_conc_plot <-
         ggplot(base_ts_conc_ym_conc, 
                aes(x = Year_Month, 
-                   y = conc_med, 
+                   y = Concentration, 
                    group = Factor, color = Factor)) + # group = 1
         geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
                       width = 0.15) +
@@ -805,12 +915,19 @@ for (site.serial in site_serial_Nos) { # 1:25
         # pretty function, y start from 0, and 3 breaks
         scale_y_continuous(limits = c(0, NA), 
                            breaks = function(x) pretty(x, n = 3)) + 
-        # Setting breaks every Month  
-        # scale_x_date(date_labels = "%Y-%m", date_breaks = "3 Month") + 
+        # Setting breaks every X months  
+        scale_x_date(
+          breaks = seq(from = start_year, to = end_year, by = "6 month"),
+          date_labels = ("%Y-%m")) +
+        geom_text(data = middle_positions_ts, size = 4,
+                  aes(x = middle_day, y = text_y_yr_mon, label = Factor_source_contr), 
+                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
         scale_color_npg() + # ggsci
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
           plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
           strip.background = element_blank(), strip.text = element_blank(),
           axis.text.x = element_text(angle = 90, vjust = 0.5),
@@ -819,6 +936,180 @@ for (site.serial in site_serial_Nos) { # 1:25
       
       # ym_conc_plot
 
+      #### Time-series Fraction contribution #### 
+      
+      # define the y position of ggtext
+      text_y_frac_position =
+        ddply(base_day_percent_plot, 
+              .(Factor),
+              summarise,
+              text_y_frac_day = quantile(Percent, 0.995),
+              text_y_frac_mon = quantile(Percent, 0.75),
+              text_y_frac_yr = quantile(Percent, 0.55),
+              text_y_frac_yr_mon = quantile(Percent, 0.95))
+      
+      middle_positions_frac_ts = 
+        merge(middle_positions_ts, text_y_frac_position)
+      
+      ## fraction time-series
+      # Daily
+      # set gap in figure if no data for >15 days
+      base_day_percent_plot <- 
+        base_day_percent_plot %>%
+        arrange(Date) %>%
+        mutate(gap = c(0, diff(as.numeric(Date))) > 15, # calculate gaps, convert Date to numeric for diff
+               group = cumsum(gap)) # Cumulative sum to create a new group after each gap
+      
+      # plot
+      daily_percent_plot <-
+        ggplot(base_day_percent_plot,
+               aes(x = Date, y = Percent,
+                   group = Factor, color = Factor)) + # group = 1
+        geom_line(aes(group = group), linewidth = 0.3, alpha = 0.6) +
+        geom_point(size = 0.7) +
+        # the preset format_variable function, for sub-/super- scripts
+        labs(x = "Date", y = format_variable("Fraction contribution %")) +
+        facet_grid(Factor ~., scales = "free_y") +
+        # pretty function, y start from 0, and 3 breaks
+        scale_y_continuous(limits = c(0, NA), 
+                           breaks = function(x) pretty(x, n = 3)) + 
+        # set breaks every X months from the start month to the end one
+        scale_x_date(
+          breaks = seq(from = start_year, to = end_year, by = "6 month"),
+          date_labels = ("%Y-%m")) +
+        geom_text(data = middle_positions_frac_ts, size = 4,
+                  aes(x = middle_day, y = text_y_frac_day, label = Factor_source_contr), 
+                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+        scale_color_npg() + 
+        theme_base() +
+        theme(
+          panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
+          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+          strip.background = element_blank(), strip.text = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5),
+          legend.position = "none"
+        )
+      # daily_percent_plot
+      
+      # annual
+      year_percent_plot <-
+        ggplot(ts_annual_fraction,
+               aes(x = Year, y = Percent,
+                   group = Factor, color = Factor)) + # group = 1
+        geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
+                      width = 0.15) +
+        geom_point(size = 1.2) +
+        # the preset format_variable function, for sub-/super- scripts
+        labs(x = "Date", y = format_variable("Fraction contribution %")) +
+        facet_grid(Factor ~., scales = "free_y") +
+        # pretty function, y start from 0, and 3 breaks
+        scale_y_continuous(limits = c(0, NA), 
+                           breaks = function(x) pretty(x, n = 3)) + 
+        scale_x_continuous(breaks = 
+                             pretty(ts_annual_fraction$Year, # pretty{base}
+                                    n = length(unique(ts_annual_fraction$Year)), 
+                                    min.n = 1)) +
+        geom_text(data = middle_positions_frac_ts, size = 4,
+                  aes(x = middle_year, y = text_y_frac_yr, label = Factor_source_contr), 
+                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+        scale_color_npg() + 
+        theme_base() +
+        theme(
+          panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
+          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+          strip.background = element_blank(), strip.text = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5),
+          legend.position = "none"
+        )
+      # year_percent_plot
+      
+      # monthly
+      month_percent_plot <-
+        ggplot(ts_month_fraction,
+               aes(x = Month, y = Percent,
+                   group = Factor, color = Factor)) + # group = 1
+        geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
+                      width = 0.15) +
+        geom_point(size = 1.2) +
+        # the preset format_variable function, for sub-/super- scripts
+        labs(x = "Date", y = format_variable("Fraction contribution %")) +
+        facet_grid(Factor ~., scales = "free_y") +
+        # pretty function, y start from 0, and 3 breaks
+        scale_y_continuous(limits = c(0, NA), 
+                           breaks = function(x) pretty(x, n = 3)) + 
+        scale_x_continuous(breaks = 
+                             pretty(ts_month_fraction$Month, # pretty{base}
+                                    n = length(unique(ts_month_fraction$Month)), 
+                                    min.n = 1)) +
+        geom_text(data = middle_positions_frac_ts, size = 4,
+                  aes(x = 6.5, y = text_y_frac_mon, label = Factor_source_contr),
+                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+        scale_color_npg() + 
+        theme_base() +
+        theme(
+          panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
+          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+          strip.background = element_blank(), strip.text = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5),
+          legend.position = "none"
+        )
+      # month_percent_plot
+      
+      # Year_Month
+      ym_percent_plot <-
+        ggplot(ts_year_month_fraction,
+               aes(x = Year_Month, y = Percent,
+                   group = Factor, color = Factor)) + # group = 1
+        geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
+                      width = 0.15) +
+        geom_point(size = 1.2) +
+        # the preset format_variable function, for sub-/super- scripts
+        labs(x = "Date", y = format_variable("Fraction contribution %")) +
+        facet_grid(Factor ~., scales = "free_y") +
+        # pretty function, y start from 0, and 3 breaks
+        scale_y_continuous(limits = c(0, NA), 
+                           breaks = function(x) pretty(x, n = 3)) + 
+        # set breaks every X months from the start month to the end one
+        scale_x_date(
+          breaks = seq(from = start_year, to = end_year, by = "6 month"),
+          date_labels = ("%Y-%m")) +
+        geom_text(data = middle_positions_frac_ts, size = 4,
+                  aes(x = middle_day, y = text_y_frac_yr_mon, label = Factor_source_contr), 
+                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+        scale_color_npg() + # ggsci
+        theme_base() +
+        theme(
+          panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
+          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+          strip.background = element_blank(), strip.text = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5),
+          legend.position = "none"
+        )
+      # ym_percent_plot
+
+      #### combine concentration & fraction plot ####
+      # combine two figures into one with grid.arrange{gridExtra}
+      
+      daily_ts_plot <- 
+        grid.arrange(daily_conc_plot, daily_percent_plot, ncol = 2)
+
+      month_ts_plot <- 
+        grid.arrange(month_conc_plot, month_percent_plot, ncol = 2)
+
+      year_ts_plot <- 
+        grid.arrange(year_conc_plot, year_percent_plot, ncol = 2)
+
+      ym_ts_plot <- 
+        grid.arrange(ym_conc_plot, ym_percent_plot, ncol = 2)
+      
       #### Overall factor percent Normalize_contri #### 
       # lm_beta_plot_use = subset(lm_beta_plot, Source.No != "F")
       lm_beta_plot_use = lm_beta_plot
@@ -836,36 +1127,7 @@ for (site.serial in site_serial_Nos) { # 1:25
       colnames(lm_beta_conc_fr)[3:4] = colnames(lm_beta_nm_contri)[3:4]
       contri_fraction = rbind(lm_beta_conc_fr, lm_beta_nm_contri)
       
-      ### fraction contribution estimated based on lm and concentration contribution
-      # overall_contri_2df <-
-      #   ggplot(contri_fraction, 
-      #          aes(x = Factor, y = Factor.contribution)) +
-      #   facet_grid(Fraction_data ~. , 
-      #              switch = "y", scales = "free_y") + 
-      #   geom_bar_pattern(aes(fill = Factor),
-      #                    stat = "identity",
-      #                    pattern_color = "white",
-      #                    pattern_fill = "white",
-      #                    # alpha = 0.8,
-      #                    width = 0.3)  +
-      #   geom_text(aes(label = paste(Factor_source, Factor.contr)), 
-      #             size = 6, angle = 90, hjust = 0, vjust = -3,
-      #             position = position_stack(vjust = 0)) + # start from same bottom level
-      #   scale_fill_npg() +
-      #   scale_y_continuous(position = "right") +
-      #   # labs(y = "Fraction (%)") +
-      #   theme_bw() +
-      #   theme(panel.grid.major.x = element_line(colour="grey60", linetype="dashed"),
-      #         panel.grid.minor.x = element_blank(),
-      #         panel.grid.major.y = element_blank(),
-      #         strip.background = element_blank(), 
-      #         strip.text = element_text(size = 20),
-      #         legend.position = "none",
-      #         axis.text.x = element_text(color="grey25", size = 16, angle = 90, hjust = 0.5, vjust = 0.5), 
-      #         axis.text.y = element_text(color="grey25", size = 16, angle = 90, hjust = 5, vjust = -0.5),
-      #         axis.title.x = element_text(color="grey25", size = 22, angle = 180, hjust = 0.5),
-      #         axis.title.y = element_text(color = "grey25", size = 0, angle = 27, vjust = 3, hjust = 1.1))
-      
+      ### fraction contribution estimated based on concentration contribution
       overall_contri <-
         ggplot(lm_beta_plot_use, 
                aes(x = Factor, y = Fractrion_conc_based)) +
@@ -884,6 +1146,8 @@ for (site.serial in site_serial_Nos) { # 1:25
         theme(panel.grid.major.x = element_line(colour="grey60", linetype="dashed"),
               panel.grid.minor.x = element_blank(),
               panel.grid.major.y = element_blank(),
+              # remove the backgroup line
+              plot.background = element_rect(color = NA),
               legend.position = "none",
               axis.text.x = element_text(color="grey25", size = 16, angle = 90, hjust = 0.5, vjust = 0.5), 
               axis.text.y = element_text(color="grey25", size = 16, angle = 90, hjust = 5, vjust = -0.5),
@@ -1057,6 +1321,8 @@ for (site.serial in site_serial_Nos) { # 1:25
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
+          # remove the backgroup line
+          plot.background = element_rect(color = NA),
           plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
           strip.background = element_blank(), strip.text = element_blank(),
           legend.position = c(0.9, 0.02), legend.background = element_blank(),
@@ -1092,58 +1358,62 @@ for (site.serial in site_serial_Nos) { # 1:25
       labs(x = format_variable("Observations µg/m3"), 
            y = format_variable("PMF_Predictions µg/m3")) +
       theme_base() +
-      theme(strip.background = element_blank(), strip.text = element_blank(),
-            axis.text.x = element_text(angle = 90, hjust = 0.5, size = 12),
-            axis.text.y = element_text(size = 12))
+      theme(
+        # remove the backgroup line
+        plot.background = element_rect(color = NA),
+        strip.background = element_blank(), strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90, hjust = 0.5, size = 12),
+        axis.text.y = element_text(size = 12))
+    
     # species_pred_vs_obs_plot
     
       ####### Daily Source-specific PM2.5 - prediction vs. observation #######
       
-      # calculate correlation for each Factor_source
-      corr_labels_site_PM <- 
-        base_ts_conc_long_plot %>%
-        group_by(Factor_source) %>%
-        nest() %>%
-        dplyr::mutate(
-          label = 
-            map_chr(data, 
-                    ~calculate_corr_label(
-                      .x, 
-                      "PM2.5", 
-                      "Concentration"))) %>%
-        select(-data)
-      
-      corr_labels_site_PM = 
-        subset(corr_labels_site_PM,
-               !(grepl("Factor", Factor_source, fixed = T)))
-      
-      base_ts_conc_long_plot = 
-        merge(base_ts_conc_long_plot, corr_labels_site_PM)
-      
-      PM_source_daily<-
-        ggplot(base_ts_conc_long_plot,
-               aes(x = PM2.5,
-                   y = Concentration)) +
-        geom_point() +
-        geom_abline(slope=1, intercept=0, color = "red") +
-        facet_wrap(~ Factor_source, ncol = 3) +
-        geom_text(aes(label = label), 
-                  x = Inf, y = Inf, 
-                  hjust = 2, vjust = 2, 
-                  check_overlap = TRUE) +
-        # labs(x = "Percent Contribution  %", y = "Count") +
-        labs(x = format_variable("Daily PM25 µg/m3"), 
-             y = format_variable("Concentration µg/m3")) +
-        theme_bw() +
-        theme(legend.position = "none",
-              strip.background = element_blank(), 
-              strip.text = element_text(color="grey25", size = 15, vjust=0), # facet title
-              axis.title.x = element_text(color="grey25", size = 18, vjust=0, family = "Arial Unicode MS"), 
-              axis.title.y = element_text(color="grey25", size = 18, vjust=1, family = "Arial Unicode MS"),
-              plot.margin = unit(c(2,1,2, 2), "lines"),
-              axis.text.x = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5, vjust = 0.5), 
-              axis.text.y = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5))
-      # PM_source_daily
+      # # calculate correlation for each Factor_source
+      # corr_labels_site_PM <- 
+      #   base_ts_conc_long_plot %>%
+      #   group_by(Factor_source) %>%
+      #   nest() %>%
+      #   dplyr::mutate(
+      #     label = 
+      #       map_chr(data, 
+      #               ~calculate_corr_label(
+      #                 .x, 
+      #                 "PM2.5", 
+      #                 "Concentration"))) %>%
+      #   select(-data)
+      # 
+      # corr_labels_site_PM = 
+      #   subset(corr_labels_site_PM,
+      #          !(grepl("Factor", Factor_source, fixed = T)))
+      # 
+      # base_ts_conc_long_plot = 
+      #   merge(base_ts_conc_long_plot, corr_labels_site_PM)
+      # 
+      # PM_source_daily<-
+      #   ggplot(base_ts_conc_long_plot,
+      #          aes(x = PM2.5,
+      #              y = Concentration)) +
+      #   geom_point() +
+      #   geom_abline(slope=1, intercept=0, color = "red") +
+      #   facet_wrap(~ Factor_source, ncol = 3) +
+      #   geom_text(aes(label = label), 
+      #             x = Inf, y = Inf, 
+      #             hjust = 2, vjust = 2, 
+      #             check_overlap = TRUE) +
+      #   # labs(x = "Percent Contribution  %", y = "Count") +
+      #   labs(x = format_variable("Daily PM25 µg/m3"), 
+      #        y = format_variable("Concentration µg/m3")) +
+      #   theme_bw() +
+      #   theme(legend.position = "none",
+      #         strip.background = element_blank(), 
+      #         strip.text = element_text(color="grey25", size = 15, vjust=0), # facet title
+      #         axis.title.x = element_text(color="grey25", size = 18, vjust=0, family = "Arial Unicode MS"), 
+      #         axis.title.y = element_text(color="grey25", size = 18, vjust=1, family = "Arial Unicode MS"),
+      #         plot.margin = unit(c(2,1,2, 2), "lines"),
+      #         axis.text.x = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5, vjust = 0.5), 
+      #         axis.text.y = element_text(color="grey25", size = 15, angle = 0, hjust = 0.5))
+      # # PM_source_daily
       
       ####### Daily & species-specific scaled residuals #######
       
@@ -1185,6 +1455,7 @@ for (site.serial in site_serial_Nos) { # 1:25
         coord_cartesian(ylim = c(0, 50)) + # ylim(0, 50) +
         ggtitle("Zoom-in Scale")
       
+      # combine two figures into one with plot_layout{patchwork}
       all_species_residual_plot <- 
         all_species_residual + 
         all_species_residual_zoom + 
@@ -1277,13 +1548,13 @@ for (site.serial in site_serial_Nos) { # 1:25
       write.csv(pred_obs_compare_summary, paste0(data.prefix, "PMF_vs_obs.csv"))
       
       ####### Output files #######
-      
-      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_conc_plot, width = 4.8, height = 6)
-      ggsave(paste0(name.prefix, "month.pdf"), plot = month_conc_plot, width = 4.8, height = 6)
-      ggsave(paste0(name.prefix, "annual.pdf"), plot = annual_conc_plot, width = 4.8, height = 6)
-      ggsave(paste0(data.pre, factor.no, "_year_month_conc.pdf"), plot = ym_conc_plot, width = 4.8, height = 6)
+
+      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_ts_plot, width = 13, height = 8)
+      ggsave(paste0(name.prefix, "month.pdf"), plot = month_ts_plot, width = 11, height = 7)
+      ggsave(paste0(name.prefix, "annual.pdf"), plot = year_ts_plot, width = 11, height = 7)
+      ggsave(paste0(name.prefix, "_year_month.pdf"), plot = ym_ts_plot, width = 13, height = 8)
       ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri, width = 9, height = 5)
-      ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
+      # ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
       ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 5.8, height = 6, 
              device = cairo_pdf) # device = cairo_pdf, save the special fonts (super-/sub- script) in pdf
       ggsave(paste0(name.prefix, "Q_Qexp.pdf"), plot = Q_Qexp_plot, width = 9, height = 5, 
@@ -1292,23 +1563,38 @@ for (site.serial in site_serial_Nos) { # 1:25
       ggsave(paste0(name.prefix, "obs_pred_ts.pdf"), plot = pred_obs_species_conc_plot, width = 14.5, height = 9)
       ggsave(paste0(name.prefix, "obs_vs_pred.pdf"), plot = species_pred_vs_obs_plot, width = 9, height = 9)
       
+      
+      #### prepare data outputs
       conc_percent_bsDisp_output = conc_percent_bsDisp
-      ts_conc_plot_output = ts_conc_plot
       lm_beta_plot_output = lm_beta_plot
-      lm_beta_plot_output
+      # lm_beta_plot_output
       
-      conc_percent_bsDisp_output$site.serial = ts_conc_plot_output$site.serial = lm_beta_plot_output$site.serial = site.serial
-      conc_percent_bsDisp_output$Factor.No = ts_conc_plot_output$Factor.No = lm_beta_plot_output$Factor.No = factor.No
+      ### merge concentration & percent data of different temporal scales
+      ts_daily_output = merge(ts_conc_plot, base_day_percent_plot)
+      ts_daily_output$group = ts_daily_output$gap = NULL
+      # dim(ts_conc_plot); dim(base_day_percent_plot); dim(ts_daily_output)
       
-      ts_annual_conc$site.serial = ts_month_conc$site.serial = site.serial
-      ts_annual_conc$Factor.No = ts_month_conc$Factor.No = factor.No
+      ts_annual_output = merge(ts_annual_conc, ts_annual_fraction)
+      # dim(ts_annual_conc); dim(ts_annual_fraction); dim(ts_annual_output)
+      ts_month_output = merge(ts_month_conc, ts_month_fraction)
+      # dim(ts_month_conc); dim(ts_month_fraction); dim(ts_month_output)
       
-      write.csv(conc_percent_bsDisp_output, paste0(name.prefix, "source_profile.csv"))
-      write.csv(ts_conc_plot_output, paste0(name.prefix, "daily.csv"))
-      write.csv(ts_annual_conc, paste0(name.prefix, "annual.csv"))
-      write.csv(ts_month_conc, paste0(name.prefix, "month.csv"))
+      ### add site.serial & factor.No info
+      conc_percent_bsDisp_output$site.serial = lm_beta_plot_output$site.serial = 
+        ts_daily_output$site.serial = ts_annual_output$site.serial = 
+        ts_month_output$site.serial = site.serial
+      conc_percent_bsDisp_output$Factor.No = lm_beta_plot_output$Factor.No = 
+        ts_daily_output$Factor.No = ts_annual_output$Factor.No = 
+        ts_month_output$Factor.No = factor.No
+      
+      # output csv files
       write.csv(lm_beta_plot_output, paste0(name.prefix, "overall.csv"))
-      
+      write.csv(conc_percent_bsDisp_output, paste0(name.prefix, "source_profile.csv"))
+
+      write.csv(ts_daily_output, paste0(name.prefix, "daily.csv"))
+      write.csv(ts_annual_output, paste0(name.prefix, "annual.csv"))
+      write.csv(ts_month_output, paste0(name.prefix, "month.csv"))
+
       write.csv(daily_species_scale_residual, paste0(name.prefix, "species_residual.csv"))
       write.csv(daily_Q_Qexp, paste0(name.prefix, "daily_Q_Qexp.csv"))
       write.csv(species_Q_Qexp, paste0(name.prefix, "species_Q_Qexp.csv"))
