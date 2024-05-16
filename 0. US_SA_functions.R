@@ -318,7 +318,7 @@ weak_species = function(cluster_info, start.species, end.species) {
 }
 
 
-####### for bar start from a value less than 0 ####### 
+####### Force the bar to start from a given value ####### 
 # https://stackoverflow.com/questions/22295253/force-bars-to-start-from-a-lower-value-than-0-in-ggplot-geom-bar-in-r
 require(scales)
 mylog_trans <- function(base=exp(1), from=0) {
@@ -328,6 +328,19 @@ mylog_trans <- function(base=exp(1), from=0) {
             domain = c(base^from, Inf))
 }
 
+####### Define the function to map percent (0-100) to exponent values of a given range  ####### 
+map_percent_to_exponent <- 
+  function(percent_values, exponent_values, percent_to_convert) {
+    # Interpolate in log10 scale for precise control over exponential mapping
+    log_exponent <- 
+      approx(percent_values, 
+             log10(exponent_values), 
+             xout = percent_to_convert, 
+             rule = 2)$y
+    convert_percent <- 10^log_exponent
+    
+    return(convert_percent)
+  }
 
 ####### Source Assignment based on source-specific N characteried species from reference ####### 
 
@@ -711,13 +724,13 @@ time_series = function(base_ts, site_date, factor.No){
 conc_percent_contri = function(conc_contribution){
   
   # get the percent contribution
-  all_species = data.frame(Species = conc_contribution$Species)
+  all_rows = data.frame(Rows = conc_contribution[, 1])
   percent_value = 
     signif(
       conc_contribution[, -1] *100 / 
         rowSums(conc_contribution[, -1]), 
       2)
-  percent_contribution = cbind(all_species, 
+  percent_contribution = cbind(all_rows, 
                                percent_value)
   
   return(percent_contribution)
