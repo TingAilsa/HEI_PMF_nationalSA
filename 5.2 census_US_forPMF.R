@@ -9,7 +9,7 @@ data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/US_census"
 library(data.table)
 library(readr)
 
-##### Combine & get the industry txt #######
+##### Combine & get the industry txt - 1, no real info, ABANDON #######
 # Define the path to your industry_folder containing txt files
 industry_folder <- "/Users/TingZhang/Documents/HEI HAQ PMF/US_census/county_industry"
 
@@ -32,6 +32,16 @@ write_csv(as.data.frame(combined_dt), file.path(industry_folder, "US_industry_20
 
 combined_use = select(combined_dt, fipstate, fipscty, naics, EMP)
 combined_use_noNA = na.omit(combined_use)
+
+##### Combine & get the industry - 2 #######
+# EPA Toxics Release Inventory (TRI) Program Basic Data Files
+# https://www.epa.gov/toxics-release-inventory-tri-program/tri-basic-data-files-calendar-years-1987-present
+
+# Industry classification according to North American Industry Classification System (NAICS)
+# https://www.census.gov/naics/?58967?yearbck=2012
+
+tri_file_folder = "/Users/TingZhang/Documents/HEI HAQ PMF/US_census/EPA_TRI_industry"
+
 
 
 ##### traffic #######
