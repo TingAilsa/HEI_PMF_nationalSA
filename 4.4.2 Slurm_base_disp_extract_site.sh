@@ -12,7 +12,6 @@
 #SBATCH --mail-type=BEGIN,END,FAIL # ALL,NONE,BEGIN,END,FAIL,REQUEUE,..
 #SBATCH --mail-user=tzhang23@gmu.edu
 
-
 # Path to the original directory containing the Cluster folders
 original_path="/projects/HAQ_LAB/tzhang/pmf_no_gui/CSN_15t1mdl0unc_site"
 
