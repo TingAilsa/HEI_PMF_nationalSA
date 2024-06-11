@@ -705,6 +705,8 @@ species_source_groups =
        resuspend_dust = c("Ba", "Br", "Pb", "Ti", "Fe"),
        construction = c("Ca", "Mg", "CaIon", "MgIon"), # Peilin Chen_2023, or only Ca, Liu_2017_EP_PMF
        fugtive_dust = c("Ti", "K", "KIon"), # Kotchenruther_2016_AE
+       # High Ca/Al ratio was a good marker for urban fugitive dust from Asian dust (Sun_2019_STE).
+       # fugitive dust in agricultural production is mainly soil dust particles, agricultural harvesting machinery (Liu_2022_Agriculture)
        sec_nitrate = c("NH4Ion", "NO3Ion"),
        sulfate = c("NH4Ion", "SO4Ion"),
        fresh_sea_salt = c("NaIon", "ClIon", "Na", "Cl", "Sr", "Br"), #Louie_2005_STE, Hadley_2017_AE
@@ -714,10 +716,12 @@ species_source_groups =
        non_ferros_metal = c("Cu", "Cr", "Ni", "Pb"), # Yang_2023_Atmosphere
        biomass = c("OC", "K", "KIon", "Br", "Cl", "ClIon", "S", "SO4Ion"), # Singh_2022_AAQR OC/EC ratio, Masiol_2017_AE
        heavy_oil = c("Ni", "V"), # Ni:V ratio, Kotchenruther_2013_AE_PM, SPECIATE, Hadley_2017_AE
-       coal_burn = c("S", "SO4Ion", "EC", "OC", "As", "Se", "Pb", "Cl", "ClIon"), # Xie_2022_EP
+       coal_burn = c("S", "SO4Ion", "EC", "OC", "As", "Se", "Pb", "Cd", "Sb", "Cl", "ClIon"), # Xie_2022_EP, Tao_2017_STE
        firework = c("K", "Pb", "Cu", "Sr", "As", "Ba", "Na", "KIon", "NaIon", "Mg", "MgIon", "OC", "EC", "NO3Ion", "SO4Ion"), # Phil, slides, natural relationships
        non_tailpipe = c("Fe", "Cu", "Zn", "Pb", "Mn", "Ba", "Sb", "Al", "Cr"), # Hasheminassab_2014_ACP, also , EC/OC gas/diesel; Nanjing_Zheng_2019; Park_STOTEN_2022_Beijing-Seoul
-       vehicle = c("OC", "EC", "Fe", "Zn", "NO3Ion"), # Dai_2023_EP, Nanjing_Zheng_2019
+       vehicle = c("OC", "EC", "Fe", "Zn", "NO3Ion"), # Dai_2023_EP, Nanjing_Zheng_2019;  Wong_2020_ACP, OC/EC ratios, diesel vehicles (high NOx) are 0.5, gasoline vehicles are 1.8–2.2
+       airport = c("OC", "Ca", "Al", "Fe", "CaIon", "FeIon", "EC", "Mg", "MgIon"), #Yin_2024_STE, PNC airport China, OC/EC 2.5–3.5.
+       lubricating_oils =c("Fe", "Cu", "Zn"), # Sahu_2011_STE
        heavy_metal_g1 = c("As", "Cu", "Pb", "Co"), # https://www.britannica.com/science
        heavy_metal_g2 = c("Ce", "Cu", "Pb"), 
        heavy_metal_g3 = c("Cs", "Al", "Si", "Rb"), 
