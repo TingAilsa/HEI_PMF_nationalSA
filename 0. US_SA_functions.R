@@ -18,7 +18,18 @@ format_variable <- function(variable) {
   variable <- gsub("PM25", "PM\u2082.\u2085", variable)
   variable <- gsub("PM2.5", "PM\u2082.\u2085", variable)
   variable <- gsub("m3", "m\u00B3", variable)
+  variable <- gsub("r2", "r\u00B2", variable)
+  variable <- gsub("R2", "R\u00B2", variable)
   return(variable)
+}
+
+# add a break in the text (the next line)
+addline_space <- function(x,...){
+  gsub('\\s','\n',x)
+}
+
+addline_underline <- function(x,...){
+  gsub('_','\n',x)
 }
 
 # theme setting for the super or sub scripts in format_variable
@@ -99,14 +110,14 @@ site_color = function(date_site_pair) {
 }
 
 # pairs plot 1, correlation calculation
-panel.corr <- function(x, y, ...){
-  usr <- par("usr"); on.exit(par(usr))
-  par(usr = c(0, 1, 0, 1))
-  r <- round(cor(x, y), digits=2)
-  txt <- paste0("R = ", r)
-  cex.cor <- 5/strwidth(txt)
-  text(0.5, 0.5, txt, cex = cex.cor * abs(r))
-}
+# panel.corr <- function(x, y, ...){
+#   usr <- par("usr"); on.exit(par(usr))
+#   par(usr = c(0, 1, 0, 1))
+#   r <- round(cor(x, y), digits=2)
+#   txt <- paste0("R = ", r)
+#   cex.cor <- 5/strwidth(txt)
+#   text(0.5, 0.5, txt, cex = cex.cor * abs(r))
+# }
 
 panel.corr <- function(x, y, ...){
   usr <- par("usr"); on.exit(par(usr))
@@ -1166,6 +1177,12 @@ source_time_periods <- function(df, time_col) {
 ############ 4. DATA MANAGEMENT ############ 
 ##########################################################################################
 
+#### rmse  ####
+
+rmse <- function(actual, predicted) {
+  sqrt(mean((predicted - actual) ^ 2))
+}
+
 #### median that exists in the dataset  ####
 
 custom_median <- function(x) {
@@ -1260,11 +1277,19 @@ trans_log <- function(value, log_max, log_min) {
 
 
 ####  Perform linear regression and return the slope #### 
-get_slope <- function(df, x, y) {
+get_slope_lm <- function(df, x, y) {
   formula <- as.formula(paste(y, "~", x))
-  model <- lm(formula, data = df)
-  slope <- coef(model)[x]
-  return(slope)
+  model_lm <- lm(formula, data = df)
+  slope_lm <- coef(model_lm)[x]
+  return(slope_lm)
+}
+
+####  Perform Thiel-Sen regression and return the slope #### 
+get_slope_ts <- function(df, x, y) {
+  formula <- as.formula(paste(y, "~", x))
+  model_ts <- theilsen(formula, data = df)
+  slope_ts <- coef(model_ts)[x]
+  return(slope_ts)
 }
 
 #### Reorder columns for datasets with PM2.5 and species  ####
