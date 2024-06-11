@@ -31,8 +31,8 @@ library(gridExtra)
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_25TimesMean/base_DISPres1/")
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_25TimesMean/base_DISP_BS_sum/"
 
-site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -49,8 +49,8 @@ csv.suffix = "_CMD.csv"
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/")
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISP_BS_sum/"
 
-site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -67,8 +67,8 @@ csv.suffix = "_CMD.csv"
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISPres1/")
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISP_BS_sum/"
 
-site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -85,8 +85,8 @@ csv.suffix = "_CMD.csv"
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISPres1/")
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISP_BS_sum/"
 
-site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -103,8 +103,8 @@ csv.suffix = "_CMD.csv"
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc_DN/base_DISPres1/")
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc_DN/base_DISP_BS_sum/"
 
-site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -127,7 +127,7 @@ site_info_all = plyr::rename(
     "SO4" = "SO4Ion",
     "PM25" = "PM2.5"))
 
-source_cmd_pm = paste0("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
+source_cmd_pm = paste0("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
                         noCsub_noExtreme)
 
 ########## single site list defination
@@ -166,8 +166,12 @@ correl_r_p_summary = NULL
 summary_base = NULL
 pred_obs_compare_summary = NULL
 
-for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9]
-  for (factor.No in 3:11) { # 5:11, # factor.No = 8
+for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3]
+  for (factor.No in 3:11) { # 5:11, # factor.No = 11
+    
+    # site.serial = site_serial_Nos[131]
+    # site.serial
+    # factor.No = 8
     
     # site.serial.factor.pre = paste0("C_", site.serial, "_F_", factor.No, "_")
     site.serial.factor.pre = paste0("S_", site.serial, "_F_", factor.No, "_")
@@ -195,6 +199,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9
                                      "base_PMFreport.txt"))
       
       # Bootstrap mapping rate
+      ## some sites, the BS results are not complete
       bs_map_fra = bs_map(bs_output, 50, factor.No, 0.6) # 0.6 is the threshold or r
       bs_map_fraction = bs_map_fra$percent_less_than_0_6
       bs_overall_map = bs_map_fra$BS_overall
@@ -1207,7 +1212,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9
       dev.off()
       
       
-      ####### Daily Specific-specific concentration - prediction vs. observation #######
+      ####### Daily time-series source concentration - prediction vs. observation #######
       
       predict_daily_species_conc$Date = site_date_PM_species_conc$Date
       predict_daily_species_conc = 
@@ -1543,6 +1548,10 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9
       
       summary_base = rbind(summary_base, base_oneFactor[1, ])
       
+      # write.csv(summary_base, paste0(data.prefix, "base_DISP_summary_supp_2.csv"))
+      # write.csv(correl_r_p_summary, paste0(data.prefix, "base_factor_correlation_supp_2.csv"))
+      # write.csv(pred_obs_compare_summary, paste0(data.prefix, "PMF_vs_obs_supp_2.csv"))
+
       write.csv(summary_base, paste0(data.prefix, "base_DISP_summary.csv"))
       write.csv(correl_r_p_summary, paste0(data.prefix, "base_factor_correlation.csv"))
       write.csv(pred_obs_compare_summary, paste0(data.prefix, "PMF_vs_obs.csv"))
@@ -1555,9 +1564,9 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9
       ggsave(paste0(name.prefix, "_year_month.pdf"), plot = ym_ts_plot, width = 13, height = 8)
       ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri, width = 9, height = 5)
       # ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
-      ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 5.8, height = 6, 
+      ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 5.8, height = 6,
              device = cairo_pdf) # device = cairo_pdf, save the special fonts (super-/sub- script) in pdf
-      ggsave(paste0(name.prefix, "Q_Qexp.pdf"), plot = Q_Qexp_plot, width = 9, height = 5, 
+      ggsave(paste0(name.prefix, "Q_Qexp.pdf"), plot = Q_Qexp_plot, width = 9, height = 5,
              device = cairo_pdf) # download xquartz for use of device = cairo_pdf.
       ggsave(paste0(name.prefix, "species_residual.pdf"), plot = all_species_residual_plot, width = 14.5, height = 9)
       ggsave(paste0(name.prefix, "obs_pred_ts.pdf"), plot = pred_obs_species_conc_plot, width = 14.5, height = 9)
@@ -1576,16 +1585,18 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9
       
       ts_annual_output = merge(ts_annual_conc, ts_annual_fraction)
       # dim(ts_annual_conc); dim(ts_annual_fraction); dim(ts_annual_output)
-      ts_month_output = merge(ts_month_conc, ts_month_fraction)
+      ts_year_month_output = merge(ts_year_month_conc, ts_year_month_fraction)
       # dim(ts_month_conc); dim(ts_month_fraction); dim(ts_month_output)
+      ts_year_month_output$Year = year(ts_year_month_output$Year_Month)
+      ts_year_month_output$Month = month(ts_year_month_output$Year_Month)
       
       ### add site.serial & factor.No info
       conc_percent_bsDisp_output$site.serial = lm_beta_plot_output$site.serial = 
         ts_daily_output$site.serial = ts_annual_output$site.serial = 
-        ts_month_output$site.serial = site.serial
+        ts_year_month_output$site.serial = site.serial
       conc_percent_bsDisp_output$Factor.No = lm_beta_plot_output$Factor.No = 
         ts_daily_output$Factor.No = ts_annual_output$Factor.No = 
-        ts_month_output$Factor.No = factor.No
+        ts_year_month_output$Factor.No = factor.No
       
       # output csv files
       write.csv(lm_beta_plot_output, paste0(name.prefix, "overall.csv"))
@@ -1593,7 +1604,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[9
 
       write.csv(ts_daily_output, paste0(name.prefix, "daily.csv"))
       write.csv(ts_annual_output, paste0(name.prefix, "annual.csv"))
-      write.csv(ts_month_output, paste0(name.prefix, "month.csv"))
+      write.csv(ts_year_month_output, paste0(name.prefix, "month.csv"))
 
       write.csv(daily_species_scale_residual, paste0(name.prefix, "species_residual.csv"))
       write.csv(daily_Q_Qexp, paste0(name.prefix, "daily_Q_Qexp.csv"))
@@ -1644,7 +1655,7 @@ for (site.serial in site_serial_Nos) { # 1:25
 
 #### merge with site geographic info ####
 
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/")
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/")
 getwd()
 
 # 15timesMean
@@ -1652,7 +1663,7 @@ getwd()
 # PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
 
 # 15t1mdl0unc
-site_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
 PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISPres1/CSN_noCsub_15t1mdl0unc_base_DISP_summary.csv")
 
 # geographic info
@@ -1660,8 +1671,8 @@ site_geo = read.csv("CSN_IMPROVE_ownPC/CSN_site_info.csv")
 site_geoid = read.csv("CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_cluster_traffic = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/County_cluster_traffic_info.csv")
 
-# site serial
-site_code_serial = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
+# site serial 
+site_code_serial = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
 site_code_serial$V1 = NULL
 site_serial_info = subset(site_code_serial,
                           serial.No %in% site_info_all$serial.No)
