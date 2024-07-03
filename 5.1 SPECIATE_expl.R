@@ -86,41 +86,6 @@ profile.included = unique(pm_csn_speciate$PROFILE_NAME)
 length(profile.included)
 
 #### Plot theme & function for font of ions ####
-# function to format ion variables
-# \u208+#, subscript#; \u00B+#, superscript#; \u207A, \u207B, superscript +/-
-
-# Here name the ions with "Ion" instead of adding symbols inside cause this cause confusion for gsub
-format_variable <- function(variable) {
-  variable <- gsub("ClIon", "Cl\u207B", variable)
-  variable <- gsub("NO3Ion", "NO\u2083\u207B", variable)
-  variable <- gsub("SO4Ion", "SO\u2084\u00B2\u207B", variable)
-  variable <- gsub("CO3Ion", "CO\u2083\u00B2\u207B", variable)
-  variable <- gsub("NH4Ion", "NH\u2084\u207A", variable)
-  variable <- gsub("NaIon", "Na\u207A", variable)
-  variable <- gsub("KIon", "K\u207A", variable)
-  variable <- gsub("PM25", "PM\u2082.\u2085", variable)
-  variable <- gsub("m3", "µm\u00B3", variable)
-  return(variable)
-}
-
-# test the function
-variable = c("ClIon", "NO3Ion", "SO4Ion", "CO3Ion", "NH4Ion", 
-             "NaIon", "KIon", "Cl", "Na", "K")
-format_variable(variable)
-
-# format_variable <- function(variable) {
-#   variable <- gsub("Cl-", "Cl\u207B", variable)
-#   variable <- gsub("NO3-", "NO\u2083\u207B", variable)
-#   variable <- gsub("SO4(2-)", "SO\u2084\u00B2\u207B", variable)
-#   variable <- gsub("CO3(2-)", "CO\u2083\u00B2\u207B", variable)
-#   variable <- gsub("NH4+", "NH\u2084\u207A", variable)
-#   variable <- gsub("Na+", "Na\u207A", variable)
-#   variable <- gsub("K+", "K\u207A", variable)
-#   return(variable)
-# }
-# variable = c("Cl-", "NO3-", "SO4(2-)", "CO3(2-)", "NH4+", "Na+", "K+", "Cl", "Na", "K")
-# format_variable(variable)
-
 
 # to display the super-/sub-scripts in figure, need to define the fonts that support the Unicode
 # for example, theme(axis.text.x = element_text(family = "Arial Unicode MS"))
