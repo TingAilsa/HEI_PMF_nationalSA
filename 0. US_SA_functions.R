@@ -178,6 +178,38 @@ panel.scatter <- function(x, y, ...){
                          alpha.f=point_alpha))
 }
 
+##### set colors for different sources
+# jco, tron, startrek, rickandmorty, futurama, 
+# show color in different palette in ggsci to chose the eight color for sources  
+library(ggsci)
+
+color_npg = pal_npg()(10)
+show_col(pal_npg()(10))
+pal_npg()(10)
+show_col(pal_jco()(10))
+pal_jco()(10)
+show_col(pal_tron()(7))
+pal_tron()(7)
+show_col(pal_startrek()(7))
+pal_startrek()(7)
+show_col(pal_rickandmorty()(12))
+pal_rickandmorty()(12)
+show_col(pal_futurama()(12))
+pal_futurama()(12)
+show_col(pal_flatui()(10))
+pal_flatui()(10)
+
+color_source = c(
+  "F1-Traffic" = "#C71000FF",         # red 
+  "F2-Secondary Nitrate" = "#0073C2FF", # blue
+  "F3-Secondary Sulfate" = "#16A085FF", # green 16A085FF 00A087FF
+  "F4-Non-tailpipe" = "#F7C530FF",     # yellow FAFD7CFF F7C530FF
+  "F5-Industry" = "#E89242FF",         # orange
+  "F6-Salt" = "#00B5E2FF",             # cyan 6EE2FFFF  84D7E1FF  00B5E2FF
+  "F7-Biomass" = "#8A4198FF",          # purple #8A4198FF violetred
+  "F8-Soil/Dust" = "grey40"         # Gray, brown
+)
+
 
 #### arrange the position of multiple plots ####
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
@@ -220,6 +252,18 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 ##########################################################################################
 ############ 2. DATA PROCESS ############ 
 ##########################################################################################
+
+####  read info from title and add it into csv file  ####
+title_info_column <- 
+  function(file_path, extract_pattern) {
+  # Extract the serial number using regex
+  title_info <- str_extract(basename(file_path), extract_pattern)
+  # Read the CSV file
+  data <- fread(file_path)
+  # Add the serial number as a new column
+  data[, title_col := title_info]
+  return(data)
+}
 
 #### Identify columns with PM2.5 species and PM2.5 ####
 
