@@ -750,7 +750,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         ylab(format_variable("Concentration µg/m3")) +
         scale_x_discrete(labels = function(x) format_variable(x)) +
         geom_text(data = middle_positions, size = 4,
-                  aes(x = Species, y = 5e-01, label = Factor_source_contr), 
+                  aes(x = Species, y = 2e-01, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
         theme_bw() +
         theme_text_speciesName +
@@ -1243,10 +1243,6 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       # summary(predict_daily_species_long$Species == obs_daily_species_long$Species)
       
       ### RMSE estimation
-      
-      rmse <- function(actual, predicted) {
-        sqrt(mean((predicted - actual) ^ 2))
-      }
       
       pred_obs_species_wide =
         cbind(select(predict_daily_species_long, -Data), 
