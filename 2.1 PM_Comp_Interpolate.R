@@ -6,9 +6,9 @@
 # getwd()
 # data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
 
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
 getwd()
-data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
+data.dir <- "/Users/TingZhangDropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
 
 ##packages in need
 library(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
@@ -358,7 +358,7 @@ for (i in 1:n.site){
   # site_single_no_NA$PM25 = NA
   # site_single_no_NA = 
   #   relocate(site_single_no_NA, PM25, .after = State)
-  # 
+  
   # random set a dataframe with same percent of NAs as the original dataset
   if(sum(is.na(site_single_noAllNA$PM25)) == row.No){
     site_single_log$PM25 = NULL
@@ -1184,13 +1184,13 @@ ggplot(miss_plot,
                                    hjust = 0.5, family = "Arial Unicode MS"))
 
 ####################################################################################
-##### 22222. IMPROVE - Fill the Missing, till & after 2015 separately #####
+##### 22222. IMPROVE  #####
 ####################################################################################
 #### generate basic data for filling ####
 imp_daily = fread("IMPROVE_Component_with_missing.csv")
 
 imp_daily$V1 = NULL
-imp_daily$Date = as.Date(imp_daily$Date)
+# imp_daily$Date = as.Date(imp_daily$Date)
 sapply(imp_daily, class)
 imp_daily = subset(imp_daily, Date > as.Date("2010-12-31"))
 
@@ -1199,6 +1199,7 @@ colnames(imp_daily)[35:48] # OPC sub-group
 colnames(imp_daily)[36:47] # OPC sub-group
 imp_daily_opt_sub = imp_daily[ ,36:47]
 imp_daily = cbind(imp_daily[,1:35], imp_daily[,48:ncol(imp_daily)])
+dim(imp_daily); head(imp_daily)
 
 # remove those not directly detected, except of RC.PM2.5, ammoniaSO4, ammoniaNO3, OC & EC
 imp_daily$SeaSalt = imp_daily$Soil = imp_daily$PM10 = imp_daily$RC.PM10 = 
@@ -1234,10 +1235,28 @@ names(imp_miss)
 cols.comp = 4:col.withAllNA # columns for PM/components
 col.component = length(names(imp_miss)[cols.comp]) 
 
+# remove rows without PM species data at all
 imp_miss_noAllNA = subset(imp_miss, 
                           rowSums(is.na(imp_miss[, cols.comp.pm])) != 
                             col.component.pm)
 n.site = length(unique(imp_miss_noAllNA$SiteCode))
+dim(imp_miss_noAllNA) # 171563, 44
+dim(imp_miss) #383448, 44
+
+View(subset(imp_miss_noAllNA, SiteCode == "ATLA1"))
+
+
+# reorder columns 
+imp_miss_noAllNA = species_col_reorder(imp_miss_noAllNA)
+imp_miss_noAllNA = relocate(imp_miss_noAllNA, SiteCode, .before = Date)
+names(imp_miss_noAllNA)
+
+# use imp_miss_noAllNA to define points used for interpolation
+imp_miss_forIntp = is.na(imp_miss_noAllNA[, -c(1:3)])
+imp_miss_forIntp = cbind(imp_miss_noAllNA[, 1:3], imp_miss_forIntp)
+
+# write.csv(imp_miss_noAllNA, "IMPROVE_interpolated_points.csv")
+write.csv(imp_miss_forIntp, "IMPROVE_TF_logical_InterpolatedOrNot_allSpecies_2024.06.csv")
 
 # calculate the overall percentages of NA for selected species
 site_day_NA_count = ddply(imp_miss_noAllNA, 
@@ -1261,12 +1280,12 @@ site.lots.NA = site_day_NA_count$SiteCode[
     site_day_NA_count$SO4.NA.per > 0.05 &
     site_day_NA_count$EC.NA.per > 0.05 & 
     site_day_NA_count$OC.NA.per > 0.05]
-length(site.lots.NA)
+length(site.lots.NA) # 0
 
-imp_halfNA = subset(imp_miss_noAllNA, SiteCode %in% site.lots.NA)
+# imp_halfNA = subset(imp_miss_noAllNA, SiteCode %in% site.lots.NA)
 
 # plot their distribution
-imp_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE metadata 192 sample sites info 2010-20.csv")
+imp_meta_sites = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE metadata 192 sample sites info 2010-20.csv")
 imp_sites = select(imp_meta_sites, Code, State, Latitude,  Longitude)
 names(imp_sites)[1] = "SiteCode"
 imp_sites$High.P.NA = "N"
@@ -1472,16 +1491,21 @@ names(mix_error_intp_pstv_summary)[
 
 #### output interpolation results ####
 
-# out put results for data until 2015
+# out put results 
 write.csv(p_miss_summary, "IMPROVE_Missing_Rate_Site-level.csv")
 write.csv(mix_error_intp_pstv_summary, "IMPROVE_interpulation_Mix_Error.csv")
 write.csv(rf_vw_oob_summary, "IMPROVE_OOBerror_random-forest.csv")
+
+# write.csv(p_miss_summary, "IMPROVE_Missing_Rate_Site-level_2023.csv")
+# write.csv(mix_error_intp_pstv_summary, "IMPROVE_interpulation_Mix_Error_2023.csv")
+# write.csv(rf_vw_oob_summary, "IMPROVE_OOBerror_random-forest_2023.csv")
 
 # write.csv(running_avg_sum, "IMPROVE_interpulation_running-6-average_afterLog.csv")
 # write.csv(linear_sum, "IMPROVE_interpulation_linear_afterLog.csv")
 # write.csv(mice_sum, "IMPROVE_interpulation_multi-mice_afterLog.csv")
 # write.csv(rf_sum, "IMPROVE_interpulation_random-forest_afterLog.csv")
 
+# latest was from 2024.03, before 1st HEI audit
 write.csv(running_avg_sum, "IMPROVE_interpulation_running-average_2023.csv")
 write.csv(linear_sum, "IMPROVE_interpulation_linear_2023.csv")
 write.csv(mice_sum, "IMPROVE_interpulation_multi-mice_2023.csv")
