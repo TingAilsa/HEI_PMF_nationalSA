@@ -37,7 +37,7 @@ species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
 
-noCsub_noExtreme = "CSN_NoGUI_NoCsub_25TimesMean_Site"
+cSet_noExtreme = "CSN_NoGUI_NoCsub_25TimesMean_Site"
 data.prefix = "CSN_noCsub_25TimesMean_"
 pm.prefix = "CSN_noCsub_25TimesMean_"
 disp.prefix = "CSN_"
@@ -55,7 +55,7 @@ species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
 
-noCsub_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
+cSet_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
 data.prefix = "CSN_noCsub_15TimesMean_"
 pm.prefix = "CSN_noCsub_15TimesMean_"
 disp.prefix = "CSN_"
@@ -73,7 +73,7 @@ species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
 
-noCsub_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
+cSet_noExtreme = "CSN_NoGUI_NoCsub_15TimesMean_Site"
 data.prefix = "CSN_noCsub_15tMean_0unc_"
 pm.prefix = "CSN_noCsub_15TimesMean_"
 disp.prefix = "CSN_"
@@ -91,7 +91,7 @@ species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
 
-noCsub_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_Site"
+cSet_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_Site"
 data.prefix = "CSN_noCsub_15t1mdl0unc_"
 pm.prefix = "CSN_noCsub_15t1mdl0unc_"
 disp.prefix = "CSN_"
@@ -109,10 +109,28 @@ species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
 
-noCsub_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_DN_Site"
+cSet_noExtreme = "CSN_NoGUI_NoCsub_15t1mdl0unc_DN_Site"
 data.prefix = "CSN_noCsub_15t1mdl0unc_DN_"
 pm.prefix = "CSN_noCsub_15t1mdl0unc_"
 disp.prefix = "CSN_"
+csv.suffix = "_CMD_DN.csv"
+
+#### 1.6 IMPROVE 15t1mdl0unc noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
+
+##set working directory
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15t1mdlVNi_DN/base_DISPres1/")
+data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15t1mdlVNi_DN/base_DISPres1/"
+
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+cSet_noExtreme = "IMPROVE_NoGUI_Csub_15t1mdlVNi_DN_Site"
+data.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
+pm.prefix = "IMPROVE_Csub_15t1mdlVNi_"
+disp.prefix = "IMPROVE_"
 csv.suffix = "_CMD_DN.csv"
 
 #### 1.N shared process #### 
@@ -128,7 +146,7 @@ site_info_all = plyr::rename(
     "PM25" = "PM2.5"))
 
 source_cmd_pm = paste0("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/", 
-                        noCsub_noExtreme)
+                       cSet_noExtreme)
 
 ########## single site list defination
 ### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
@@ -147,6 +165,8 @@ source_cmd_pm = paste0("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_
 #                    "9_530530031", "9_550790010")
 ### ONLY use when randomly select some sites for sensitivity analyses of the multi-site result
 
+### 11 color panel based on ggsic_npg
+col_npg = append(pal_npg()(10), "#8A4198FF")
 
 ### for ALL sites
 site_info_all =
@@ -167,7 +187,7 @@ summary_base = NULL
 pred_obs_compare_summary = NULL
 
 for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3]
-  for (factor.No in 3:11) { # 5:11, # factor.No = 11
+  for (factor.No in 4:11) { # 5:11, # factor.No = 11
     
     # site.serial = site_serial_Nos[131]
     # site.serial
@@ -199,10 +219,21 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
                                      "base_PMFreport.txt"))
       
       # Bootstrap mapping rate
-      ## some sites, the BS results are not complete
-      bs_map_fra = bs_map(bs_output, 50, factor.No, 0.6) # 0.6 is the threshold or r
-      bs_map_fraction = bs_map_fra$percent_less_than_0_6
-      bs_overall_map = bs_map_fra$BS_overall
+      ## some sites, the BS results are not complete, thus, use the tryCatch
+      # Try to run the function and catch errors
+      bs_map_result <- tryCatch({
+        bs_map_fra <- bs_map(bs_output, 50, factor.No, 0.6) # 0.6 is the threshold or r
+        bs_map_fraction <- bs_map_fra$percent_less_than_0_6
+        bs_overall_map <- bs_map_fra$BS_overall
+        list(bs_map_fra = bs_map_fra, bs_map_fraction = bs_map_fraction, bs_overall_map = bs_overall_map)
+      }, error = function(e) {
+        list(bs_map_fra = NULL, bs_map_fraction = NULL, bs_overall_map = "error_in_BS")
+      })
+      
+      # extract values from the bs_map_result
+      bs_map_fra <- bs_map_result$bs_map_fra
+      bs_map_fraction <- bs_map_result$bs_map_fraction
+      bs_overall_map <- bs_map_result$bs_overall_map
       
       # Find the number of task when the value of Qm is the lowest
       lowest_Qm_taskNo = lowest_Qm_task(base_report)$lowest_Qm_task
@@ -242,18 +273,25 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       
       # base_G_cor = base_info$base_G_cor
       base_ts = base_info$base_ts
-      base_contri = base_info$base_contri
-      base_ts_conc = base_info$base_ts_conc
+      base_contri = base_info$base_contri # species overall contribution
+      base_ts_conc = base_info$base_ts_conc 
       base_conc_fraction = base_info$base_fraction
       base_conc_fraction = as.data.frame(t(base_conc_fraction))
+      base_factor_concen = base_info$base_factor_concen
+      base_factor_concen = as.data.frame(t(base_factor_concen))
       predict_daily_species_conc = base_info$predict_daily_species_conc
       
+      # rename the overall fraction contribution (based on daily concentration) of each factor
       colnames(base_conc_fraction)[1] = "Fractrion_conc_based"
       base_conc_fraction$Faraction_conc_contri = 
         paste0(round(base_conc_fraction$Fractrion_conc_based*100, 1),
                "%")
       base_conc_fraction$Factor = rownames(base_conc_fraction)
-      
+ 
+      # rename the overall concentration contribution of each factor
+      names(base_factor_concen)[1] = "Factor_concentration"
+      base_factor_concen$Factor = rownames(base_factor_concen)
+
       # assign species names 
       base_contri$Species = site.weak.strong
       colnames(predict_daily_species_conc)[-1] = 
@@ -490,7 +528,6 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       disp.error.code = disp_analysis(disp_output)[[1]]
       disp.qdrop = disp_analysis(disp_output)[[2]]
       
-      
       ####### Source Assignment & Match #######
       #main3_species = Nmain_Species(base_percent, 3)
       main5_species = Nmain_Species(base_percent, 5)
@@ -537,6 +574,8 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       # match overall contribution based on normalized data with that from mass concentration
       lm_beta_plot = merge(lm_beta_plot, base_conc_fraction)
       lm_beta_plot$Fractrion_conc_based = 100 * lm_beta_plot$Fractrion_conc_based
+      
+      lm_beta_plot = merge(lm_beta_plot, base_factor_concen)
       
       cor.two.fraction.contri = cor.test(lm_beta_plot$Factor.contribution,
                                          lm_beta_plot$Fractrion_conc_based,
@@ -679,7 +718,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         dplyr::group_by(Factor) %>%
         dplyr::summarize(Factor_source = Factor_source[1],
                          middle = custom_median(as.numeric(sequence)),
-                         Factor_nm_contr = paste(unique(Factor.contr), 
+                         Factor_conc = paste(round(unique(Factor_concentration), 3), 
                                                  collapse = ", "),
                          Factor_conc_fr = paste(unique(Faraction_conc_contri), 
                                                 collapse = ", ")) %>%
@@ -693,17 +732,17 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       middle_positions$Species = middle_species[1]
       
       ### add BS results
-      bs_map_fraction_source = 
-        merge(bs_map_fraction, 
-              select(lm_beta_plot, 
-                     Factor, Factor_source))
-      middle_positions = merge(middle_positions, bs_map_fraction_source)
+      # bs_map_fraction_source = 
+      #   merge(bs_map_fraction, 
+      #         select(lm_beta_plot, 
+      #                Factor, Factor_source))
+      # middle_positions = merge(middle_positions, bs_map_fraction_source)
       
       ### Mark on figure, ggtext
       middle_positions$Factor_source_contr = 
         paste0(middle_positions$Factor_source, ", ", 
-               "conc_fr ", middle_positions$Factor_conc_fr,
-               ", BS_map ", middle_positions$BS_map_fra)
+               "frac ", middle_positions$Factor_conc_fr,
+               ", conc ", middle_positions$Factor_conc)
 
       # Create the plot
       source_profile <- 
@@ -739,18 +778,19 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
           transform = mylog_trans(base=10, from=-5),
           limits = c(1E-5, max(conc_percent_bsDisp$Concentration))) +
         ggtitle(paste0(paste0(disp.prefix, site.serial.factor.pre), # "\n",
-                       ", Error.Code = ", disp.error.code, 
-                       ", DISP.Qdrop = ", disp.qdrop, 
-                       ", BS.map = ", paste0(bs_overall_map*100, "%"), "\n",
-                       "Estimated Q.true = ", Q.true,
-                       ", Q.robust = ", Q.robust,
-                       ", nonGUI.Qmin = ", lowest_Qm)) + 
-        scale_fill_npg() +
+                       ", Qmin = ", lowest_Qm, 
+                       ", DISP.Error = ", disp.error.code, 
+                       ", DISP.Qdrop = ", paste0(round(disp.qdrop/lowest_Qm*1000, 1), "‰,"), "\n",
+                       "BS.map = ", bs_overall_map, 
+                       ", med.PMF.PM25 = ", round(median_PMF_PM2.5, 2),
+                       ", med.obs.PM25 = ", round(median_obs_PM2.5, 2),
+                       ", conc-µg/m3")) + 
+        scale_fill_manual(values = col_npg) +
         xlab(format_variable("PM25 Species")) +
         ylab(format_variable("Concentration µg/m3")) +
         scale_x_discrete(labels = function(x) format_variable(x)) +
         geom_text(data = middle_positions, size = 4,
-                  aes(x = Species, y = 2e-01, label = Factor_source_contr), 
+                  aes(x = Species, y = 7e-02, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
         theme_bw() +
         theme_text_speciesName +
@@ -811,7 +851,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         scale_x_date(
           breaks = seq(from = start_year, to = end_year, by = "6 month"),
           date_labels = ("%Y-%m")) +
-        scale_color_npg() +
+        scale_color_manual(values = col_npg) +
         geom_text(data = middle_positions_ts, size = 4,
                   aes(x = middle_day, y = text_y_day, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
@@ -852,7 +892,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_ts, size = 4,
                   aes(x = middle_year, y = text_y_yr, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() +
+        scale_color_manual(values = col_npg) +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -889,7 +929,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_ts, size = 4,
                   aes(x = 6, y = text_y_mon, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() +
+        scale_color_manual(values = col_npg) +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -927,7 +967,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_ts, size = 4,
                   aes(x = middle_day, y = text_y_yr_mon, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() + # ggsci
+        scale_color_manual(values = col_npg) +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -985,7 +1025,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_frac_ts, size = 4,
                   aes(x = middle_day, y = text_y_frac_day, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() + 
+         scale_color_manual(values = col_npg) +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -1019,7 +1059,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_frac_ts, size = 4,
                   aes(x = middle_year, y = text_y_frac_yr, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() + 
+         scale_color_manual(values = col_npg) +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -1053,7 +1093,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_frac_ts, size = 4,
                   aes(x = 6.5, y = text_y_frac_mon, label = Factor_source_contr),
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() + 
+         scale_color_manual(values = col_npg) +
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -1087,7 +1127,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(data = middle_positions_frac_ts, size = 4,
                   aes(x = middle_day, y = text_y_frac_yr_mon, label = Factor_source_contr), 
                   inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_npg() + # ggsci
+         scale_color_manual(values = col_npg) +# ggsci
         theme_base() +
         theme(
           panel.grid = element_line(colour = "white"),
@@ -1145,7 +1185,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
         geom_text(aes(label = paste(Factor_source, Faraction_conc_contri)), 
                   size = 6, angle = 90, hjust = 0, vjust = -3,
                   position = position_stack(vjust = 0)) + # start from same bottom level
-        scale_fill_npg() +
+        scale_fill_manual(values = col_npg) +
         scale_y_continuous(position = "right") +
         theme_base() +
         theme(panel.grid.major.x = element_line(colour="grey60", linetype="dashed"),
@@ -1158,6 +1198,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
               axis.text.y = element_text(color="grey25", size = 16, angle = 90, hjust = 5, vjust = -0.5),
               axis.title.x = element_text(color="grey25", size = 22, angle = 180, hjust = 0.5),
               axis.title.y = element_text(color="grey25", size = 0, angle = -90, vjust = -1))
+      # overall_contri
       
       ####### G-space plot, pairs: between-factor scattor & correlation & summary form #######
       
@@ -1215,7 +1256,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       ####### Daily time-series source concentration - prediction vs. observation #######
       
       predict_daily_species_conc$Date = site_date_PM_species_conc$Date
-      predict_daily_species_conc = 
+      predict_daily_species_conc =
         predict_daily_species_conc %>%
         relocate(Date, .before = Serial.No) %>%
         select(-Serial.No)
@@ -1223,7 +1264,8 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       predict_daily_species_long =
         predict_daily_species_conc %>% 
         pivot_longer(
-          cols = Al:PM2.5,
+          # apply to all numeric columns, instead of specify the columns (Al is not always the first one)
+          cols = where(is.numeric), #Al:PM2.5, 
           names_to = c("Species"),
           values_to = "Concentration"
         )
@@ -1232,7 +1274,8 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       obs_daily_species_long =
         site_date_PM_species_conc %>% 
         pivot_longer(
-          cols = Al:PM2.5,
+          # apply to all numeric columns, instead of specify the columns (Al is not always the first one)
+          cols = where(is.numeric), #Al:PM2.5, 
           names_to = c("Species"),
           values_to = "Concentration"
         )
@@ -1326,11 +1369,11 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
           plot.background = element_rect(color = NA),
           plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
           strip.background = element_blank(), strip.text = element_blank(),
-          legend.position = c(0.9, 0.02), legend.background = element_blank(),
+          legend.position.inside = c(0.9, 0.02), legend.background = element_blank(),
           legend.title = element_text(size = 0),
           axis.text = element_text(size = 11, color = "grey25")
         )
-      
+      # pred_obs_species_conc_plot
       
     ##### predictions vs. observations, scatter
     species_conc_pred_vs_obs = 
@@ -1394,7 +1437,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       # PM_source_daily<-
       #   ggplot(base_ts_conc_long_plot,
       #          aes(x = PM2.5,
-      #              y = Concentration)) +
+      #              y if = Concentration)) +
       #   geom_point() +
       #   geom_abline(slope=1, intercept=0, color = "red") +
       #   facet_wrap(~ Factor_source, ncol = 3) +
@@ -1421,7 +1464,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       daily_species_scale_residual_long =
         data.frame(Date = site_date_PM_species_conc$Date, daily_species_scale_residual) %>% 
         pivot_longer(
-          cols = Al:PM2.5,
+          cols = where(is.numeric), #Al:PM2.5, 
           names_to = c("Species"),
           # names_pattern = "new_?(.*)_(.)(.*)",
           values_to = "Scaled_residuals"
@@ -1589,10 +1632,14 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       ### add site.serial & factor.No info
       conc_percent_bsDisp_output$site.serial = lm_beta_plot_output$site.serial = 
         ts_daily_output$site.serial = ts_annual_output$site.serial = 
-        ts_year_month_output$site.serial = site.serial
+        ts_year_month_output$site.serial = daily_species_scale_residual$site.serial = 
+        daily_Q_Qexp$site.serial = species_Q_Qexp$site.serial = 
+        site.serial
       conc_percent_bsDisp_output$Factor.No = lm_beta_plot_output$Factor.No = 
         ts_daily_output$Factor.No = ts_annual_output$Factor.No = 
-        ts_year_month_output$Factor.No = factor.No
+        ts_year_month_output$Factor.No = daily_species_scale_residual$factor.No = 
+        daily_Q_Qexp$factor.No = species_Q_Qexp$factor.No = 
+        factor.No
       
       # output csv files
       write.csv(lm_beta_plot_output, paste0(name.prefix, "overall.csv"))
@@ -1647,49 +1694,4 @@ for (site.serial in site_serial_Nos) { # 1:25
     })
   }
 }
-
-
-#### merge with site geographic info ####
-
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/")
-getwd()
-
-# 15timesMean
-# site_info_all = read.csv("CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_CMD_StrongWeakBad_Site.csv")
-# PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_base_DISP_summary.csv")
-
-# 15t1mdl0unc
-site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
-PMF_base_summary = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISPres1/CSN_noCsub_15t1mdl0unc_base_DISP_summary.csv")
-
-# geographic info
-site_geo = read.csv("CSN_IMPROVE_ownPC/CSN_site_info.csv")
-site_geoid = read.csv("CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
-cty_cluster_traffic = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/results_R_data/County_cluster_traffic_info.csv")
-
-# site serial 
-site_code_serial = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
-site_code_serial$V1 = NULL
-site_serial_info = subset(site_code_serial,
-                          serial.No %in% site_info_all$serial.No)
-dim(site_serial_info)
-
-site_info_all$X = site_geo$X = cty_cluster_traffic$X = site_geoid$X = PMF_base_summary$X = NULL
-
-site_serial = select(site_serial_info, 
-                     SiteCode, serial.No)
-site_geoid = select(site_geoid,
-                    SiteCode, geoid)
-col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
-                   "countyns", "namelsad", "county_name", "geoid")
-site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
-
-site_census = merge(site_serial, site_geo)
-site_census$SiteCode = as.character(site_census$SiteCode)
-
-site_census = merge(site_census, site_geoid, all.x = TRUE)
-site_census = merge(site_census, site_cluster_traffic, all.x = TRUE)
-# sapply(site_census, class)
-
-site_census_pmf = merge(summary_base, cty_cluster_traffic, all.x = TRUE)
 
