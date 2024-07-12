@@ -18,6 +18,12 @@ library(stringr)
 
 #### A. create cluster & sub-factor folders for sites  ####
 
+# dataset = "CSN"
+dataset = "IMPROVE"
+
+# c_data = "_NoCsub_"
+c_data = "_Csub_"
+
 # midfix = "15tMean_0unc"
 # midfix = "15TimesMean"
 # midfix = "15tMean"
@@ -26,11 +32,14 @@ library(stringr)
 # midfix = "15t1mdl0unc"
 # midfix = "15t1mdl0unc_DN"
 
-dropbox_path = "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
-dropbox_site = paste0(dropbox_path, "CSN_NoGUI_NoCsub_", midfix, "_Site")
+# midfix = "15t1mdlVNi_DN" # not really 1 mdl, montly MDL applied
+
+
+dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
+dropbox_site = paste0(dropbox_path, dataset, "_NoGUI", c_data, midfix, "_Site") # 
 
 # create folder to hold the site-specific subfolders
-new_file_folder = paste0(data.dir, "/", "CSN_CMD_noCsub_", midfix, "_Site")
+new_file_folder = paste0(data.dir, "/", dataset, "_CMD", c_data, midfix, "_Site")
 dir.create(file.path(new_file_folder), showWarnings = FALSE)
 
 ###### post-process script updates, no longer needed
@@ -40,6 +49,7 @@ dir.create(file.path(new_file_folder), showWarnings = FALSE)
 #  all CSV files in the dropbox_site folder
 # site_files <- list.files(path = dropbox_site, pattern = ".*_C_.*_.*\\.csv", full.names = TRUE)
 site_files <- list.files(path = dropbox_site, pattern = ".*_S_.*\\.csv", full.names = TRUE)
+length(site_files)
 
 ########### ONLY used when selecting the some site_serial groups for sensitivity analyses in 2024.01
 # # extract the pattern (ClusterNo_SiteCode) "_.*_.*" between "C_" and ".csv"
@@ -75,7 +85,7 @@ for (site_file in site_files) {
   }
   
   # create subfolders Factor_6 to Factor_11 under site_cmd
-  for (i in 3:11) {
+  for (i in 4:11) {
     subfolder <- file.path(site_cmd_folder, paste0("Factor_", i))
     if (!dir.exists(subfolder)) {
       dir.create(subfolder, recursive = TRUE)
@@ -102,7 +112,7 @@ for (site_file in site_files) {
   # path_PM_date <- file.path(dropbox_sitedate,
   #                           paste0("CSN_noCsub_", midfix, "_", site_cmd, "_PM_Date.csv"))
   path_nonGUI <- file.path(site_cmd_folder,
-                           paste0("CSN_noCsub_", midfix, "_", site_cmd, ".csv"))
+                           paste0(dataset, c_data, midfix, "_", site_cmd, ".csv"))
 
   # Save site_PM_date to dropbox_sitedate folder
   # write.csv(site_PM_date, path_PM_date, row.names = FALSE)
@@ -122,15 +132,21 @@ DISP_par_org = readLines("iniparams_DISP_3.txt")
 before_BS_DISP_par_org = readLines("iniparams_BS_PHASE_of_BSDISP_4.txt")
 BS_DISP_par_org = readLines("iniparams_BS-DISP_5.txt")
 
-factor.number.series = c(3:11)
+factor.number.series = c(4:11) # 3:11
 
 #### B2. edit and output new iniparams.txt ####
 
+### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization
+site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv")
+site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15t1mdlVNi_DN_Site")
+name.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
+name.prefix.csv = "IMPROVE_Csub_15t1mdlVNi_DN_"
+
 ### 15TimesMean, 0 extra uncertainty, monthly MDL, CSN, Dispersion Normalization
-site_sum = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
-site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_DN_Site")
-name.prefix = "CSN_noCsub_15t1mdl0unc_DN_"
-name.prefix.csv = "CSN_noCsub_15t1mdl0unc_DN_"
+# site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_noCsub_15t1mdl0unc_DN_Site")
+# name.prefix = "CSN_noCsub_15t1mdl0unc_DN_"
+# name.prefix.csv = "CSN_noCsub_15t1mdl0unc_DN_"
 
 ### 15TimesMean, 0 extra uncertainty, monthly MDL, CSN
 # site_sum = read.csv(file.path(dropbox_site, "CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
