@@ -6,9 +6,9 @@
 # getwd()
 # data.dir <- "/Users/ztttttt/Documents/HEI PMF/CSN_IMPROVE"
 
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC")
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC")
 getwd()
-data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC"
+data.dir <- "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC"
 
 library(tidyverse)
 library(readxl)
@@ -564,17 +564,19 @@ sum(duplicated(select(csn_mdl_month_median_use, SiteCode, month)))
 write.csv(csn_mdl_month_median_use, "CSN_MDL_C-Sub_monthly_forPMF_2024.04.csv")
 write.csv(csn_mdl_till15_month_median_overall, "CSN_MDL_C-Sub_monthly_2015base.csv")
 
-##### CSN & IMPROVE - concentration vs. MDL #####
+##### CSN - concentration vs. MDL #####
 ## CSN
 # species_daily = fread("CSN_RFinterpulated_combine_2023.04.csv")
 # species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2023.04.csv") 
 species_daily = fread("CSN_RFinterpulated_combine_Csubgroup_2024.04.csv") 
 
-## IMPROVE
-species_daily = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv")
-
 species_daily$V1 = NULL
-species_daily$Date = as.Date(species_daily$Date)
+# species_daily$Date = as.Date(species_daily$Date)
+dim(species_daily)
+
+# reorder columns
+species_daily = species_col_reorder(species_daily)
+species_daily = relocate(species_daily, SiteCode, .before = Date)
 names(species_daily)
 
 # get monthly MDL
@@ -588,11 +590,8 @@ species_mdl = fread("CSN_MDL_C-Sub_monthly_forPMF_2024.04.csv")
 species_mdl_till2015 = fread("CSN_MDL_C-Sub_monthly_2015base.csv")
 species_mdl_till2015$V1 = species_mdl_till2015$ClIon = NULL
 
-### IMPROVE
-species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
-
 species_mdl$V1 = species_mdl$ClIon = NULL # imp_mdl$OP = 
-names(species_mdl)
+names(species_mdl); dim(species_mdl)
 
 # reorder
 species_daily = species_daily[with(
@@ -602,11 +601,13 @@ species_daily = species_daily[with(
 # get month, for matching with monthly MDL
 species_daily_conc = species_daily
 species_daily_conc$month = month(species_daily_conc$Date)
-dim(species_daily_conc)
+species_daily_conc = relocate(species_daily_conc, PM25, .before = "month")
+dim(species_daily_conc); names(species_daily_conc)
 
 # reorder columns the dataset for matching
-species_col_mdl = names(species_mdl)[col_comp(species_mdl, "Ag", "PM25")]
-species_col_conc = names(species_daily_conc)[col_comp(species_daily_conc, "Ag", "PM25")]
+fist_element = names(species_mdl)[3]
+species_col_mdl = names(species_mdl)[col_comp(species_mdl, fist_element, "PM25")]
+species_col_conc = names(species_daily_conc)[col_comp(species_daily_conc, fist_element, "PM25")]
 species_mdl_reag = species_mdl[, ..species_col_mdl]
 species_mdl_till2015_reag = species_mdl_till2015[, ..species_col_mdl]
 
@@ -745,7 +746,56 @@ write.csv(species_daily_fullMDL, "CSN_MDL_C-Sub_monthly_forPMF_expand_2024.04.cs
 
 # species_conc_mdl_Site = subset(species_conc_mdl_Site, !is.na(OP))
 
-# write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2023.csv")
-write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.csv")
+##### IMPROVE - concentration vs. MDL #####
+#### missing MDLs were interpolated via random forest in 2024.07
 
+# read data
+species_daily = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv") # in fact, updated data from 2024.03, before HEI audit
+# species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
+species_mdl = fread("IMPROVE_MDL_monthly_RF_2024.csv") 
+
+species_daily$V1 = species_mdl$V1 = NULL
+# species_daily$Date = as.Date(species_daily$Date)
+dim(species_daily)
+
+# get site & date combination
+site_date = select(species_daily, SiteCode, Date, State)
+site_date$year = year(site_date$Date)
+site_date$month = month(site_date$Date)
+
+# merge with monthly MDL
+species_daily_fullMDL = join(site_date, species_mdl)
+species_daily_fullMDL$year = species_daily_fullMDL$month = NULL
+
+# revise and reorder columns 
+species_daily_fullMDL = species_col_reorder(species_daily_fullMDL)
+species_daily = species_col_reorder(species_daily)
+names(species_daily_fullMDL)
+names(species_daily)
+species_daily = relocate(species_daily, SiteCode, .before = Date)
+
+# reorder columns of species_daily_fullMDL to be the same as species_daily
+setcolorder(species_daily_fullMDL, names(species_daily))
+summary(names(species_daily_fullMDL) == names(species_daily))
+
+# compare concentration and MDL of a given component
+cols_to_extract <- setdiff(names(species_daily), 
+                           c("SiteCode", "Date", "State"))
+species_conc = species_daily[, ..cols_to_extract]
+species_mdl_only = species_daily_fullMDL[, ..cols_to_extract]
+
+species_conc_mdl = data.frame(Map(">", species_conc, species_mdl_only))
+
+# combine the site and date info
+species_conc_mdl_Site = 
+  cbind(select(species_daily, SiteCode, Date, State), 
+        species_conc_mdl)
+summary(names(species_conc_mdl_Site) == names(species_daily))
+
+dim(species_conc_mdl_Site)
+dim(species_daily_fullMDL)
+
+# write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2023.csv")
+write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.06.csv")
+write.csv(species_daily_fullMDL, "IMPROVE_MDL_C-Sub_daily_forPMF_expand_2024.06.csv")
 
