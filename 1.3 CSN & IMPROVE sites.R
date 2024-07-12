@@ -6,9 +6,9 @@
 # getwd()
 # data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
  
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
 getwd()
-data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
+data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
 
 
 ##packages in need
@@ -630,7 +630,7 @@ head(imp_dup_date_comp_site_noMissing)
 nrow(imp_dup_date_comp_site_noMissing)
 
 ######## check if the strange duplicated component values from the same date-site-component groups exist in original dataset
-imp_data_org = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20221008_205315_uNQ0v IMPROVE.txt",
+imp_data_org = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20221008_205315_uNQ0v IMPROVE.txt",
                     sep = ",", dec = ".")
 head(imp_data_org)
 dim(imp_data_org) # 18003337, 25
@@ -761,14 +761,167 @@ summary(imp_daily_comp_use_Q.Na)
 imp_daily_comp_use =
   subset(imp_daily_comp_use, Qualifier != "NA")
 
-imp_meta_sites = read.csv("IMPROVE metadata 196 sample sites info 2010-20.csv")
+imp_daily_comp_use$Date.1 = NULL
+
+imp_meta_sites = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/IMPROVE metadata 196 sample sites info 2010-20.csv")
 imp_state_site = select(imp_meta_sites, State, SiteCode)
 
-imp_daily_comp_use = merge(imp_daily_comp_use, imp_state_site, all.x = T)
-imp_daily_comp_use$site.date.qualifier = imp_daily_comp_use$State
-imp_daily_comp_use$State = NULL
-colnames(imp_daily_comp_use)[4] = "State"
-write.csv(imp_daily_comp_use, "IMPROVE_Component_with_missing.csv")
+setDT(imp_daily_comp_use)
+dim(imp_daily_comp_use)
+
+imp_daily_comp_use = join(imp_daily_comp_use, imp_state_site)
+imp_daily_comp_use$site.date.qualifier = NULL
+imp_daily_comp_use = relocate(imp_daily_comp_use, State, .before = SiteCode)
+head(imp_daily_comp_use)
+# write.csv(imp_daily_comp_use, "IMPROVE_Component_with_missing.csv")
+write.csv(imp_daily_comp_use, "IMPROVE_Component_with_missing_2024.csv")
+
+##### 1.5 monthly MDL, random forest for C-groups #####
+imp_data_mdl = select(imp_data_compare, 
+                      SiteCode, CompName, year, month, MDL, Val)
+
+# replace negative values with NA 
+imp_data_mdl$MDL.not.neg = imp_data_mdl$MDL
+imp_data_mdl$MDL.not.neg = replace(imp_data_mdl$MDL.not.neg, 
+                               which(imp_data_mdl$MDL.not.neg < 0), 
+                               NA)
+
+# get the montly average MDL for each site
+imp_mdl =
+  imp_data_mdl[, .(
+    MDL = mean(MDL.not.neg, na.rm = TRUE),
+    Val = mean(Val, na.rm = TRUE)
+  ), by = .(SiteCode, CompName, year, month)]
+
+imp_data_mdl$MDL.not.neg = NULL
+summary(imp_mdl) # till this step, no NA in Val, but NA in MDL
+
+imp_mdl$site.date = paste(imp_mdl$SiteCode, imp_mdl$year, imp_mdl$month)
+imp_mdl_gathered = select(imp_mdl, CompName, MDL, site.date)
+
+# convert to site-day-allSpecies format
+imp_mdl_spread = imp_mdl_gathered %>% spread(CompName, MDL)
+head(imp_mdl_spread)
+nrow(imp_mdl_spread)
+imp_SiteDate = data.frame(select(imp_mdl_spread, site.date))
+imp_SiteDate = imp_SiteDate %>% 
+  separate(site.date, c("SiteCode", "year", "month"),  
+           sep = "\\s+")
+imp_mdl_use = cbind(imp_SiteDate, imp_mdl_spread)
+imp_mdl_use$site.date = NULL
+
+# remove columns not to be used
+imp_remove = 
+  c("CM_calculated", "EC_UCD", "OC_UCD", 
+    "OMC", "RC.PM10", "RC.PM2.5", "TC",
+    "OP405TR", "OP405TT", "OP445TR", "OP445TT", "OP532TR", "OP532TT", 
+    "OP780TR", "OP780TT", "OP808TR", "OP808TT", "OP980TR", "OP980TT", "OPT",
+    "SeaSalt", "Soil")
+
+imp_mdl_use[ ,imp_remove] <- list(NULL)
+
+# get the median MDL of each year for each site
+imp_mdl_median_annual = 
+  imp_mdl_use  %>% 
+  group_by(SiteCode, year) %>%
+  summarise_if(is.numeric,
+               median, na.rm = T)
+dim(imp_mdl_median_annual)
+
+# get the median MDL across all year
+imp_mdl_median_overall = 
+  imp_mdl_use  %>% 
+  group_by(SiteCode) %>%
+  summarise_if(is.numeric,
+               median, na.rm = T)
+dim(imp_mdl_median_overall)
+
+# detect site-year groups of data with NA in MDL
+summary(imp_mdl_median_annual)
+data.frame(table(imp_mdl_median_annual$SiteCode))
+imp_mdl_med_annual_NA = subset(imp_mdl_median_annual, is.na(Al) | is.na(NO3))
+unique(imp_mdl_med_annual_NA$SiteCode)
+## detect NA exists for 22 site-year groups of data (ions & elements) from 7 sites
+### "132950002" "171190024" "20904101"  "390350065" "390350076" "560210100" "720210010"
+
+# for those with MDL for OC/EC subgroups but not total OC/EC, estimate the MDLs
+library(missForest)
+
+imp_mdl_use = relocate(imp_mdl_use, PM10, .after = Zr)
+imp_mdl_use = relocate(imp_mdl_use, PM2.5, .after = Zr)
+imp_mdl_use = relocate(imp_mdl_use, Al, .before = As)
+
+# remove rows without PM species data at all
+imp.mdl.cols.comp = col_comp(imp_mdl_use, "Al", "PM10")
+imp_mdl_miss_noAllNA = subset(imp_mdl_use, 
+                              rowSums(is.na(imp_mdl_use[, imp.mdl.cols.comp])) != 
+                                length(imp.mdl.cols.comp))
+dim(imp_mdl_use); dim(imp_mdl_miss_noAllNA)
+
+# get site list
+imp_mdl_sites = unique(imp_mdl_miss_noAllNA$SiteCode)
+length(imp_mdl_sites)
+
+## log all value to avoid negative interpolation 
+imp_mdl_log = cbind(select(imp_mdl_miss_noAllNA, 
+                                  SiteCode, year, month),
+                    imp_mdl_miss_noAllNA[imp.mdl.cols.comp] %>%
+                             log())
+
+## interpolation for all Carbonaceous groups and others separately
+oc_ec_col = c("OC", "OC1", "OC2", "OC3", "OC4",
+              "EC", "EC1", "EC2", "EC3", "OP")
+imp_mdl_c_log = select(imp_mdl_log, oc_ec_col)
+imp_mdl_other_log = select(imp_mdl_log, -oc_ec_col)
+imp_mdl_other_log = imp_mdl_other_log[, -c(1:3)]
+
+# RF modeling for carbonaceous groups
+imp_mdl_C_rf = 
+  missForest(imp_mdl_c_log, 
+             variablewise = T)
+
+imp_mdl_C_intp_rf = cbind(imp_mdl_log[, 1:3], 
+                        exp(imp_mdl_C_rf$ximp))
+
+# replace NaN and Inf with NA in imp_mdl_other_log
+# when running missForest directly, error like "NA/NaN/Inf in foreign function call (arg 1)"
+sapply(imp_mdl_other_log, function(x) any(is.infinite(x)))
+sapply(imp_mdl_other_log, function(x) any(is.nan(x)))
+sapply(imp_mdl_other_log, function(x) any(is.na(x)))
+
+setDT(imp_mdl_other_log)
+imp_mdl_other_log <- 
+  imp_mdl_other_log[, lapply(.SD, function(x) {
+  x[is.nan(x)] <- NA  # Replace NaN with NA
+  x[is.infinite(x)] <- NA  # Replace Inf and -Inf with NA
+  return(x)
+})]
+
+# RF modeling for other PM species
+imp_mdl_all_rf = 
+  missForest(cbind(imp_mdl_other_log, imp_mdl_C_rf$ximp), 
+             variablewise = T)
+imp_mdl_all_intp_rf = exp(imp_mdl_all_rf$ximp)
+
+imp_mdl_noNA = cbind(imp_mdl_log[, 1:3], imp_mdl_all_intp_rf)
+
+# In IMPROVE, c(ammSO4) = 1.375*c(sulfate), or 4.125*c(S) if sulfate data is absent
+# thus, we set the same for MDL, mdl(ammSO4) = 1.375*mdl(sulfate), and mdl(ammNO3) = 1.29*mdl(nitrate)
+imp_mdl_noNA$ammNO3 = 1.29 * imp_mdl_noNA$NO3
+imp_mdl_noNA$ammSO4 = 1.375* imp_mdl_noNA$SO4
+
+# # check the MDL from CSN measurements
+# csn_mdl = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_MDL_C-Sub_monthly_forPMF_expand_2024.04.csv")
+# View(select(csn_mdl, SiteCode, Date, NH4Ion, NO3Ion, SO4Ion))
+
+# convert year, month to numeric
+imp_mdl_noNA[, 2:3] = lapply(imp_mdl_noNA[, 2:3], as.integer)
+imp_mdl_noNA$PM10 = NULL
+sapply(imp_mdl_noNA, class)
+names(imp_mdl_noNA)
+
+# output MDL file
+write.csv(imp_mdl_noNA, "IMPROVE_MDL_monthly_RF_2024.csv")
 
 #### 2. CSN data preparation ####
 
