@@ -181,23 +181,25 @@ panel.scatter <- function(x, y, ...){
 ##### set colors for different sources
 # jco, tron, startrek, rickandmorty, futurama, 
 # show color in different palette in ggsci to chose the eight color for sources  
-library(ggsci)
+# library(ggsci)
+# library(scales)
 
-color_npg = pal_npg()(10)
-show_col(pal_npg()(10))
-pal_npg()(10)
-show_col(pal_jco()(10))
-pal_jco()(10)
-show_col(pal_tron()(7))
-pal_tron()(7)
-show_col(pal_startrek()(7))
-pal_startrek()(7)
-show_col(pal_rickandmorty()(12))
-pal_rickandmorty()(12)
-show_col(pal_futurama()(12))
-pal_futurama()(12)
-show_col(pal_flatui()(10))
-pal_flatui()(10)
+# color_npg = pal_npg()(10)
+# show_col(pal_npg()(10))
+# pal_npg()(10)
+# show_col(pal_jco()(10))
+# pal_jco()(10)
+# show_col(pal_tron()(7))
+# pal_tron()(7)
+# show_col(pal_startrek()(7))
+# pal_startrek()(7)
+# show_col(pal_rickandmorty()(12))
+# pal_rickandmorty()(12)
+# show_col(pal_futurama()(12))
+# pal_futurama()(12)
+# show_col(pal_flatui()(10))
+# pal_flatui()(10)
+
 
 color_source = c(
   "F1-Traffic" = "#C71000FF",         # red 
@@ -661,6 +663,9 @@ base_results <- function(base_output, task, input.row) {
   # estimate overall fraction contribution based on base_conc
   base_fraction = factor_concen_contri[1, -1] / sum(factor_concen)
   
+  # overall factor concentration contribution
+  base_factor_concen = factor_concen_contri[1, -1]
+  
   #### Estimate the predicted daily contribution of each species
 
   # initialize an empty matrix to store the species-specific daily concentraion contributions 
@@ -716,6 +721,7 @@ base_results <- function(base_output, task, input.row) {
               base_contri = base_conc,
               base_ts_conc = base_ts_conc, 
               base_fraction = base_fraction,
+              base_factor_concen = base_factor_concen,
               predict_daily_species_conc = predict_daily_species_conc))
 }
 
@@ -1343,6 +1349,10 @@ species_col_reorder = function(species_df) {
   species_df = plyr::rename(species_df, 
                             c("PM2.5" = "PM25", 
                               "Cl-" = "ClIon",
+                              "Cl." = "ClIon",
+                              "NO2" = "NO2Ion",
+                              "NO2." = "NO2Ion",
+                              "NO2-" = "NO2Ion",
                               "NO3" = "NO3Ion",
                               "SO4" = "SO4Ion",
                               "NH4" = "NH4Ion",
@@ -1358,7 +1368,7 @@ species_col_reorder = function(species_df) {
             "OC", "OC1", "OC2", "OC3", "OC4",
             "OP")
   
-  ions = c("ClIon", "NaIon", "KIon", "NH4Ion", "NO3", "SO4")
+  ions = c("ClIon", "NaIon", "KIon", "NH4Ion", "NO3", "SO4", "ammNO3", "ammSO4")
   
   species_df = species_df %>%
     select(!(matches(OC.EC)), 
