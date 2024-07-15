@@ -33,7 +33,7 @@ c_data = "_Csub_"
 # midfix = "15t1mdl0unc_DN"
 
 # midfix = "15t1mdlVNi_DN" # not really 1 mdl, montly MDL applied
-
+# midfix = "15tAmmIonVNi_DN"
 
 dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 dropbox_site = paste0(dropbox_path, dataset, "_NoGUI", c_data, midfix, "_Site") # 
@@ -136,11 +136,17 @@ factor.number.series = c(4:11) # 3:11
 
 #### B2. edit and output new iniparams.txt ####
 
-### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization
-site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv")
-site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15t1mdlVNi_DN_Site")
-name.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
-name.prefix.csv = "IMPROVE_Csub_15t1mdlVNi_DN_"
+### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization, using ammSO4, ammNO3, Csub
+site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site/IMPROVE_Csub_15tAmmIonVNi_PMF_SWB_site.csv")
+site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15tAmmIonVNi_DN_Site")
+name.prefix = "IMPROVE_Csub_15tAmmIonVNi_DN_"
+name.prefix.csv = "IMPROVE_Csub_15tAmmIonVNi_DN_"
+
+# ### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization, using NO3, S, Csub
+# site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv")
+# site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15t1mdlVNi_DN_Site")
+# name.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
+# name.prefix.csv = "IMPROVE_Csub_15t1mdlVNi_DN_"
 
 ### 15TimesMean, 0 extra uncertainty, monthly MDL, CSN, Dispersion Normalization
 # site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")

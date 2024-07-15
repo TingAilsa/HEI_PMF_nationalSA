@@ -620,10 +620,10 @@ site_code_serial_all$serial.No =
          as.character(site_code_serial_all$serial.No))
 
 ## CSN
-site_code_serial = subset(site_code_serial_all_all, Dataset == "EPACSN") 
+site_code_serial = subset(site_code_serial_all, Dataset == "EPACSN") 
 
 ## IMPROVE
-site_code_serial = subset(site_code_serial_all_all, Dataset == "IMPAER") 
+site_code_serial = subset(site_code_serial_all, Dataset == "IMPAER") 
 
 dim(site_code_serial)
 
@@ -1891,7 +1891,9 @@ onedrive_path = "/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUnive
 # Sitefolder = "CSN_NoGUI_NoCsub_15t1mdl0unc"
 # Sitefolder = "CSN_NoGUI_NoCsub_15t1mdlVNi"
 
-Sitefolder = "IMPROVE_NoGUI_Csub_15t1mdlVNi"
+# Sitefolder = "IMPROVE_NoGUI_Csub_15t1mdlVNi"
+Sitefolder = "IMPROVE_NoGUI_Csub_15tAmmIonVNi"
+
 
 # define the folder of output results
 dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
@@ -1992,7 +1994,7 @@ for (nongui_org_csv in nongui_org_csvs) { # [140:length(nongui_org_csvs)]
   
   write.csv(site_vc_all, 
             file.path(dropbox_path, dn_site_folder, 
-                      "Nearest_ERA5_Wind_BLH_VC_CSN_2024.06.csv"),
+                      "Nearest_ERA5_Wind_BLH_VC_CSN_2024.07.csv"),
             row.names = FALSE)
 }
 

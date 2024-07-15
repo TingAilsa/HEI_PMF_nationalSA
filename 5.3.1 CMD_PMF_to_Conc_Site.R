@@ -22,6 +22,9 @@ library(patchwork)
 library(Metrics)
 library(gridExtra)
 
+# ensure if all packages are up to date
+# update.packages(ask = FALSE)
+
 ####### 1. Read & process other files to use ####### 
 
 #### 1.1 CSN 25TimesMean noCsub #### 
@@ -132,6 +135,26 @@ data.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
 pm.prefix = "IMPROVE_Csub_15t1mdlVNi_"
 disp.prefix = "IMPROVE_"
 csv.suffix = "_CMD_DN.csv"
+
+
+#### 1.7 IMPROVE 15t1mdl0unc noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
+
+##set working directory
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15tAmmIonVNi_DN/base_DISPres1/")
+data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15tAmmIonVNi_DN/base_DISPres1/"
+
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site/IMPROVE_Csub_15tAmmIonVNi_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+cSet_noExtreme = "IMPROVE_NoGUI_Csub_15tAmmIonVNi_DN_Site"
+data.prefix = "IMPROVE_Csub_15tAmmIonVNi_DN_"
+pm.prefix = "IMPROVE_Csub_15tAmmIonVNi_"
+disp.prefix = "IMPROVE_"
+csv.suffix = "_CMD_DN.csv"
+
 
 #### 1.N shared process #### 
 
@@ -686,7 +709,7 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3
       # Convert 0 to 1e-10 for columns to be used for y-axis, there is log transfer later
       conc_percent_bsDisp_use <- 
         conc_percent_bsDisp_use %>%
-        mutate(across(Concentration:Percent.up, 
+        mutate(across(Concentration:disp_conc_up, # Percent.up
                       ~replace(., . == 0, 1e-10)))
       
       ##### Convert percent values to make the scale pattern similar to log concentration
