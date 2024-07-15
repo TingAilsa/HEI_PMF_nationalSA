@@ -36,10 +36,17 @@ getwd()
 # data_use = "CSN_Site_15t1mdl0unc"
 # data.pre = "CSN_noCsub_15t1mdl0unc_"
 
-# 0 uncertainty, dispersion normalization
-data_use = "CSN_Site_15t1mdl0unc_DN"
-data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
+# # 0 uncertainty, dispersion normalization
+# data_use = "CSN_Site_15t1mdl0unc_DN"
+# data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
 
+# # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
+# data_use = "IMPROVE_Site_15t1mdlVNi_DN"
+# data.pre = "IMPROVE_Csub_15t1mdlVNi_DN_"
+
+# 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
+data_use = "IMPROVE_Site_15tAmmIonVNi_DN"
+data.pre = "IMPROVE_Csub_15tAmmIonVNi_DN_"
 
 dir_path <- paste0("PMF_NonGUI/", data_use, "/base_DISPres1")
 
@@ -58,7 +65,8 @@ csv_overall <-
     (lapply(
       csv_overall_list, 
       read.csv)))
-csv_overall$Dataset = "CSN"
+# csv_overall$Dataset = "CSN"
+csv_overall$Dataset = "IMPROVE"
 csv_overall$X = NULL
 
 
@@ -184,6 +192,8 @@ csv_source_profile <-
 # write.csv(csv_source_profile, paste0(data_use, "_source_profile.csv"))
 write.csv(csv_source_profile, paste0(data_use, "_source_profile_", time, ".csv"))
 # CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv
+# "IMPROVE_Site_15t1mdlVNi_DN_source_profile_2024-07-12.csv"
+# "IMPROVE_Site_15tAmmIonVNi_DN_source_profile_2024-07-15.csv"
 
 ###### 1.2.2 merge contribution - daily & monthly - post Manual + Auto SA analyses  ######
 
@@ -201,7 +211,14 @@ csv_daily_org$V1 = NULL
 
 ##### convert to data before Dispersion Normalization DN, if any
 # read DN coefficient
+
+### CSN
 dn_metro_coef = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_DN_Site/Nearest_ERA5_Wind_BLH_VC_CSN_2024.05.csv")
+
+### IMPROVE
+dn_metro_coef = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_DN_Site/Nearest_ERA5_Wind_BLH_VC_CSN_2024.06.csv")
+
+unique(dn_metro_coef$SiteCode)
 dn_coef = select(dn_metro_coef,
                  SiteCode, Date, VC_coef, serial.No)
 names(dn_coef)[ncol(dn_coef)] = "site.serial"
@@ -209,9 +226,18 @@ names(dn_coef)[ncol(dn_coef)] = "site.serial"
 csv_daily_org_dn = csv_daily_org
 names(csv_daily_org_dn)[12] = "Concentration_dn"
 
+csv_daily_org_dn$site.serial = as.character(csv_daily_org_dn$site.serial)
+dn_coef$site.serial = as.character(dn_coef$site.serial)
+
 # merge daily DN contribution with DN coefficient
-csv_daily_org_dn = merge(csv_daily_org_dn, dn_coef)
-# dim(csv_daily_org_dn); dim(csv_daily_org); dim(dn_coef)
+csv_daily_org_dn = join(csv_daily_org_dn, dn_coef)
+
+# remove duplicated rows
+csv_daily_org_dn = csv_daily_org_dn[!duplicated(csv_daily_org_dn), ]
+dim(csv_daily_org_dn); dim(csv_daily_org); dim(dn_coef)
+
+summary(unique(csv_daily_org$site.serial) %in% unique(dn_coef$site.serial))
+summary(unique(dn_coef$site.serial) %in% unique(csv_daily_org$site.serial))
 
 # estimated concentration contribution before DN
 csv_daily_org_dn$Concentration = csv_daily_org_dn$Concentration_dn / csv_daily_org_dn$VC_coef
@@ -247,9 +273,11 @@ csv_month = data.frame(csv_month)
 csv_month <- 
   csv_month[, c(adjusted_columns, remaining_columns)]
 
-# write.csv(csv_month, paste0(data_use, "_covertBack_month", ".csv")) # convert DN data to non-DN
-# write.csv(csv_daily, paste0(data_use, "_covertBack_daily", ".csv")) # convert DN data to non-DN
+write.csv(csv_month, paste0(data_use, "_covertBack_month", ".csv")) # convert DN data to non-DN
+write.csv(csv_daily, paste0(data_use, "_covertBack_daily", ".csv")) # convert DN data to non-DN
 ## CSN_Site_15t1mdl0unc_DN_covertBack_month.csv
+## IMPROVE_Site_15t1mdlVNi_DN_covertBack_month.csv
+## "IMPROVE_Site_15tAmmIonVNi_DN_covertBack_month.csv"
 
 # write.csv(csv_month, paste0(data_use, "_month", ".csv"))
 # write.csv(csv_daily, paste0(data_use, "_daily", ".csv"))
@@ -286,7 +314,8 @@ write.csv(csv_daily_site, paste0(data_use, "_covertBack_PM2.5_daily", ".csv"))
 dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 
 # site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv"))
-site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15t1mdl0unc_site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
+# site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15t1mdl0unc_site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
+site_info_all = read.csv(paste0(dropbox_path, "IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
 
 site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
 site_geo$SiteCode = as.character(site_geo$SiteCode)
@@ -322,7 +351,7 @@ PMF_base_summary$Dataset = gsub("^(.*)_.*$", "\\1", PMF_base_summary$Dataset)
 
 # repeat to match factor number
 site_serial_factor = site_serial[rep(1:nrow(site_serial), each = 9), ]
-site_serial_factor$Factor.No = rep(3:11, nrow(site_serial))
+site_serial_factor$Factor.No = rep(3:11, nrow(site_serial)) 
 
 col_remove_cty = c("Dataset", "state_abbr", "Longitude", "Latitude",
                    "countyns", "namelsad", "county_name", "geoid")
@@ -330,8 +359,15 @@ site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
 
 # merge all listed files, all.x = TRUE
 # make sure all listed files are data.frame or all are data.table, otherwise, error in Reduce
+
+# ### CSN
+# list_site_census_source_assign = 
+#   list(site_serial, site_geo, site_geoid, site_cluster_traffic, 
+#        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
+
+### IMPROVE
 list_site_census_source_assign = 
-  list(site_serial, site_geo, site_geoid, site_cluster_traffic, 
+  list(site_serial, site_geoid, site_cluster_traffic,
        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
 
 site_census_source_assign =
@@ -339,21 +375,12 @@ site_census_source_assign =
     merge(x, y, all.x = TRUE), 
     list_site_census_source_assign)
 
-site_census_source_assign = 
+length(unique(site_census_source_assign$SiteCode))
+
+site_census_source_assign = site_census_SiteCodesource_assign = 
   relocate(site_census_source_assign, Dataset, .before = serial.No)
 site_census_source_assign = 
   relocate(site_census_source_assign, SiteCode, .before = serial.No)
-
-# merge with converge results
-converge_all = read.csv(
-  paste0(dir_path, "/", data.pre, "converge_percent.csv")
-)
-
-converge_all$X = NULL
-names(converge_all)[1:2] = c("serial.No", "Factor.No")
-
-site_census_source_assign = 
-  merge(site_census_source_assign, converge_all, all.x = TRUE)
 
 # reorder the file
 site_census_source_assign = 
@@ -380,10 +407,39 @@ site_census_source_assign =
 # site_pm_rmse = site_pm_rmse[!duplicated(site_pm_rmse), ]
 # write.csv(site_pm_rmse, paste0(data_use, "_matched_RMSE_R2_", ".csv"))
 
+
+#### for further analyses with checked local information
+library(readxl)
+
+#### IMPROVE
+manual_site_info = read_excel("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_168_site_osm_geocode.xlsx")
+head(manual_site_info); dim(manual_site_info)
+names(manual_site_info)
+
+manual_site_info_use = 
+  select(manual_site_info,
+         SiteCode, 
+         LocDesc, 
+         "Site (NP, National Park; NM, National Monument, park around)",
+         "Other_web_search (NP1, NP2, NM, NF, NRA, NWR, National Park, Preserve, Monument, Forest, Recreation Area, Wildlife Refuge)",
+         "Natural sites - NP1, NP2, NM, NF, NRA, NWR; Or county/city description",
+         "google_address", osm_class, osm_type)
+
+names(manual_site_info_use)[3:5] = 
+  c("Site_meta_info", "Site_Scenic_NP-NM-NF-NRA-NWR", "Non-scene_Economy")
+
+site_census_source_assign =
+  merge(site_census_source_assign, manual_site_info_use)
+
+site_census_source_assign$DUP = NULL
+
 write.csv(site_census_source_assign, 
           paste0(data_use, "_PMF_source_census_", time, ".csv"))
 # "CSN_Site_15TimesMean_PMF_source_census_2024-03-15.csv"
 # "CSN_Site_15t1mdl0unc_PMF_source_census_2024-04-19.csv"
+# "IMPROVE_Site_15t1mdlVNi_DN_PMF_source_census_2024-07-12.csv"
+# "IMPROVE_Site_15tAmmIonVNi_DN_PMF_source_census_2024-07-05.csv" # 15
+
 
 # data_use = "CSN_Site_15TimesMean"
 # site_census_source_assign = site_census_source_assign_5unc
