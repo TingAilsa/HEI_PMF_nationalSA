@@ -35,7 +35,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_25
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_25TimesMean/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_25TimesMean_Site/CSN_noCsub_25timesMean_PMF_CMD_StrongWeakBad_Site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -53,7 +53,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -71,7 +71,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15TimesMean_Site/CSN_noCsub_15timesMean_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -89,7 +89,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -107,7 +107,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc_DN/base_DISP_BS_sum/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -125,7 +125,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Sit
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15t1mdlVNi_DN/base_DISPres1/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -144,7 +144,7 @@ setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Sit
 data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15tAmmIonVNi_DN/base_DISPres1/"
 
 site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site/IMPROVE_Csub_15tAmmIonVNi_PMF_SWB_site.csv")
-species_class = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/Progress data/CSN_Species_class_sub.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
 species_class$Species[nrow(species_class)] = "PM2.5"
 
 site_info_all$X = species_class$X = NULL
@@ -202,14 +202,14 @@ site_serial_Nos = unique(site_info_all$serial.No)
 
 
 ########################################################
-######## 2. Process the PMF non-GUI outputs & Plot ####### 
+######## 2. START the LOOP! - Process the PMF non-GUI outputs & Plot ####### 
 ########################################################
 
 correl_r_p_summary = NULL
 summary_base = NULL
 pred_obs_compare_summary = NULL
 
-for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[3]
+for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1]
   for (factor.No in 4:11) { # 5:11, # factor.No = 11
     
     # site.serial = site_serial_Nos[131]
