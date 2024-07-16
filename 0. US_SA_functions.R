@@ -414,10 +414,10 @@ source_ref = function(base_percent, N){
       grepl("Mg", Main_Species) & grepl("SO4Ion", Main_Species) ~ "F4-Aged Sea Salt",
       
       (grepl("NH4Ion", Main_Species) & (grepl("NO3Ion", Main_Species)) | 
-         startsWith(Main_Species, "NO3Ion")) ~ "F2-Secondary Nitrate",
+         startsWith(Main_Species, "NO3Ion") | startsWith(Main_Species, "ammNO3")) ~ "F2-Secondary Nitrate",
       
       (grepl("NH4Ion", Main_Species) & (grepl("SO4Ion", Main_Species)) | 
-         startsWith(Main_Species, "SO4Ion")) ~ "F3-Secondary Sulfate",
+         startsWith(Main_Species, "SO4Ion") | startsWith(Main_Species, "ammSO4"))  ~ "F3-Secondary Sulfate",
       
       (grepl("KIon", Main_Species) & grepl("OC", Main_Species)) | 
         grepl("K", Main_Species) & grepl("OC", Main_Species) ~ "F8-Biomass",
