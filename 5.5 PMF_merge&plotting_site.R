@@ -40,13 +40,17 @@ getwd()
 # data_use = "CSN_Site_15t1mdl0unc_DN"
 # data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
 
+# 0 uncertainty, dispersion normalization, Csub, Ni V
+data_use = "CSN_Site_Csub_15t1mdlVNi_DN"
+data.pre = "CSN_Csub_15t1mdlVNi_DN_"
+
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
 # data_use = "IMPROVE_Site_15t1mdlVNi_DN"
 # data.pre = "IMPROVE_Csub_15t1mdlVNi_DN_"
 
-# 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
-data_use = "IMPROVE_Site_15tAmmIonVNi_DN"
-data.pre = "IMPROVE_Csub_15tAmmIonVNi_DN_"
+# # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
+# data_use = "IMPROVE_Site_15tAmmIonVNi_DN"
+# data.pre = "IMPROVE_Csub_15tAmmIonVNi_DN_"
 
 dir_path <- paste0("PMF_NonGUI/", data_use, "/base_DISPres1")
 
@@ -65,8 +69,8 @@ csv_overall <-
     (lapply(
       csv_overall_list, 
       read.csv)))
-# csv_overall$Dataset = "CSN"
-csv_overall$Dataset = "IMPROVE"
+csv_overall$Dataset = "CSN"
+# csv_overall$Dataset = "IMPROVE"
 csv_overall$X = NULL
 
 
@@ -176,6 +180,7 @@ csv_source_profile <-
       csv_source_profile_list, 
       read.csv)))
 csv_source_profile$Dataset = "CSN"
+# csv_source_profile$Dataset = "IMPROVE"
 csv_source_profile$X = NULL
 
 # reoder the columns
@@ -194,6 +199,7 @@ write.csv(csv_source_profile, paste0(data_use, "_source_profile_", time, ".csv")
 # CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv
 # "IMPROVE_Site_15t1mdlVNi_DN_source_profile_2024-07-12.csv"
 # "IMPROVE_Site_15tAmmIonVNi_DN_source_profile_2024-07-15.csv"
+# "CSN_Site_Csub_15t1mdlVNi_DN_source_profile_2024-07-26.csv"
 
 ###### 1.2.2 merge contribution - daily & monthly - post Manual + Auto SA analyses  ######
 
@@ -273,11 +279,15 @@ csv_month = data.frame(csv_month)
 csv_month <- 
   csv_month[, c(adjusted_columns, remaining_columns)]
 
+csv_month$Dataset[1:5]
+
 write.csv(csv_month, paste0(data_use, "_covertBack_month", ".csv")) # convert DN data to non-DN
 write.csv(csv_daily, paste0(data_use, "_covertBack_daily", ".csv")) # convert DN data to non-DN
+
 ## CSN_Site_15t1mdl0unc_DN_covertBack_month.csv
 ## IMPROVE_Site_15t1mdlVNi_DN_covertBack_month.csv
 ## "IMPROVE_Site_15tAmmIonVNi_DN_covertBack_month.csv"
+## CSN_Site_Csub_15t1mdlVNi_DN_covertBack_month.csv
 
 # write.csv(csv_month, paste0(data_use, "_month", ".csv"))
 # write.csv(csv_daily, paste0(data_use, "_daily", ".csv"))
@@ -315,7 +325,9 @@ dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 
 # site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv"))
 # site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15t1mdl0unc_site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
-site_info_all = read.csv(paste0(dropbox_path, "IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
+site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_Csub_15t1mdlVNi_Site/CSN_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
+
+# site_info_all = read.csv(paste0(dropbox_path, "IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
 
 site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
 site_geo$SiteCode = as.character(site_geo$SiteCode)
@@ -360,15 +372,15 @@ site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
 # merge all listed files, all.x = TRUE
 # make sure all listed files are data.frame or all are data.table, otherwise, error in Reduce
 
-# ### CSN
-# list_site_census_source_assign = 
-#   list(site_serial, site_geo, site_geoid, site_cluster_traffic, 
-#        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
-
-### IMPROVE
-list_site_census_source_assign = 
-  list(site_serial, site_geoid, site_cluster_traffic,
+### CSN
+list_site_census_source_assign =
+  list(site_serial, site_geo, site_geoid, site_cluster_traffic,
        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
+
+# ### IMPROVE
+# list_site_census_source_assign = 
+#   list(site_serial, site_geoid, site_cluster_traffic,
+#        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
 
 site_census_source_assign =
   Reduce(function(x, y) 
@@ -439,6 +451,7 @@ write.csv(site_census_source_assign,
 # "CSN_Site_15t1mdl0unc_PMF_source_census_2024-04-19.csv"
 # "IMPROVE_Site_15t1mdlVNi_DN_PMF_source_census_2024-07-12.csv"
 # "IMPROVE_Site_15tAmmIonVNi_DN_PMF_source_census_2024-07-05.csv" # 15
+# "CSN_Site_Csub_15t1mdlVNi_DN_PMF_source_census_2024-07-26.csv"
 
 
 # data_use = "CSN_Site_15TimesMean"
@@ -628,48 +641,48 @@ pm_perform
 #   scale_x_continuous(breaks = 3:11) +
 #   theme_bw(base_size = 16)
 
-###### 1.5 species prediction performance ######
-# species_perf_5 = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_noCsub_15TimesMean_PMF_vs_obs.csv")
-species_perf_0 = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISPres1/CSN_noCsub_15tMean_0unc_PMF_vs_obs.csv")
-species_perf_5$X = species_perf_0$X = NULL
-species_perf_0$higher.3.scalRes.per = 
-  as.numeric(sub("%$", "", 
-                 species_perf_0$higher.3.scalRes.per))
-species_perf_5$higher.3.scalRes.per = 
-  as.numeric(sub("%$", "", 
-                 species_perf_5$higher.3.scalRes.per))
-
-species_perf_5 =
-  species_perf_5 %>%
-  pivot_longer(
-    cols = RMSE:higher.3.scalRes.per,
-    names_to = "criteria",
-    values_to = "performance"
-  )
-species_perf_0 =
-  species_perf_0 %>%
-  pivot_longer(
-    cols = RMSE:higher.3.scalRes.per,
-    names_to = "criteria",
-    values_to = "performance"
-  )
-
-species_perf_5$overall_unc = "Extra_overall_5%"
-species_perf_0$overall_unc = "No_extra_uncertainty"
-
-species_perform = rbind(species_perf_5, species_perf_0)
-
-ggplot(species_perf_5, 
-       aes(x = Species, y = performance)) +
-  geom_boxplot() +
-  facet_grid(criteria ~ ., scales = "free") +
-  theme_bw(base_size = 12)
-
-ggplot(species_perf_0, 
-       aes(x = Species, y = performance)) +
-  geom_boxplot() +
-  facet_grid(criteria ~ ., scales = "free") +
-  theme_bw(base_size = 12)
+# ###### 1.5 species prediction performance ######
+# # species_perf_5 = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15TimesMean/base_DISPres1/CSN_noCsub_15TimesMean_PMF_vs_obs.csv")
+# species_perf_0 = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15tMean_0unc/base_DISPres1/CSN_noCsub_15tMean_0unc_PMF_vs_obs.csv")
+# species_perf_5$X = species_perf_0$X = NULL
+# species_perf_0$higher.3.scalRes.per = 
+#   as.numeric(sub("%$", "", 
+#                  species_perf_0$higher.3.scalRes.per))
+# species_perf_5$higher.3.scalRes.per = 
+#   as.numeric(sub("%$", "", 
+#                  species_perf_5$higher.3.scalRes.per))
+# 
+# species_perf_5 =
+#   species_perf_5 %>%
+#   pivot_longer(
+#     cols = RMSE:higher.3.scalRes.per,
+#     names_to = "criteria",
+#     values_to = "performance"
+#   )
+# species_perf_0 =
+#   species_perf_0 %>%
+#   pivot_longer(
+#     cols = RMSE:higher.3.scalRes.per,
+#     names_to = "criteria",
+#     values_to = "performance"
+#   )
+# 
+# species_perf_5$overall_unc = "Extra_overall_5%"
+# species_perf_0$overall_unc = "No_extra_uncertainty"
+# 
+# species_perform = rbind(species_perf_5, species_perf_0)
+# 
+# ggplot(species_perf_5, 
+#        aes(x = Species, y = performance)) +
+#   geom_boxplot() +
+#   facet_grid(criteria ~ ., scales = "free") +
+#   theme_bw(base_size = 12)
+# 
+# ggplot(species_perf_0, 
+#        aes(x = Species, y = performance)) +
+#   geom_boxplot() +
+#   facet_grid(criteria ~ ., scales = "free") +
+#   theme_bw(base_size = 12)
 
 
 
@@ -678,7 +691,10 @@ ggplot(species_perf_0,
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-04.csv")
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-05.csv")
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-05-30.csv")
-source_org = read.csv("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv")
+# source_org = read.csv("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv")
+
+source_org = read.csv("IMPROVE_Site_15t1mdlVNi_DN_PMF_2024-07-23.csv")
+
 source_org$X = NULL
 names(source_org)
 dim(source_org)
