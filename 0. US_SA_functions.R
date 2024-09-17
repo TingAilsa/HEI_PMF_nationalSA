@@ -203,13 +203,17 @@ panel.scatter <- function(x, y, ...){
 
 color_source = c(
   "F1-Traffic" = "#C71000FF",         # red 
+  "F1-Traffic-Diesel" = "#FF95A8FF",         # red 
+  "F1-Traffic-Gasoline" = "#FF410DFF",         # red 
+  "F1-Traffic-ResOil" = "#FB6467FF",         # red 
   "F2-Secondary Nitrate" = "#0073C2FF", # blue
   "F3-Secondary Sulfate" = "#16A085FF", # green 16A085FF 00A087FF
   "F4-Non-tailpipe" = "#F7C530FF",     # yellow FAFD7CFF F7C530FF
   "F5-Industry" = "#E89242FF",         # orange
   "F6-Salt" = "#00B5E2FF",             # cyan 6EE2FFFF  84D7E1FF  00B5E2FF
   "F7-Biomass" = "#8A4198FF",          # purple #8A4198FF violetred
-  "F8-Soil/Dust" = "grey40"         # Gray, brown
+  "F8-Soil/Dust" = "grey40",         # Gray, brown
+  "F9-OP-rich" = "#5A9599FF"         # , brown
 )
 
 
@@ -489,6 +493,12 @@ reorder_col_number <- function(dataset) {
   }
   
   return(ordered_names)
+}
+
+#### get divisible numbers  ####
+get_divisible_numbers <- function(max_num, divisor) {
+  # Generate the sequence from 1 to max_num
+  seq(from = divisor, to = max_num, by = divisor)
 }
 
 ##########################################################################################
@@ -796,8 +806,6 @@ conc_percent_contri = function(conc_contribution){
   
   return(percent_contribution)
 }
-
-
 
 
 #### Extract info in Displacement results DISP and prepare for plotting #### 
@@ -1382,5 +1390,54 @@ species_col_reorder = function(species_df) {
   species_df = species_df %>% relocate(PM25, .after = SO4Ion)
   
   return(species_df)
+}
+
+
+####  extract the day info from the file name and add it into the .shp file #### 
+read_and_add_day <- function(file_path) {
+  # Extract the day from the file name using a regular expression
+  day <- as.numeric(gsub(".*?(\\d+).*", "\\1", basename(file_path)))
+  
+  # Read the shapefile
+  shp <- st_read(file_path)
+  
+  # Check if the shapefile has any features, 0 feature may lead to error in future_map_dfr step
+  if (nrow(shp) == 0) {
+    message("Skipping file with no features: ", file_path)
+    return(NULL)  # Return NULL for empty shapefiles
+  }
+  
+  # Add the day as a new column
+  shp$Day <- day
+  
+  return(shp)
+}
+
+#### convert Lambert Conformal Conic (LCC) projection to longitude and latitude ####
+lcc_to_longlat <- function(a, b) {
+  # Create a data frame with x (a) and y (b) coordinates
+  coords <- data.frame(x = a, y = b)
+  
+  # Create an sf object with the custom CRS for the LCC projection
+  lcc_proj <- "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +a=6370000 +b=6370000"
+  sf_points <- st_as_sf(coords, coords = c("x", "y"), crs = lcc_proj)
+  
+  # Transform the coordinates to WGS84 (longitude/latitude)
+  sf_points_ll <- st_transform(sf_points, crs = 4326)
+  
+  # Extract and return the transformed longitude and latitude
+  return(st_coordinates(sf_points_ll))
+}
+
+
+#### convert day or year'YYYYDDD' format to date YYYY-MM-DD #### 
+day_of_year_toDate <- function(day_of_year) {
+  year <- as.numeric(substr(day_of_year, 1, 4))  # Extract the year
+  day <- as.numeric(substr(day_of_year, 5, 7))   # Extract the day of the year
+  
+  # Convert to date using the year and day of year
+  dates = as.Date(day - 1, origin = paste0(year, "-01-01"))  # Subtract 1 since day 001 is January 1st
+  
+  return(dates)
 }
 
