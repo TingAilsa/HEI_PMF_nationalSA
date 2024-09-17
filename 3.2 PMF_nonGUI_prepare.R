@@ -523,6 +523,7 @@ names(OOB_comb_avg)[1] = "SiteCode"
 miss_comb_avg = fread("IMPROVE_Missing_Qualifier_interpolation_All.csv")
 
 
+### CSN & IMPROVE
 OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
 
 OOB_comb_avg = species_col_reorder(OOB_comb_avg)
@@ -728,15 +729,15 @@ summary(names(species_NA_intp) == names(conc_pmf))
 
 ########## read.7 excluding species not to be used  ##########
 
-# OC.EC.sub = c("EC1", "EC2", "EC3", "OP",
-#               "OC1", "OC2", "OC3", "OC4")
-OC.EC.sub = c("OC", "EC")
+OC.EC.sub = c("EC1", "EC2", "EC3", "OP",
+              "OC1", "OC2", "OC3", "OC4")
+# OC.EC.sub = c("OC", "EC")
 
-## CSN
-species_exclude <- c(OC.EC.sub, c("Ag", "Na", "K", "S", "Zr", "ClIon")) # not used for SA, or colinearity
+## CSN, Br too noisy
+species_exclude <- c(OC.EC.sub, c("Ag", "Br", "Na", "K", "Rb", "S", "Zr", "ClIon")) # not used for SA, or colinearity
 
-## IMPROVE
-species_exclude <- c(OC.EC.sub, c("P", "Zr", "ClIon", "NO2Ion")) # not used for SA, or colinearity
+## IMPROVE, Br too noisy
+species_exclude <- c(OC.EC.sub, c("P", "Br", "Rb", "Zr", "ClIon", "NO2Ion")) # not used for SA, or colinearity
 
 
 conc_pmf[ , species_exclude] <- list(NULL)
@@ -763,7 +764,8 @@ species_source_groups =
        galvanizing = c("Pb", "Zn"), # Dai_2023_EP
        ferros_metal = c("Fe", "Zn", "Mn"), # Yang_2023_Atmosphere
        non_ferros_metal = c("Cu", "Cr", "Ni", "Pb"), # Yang_2023_Atmosphere
-       biomass = c("OC", "K", "KIon", "Br", "Cl", "ClIon", "S", "SO4Ion", "ammSO4"), # Singh_2022_AAQR OC/EC ratio, Masiol_2017_AE
+       # Singh_2022_AAQR OC/EC ratio, Masiol_2017_AE, Maiti_2006_EMA, Vassilev_2010_Fuel
+       biomass = c("OC", "K", "KIon", "Br", "Cl", "ClIon", "S", "SO4Ion", "ammSO4", "Mn", "P", "Ti", "Na", "Zn", "Pb", "Ni", "Cu"), 
        heavy_oil = c("Ni", "V"), # Ni:V ratio, Kotchenruther_2013_AE_PM, SPECIATE, Hadley_2017_AE
        coal_burn = c("S", "SO4Ion", "ammSO4", "EC", "OC", "As", "Se", "Pb", "Cd", "Sb", "Cl", "ClIon"), # Xie_2022_EP, Tao_2017_STE
        firework = c("K", "Pb", "Cu", "Sr", "As", "Ba", "Na", "KIon", "NaIon", "Mg", "MgIon", "OC", "EC", "NO3Ion", "SO4Ion"), # Phil, slides, natural relationships
@@ -771,6 +773,7 @@ species_source_groups =
        vehicle = c("OC", "EC", "Fe", "Zn", "NO3Ion", "ammNO3"), # Dai_2023_EP, Nanjing_Zheng_2019;  Wong_2020_ACP, OC/EC ratios, diesel vehicles (high NOx) are 0.5, gasoline vehicles are 1.8–2.2
        airport = c("OC", "Ca", "Al", "Fe", "CaIon", "FeIon", "EC", "Mg", "MgIon"), #Yin_2024_STE, PNC airport China, OC/EC 2.5–3.5.
        lubricating_oils =c("Fe", "Cu", "Zn"), # Sahu_2011_STE
+       op_rich = c("OP", "S", "SOIon", "ammSO4", "NH4Ion", "H"),
        # steel_industry = c("Mn"), metal_industry = c("Pb"), coal_burn = c("Se"), # Rahman_2022_EI
        heavy_metal_g1 = c("As", "Cu", "Pb", "Co"), # https://www.britannica.com/science
        heavy_metal_g2 = c("Ce", "Cu", "Pb"), 
@@ -895,10 +898,10 @@ dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
 # nonGUI.site.folder <- "CSN_NoGUI_NoCsub_15t1mdlVNi_Site" ## if no OC EC subgroups, no extreme values 
 # GUI.site.folder <- "CSN_GUI_NoCsub_15t1mdlVNi_Site"
 # prefix = "CSN_noCsub_15t1mdlVNi_S_"
-# 
+# # 
 # #### CSN, extreme, mean*15, MDL from either 2011015, or post-2016 median, 4.5 times uncertainty, match AQS PM2.5
 # # always V, Ni, (higher uncertainty if they were grouped as Bad according to current criteria
-# nonGUI.site.folder <- "CSN_NoGUI_Csub_15t1mdlVNi_Site" ## if no OC EC subgroups, no extreme values 
+# nonGUI.site.folder <- "CSN_NoGUI_Csub_15t1mdlVNi_Site" ## if no OC EC subgroups, no extreme values
 # GUI.site.folder <- "CSN_GUI_Csub_15t1mdlVNi_Site"
 # prefix = "CSN_Csub_15t1mdlVNi_S_"
 
@@ -908,11 +911,17 @@ dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF"
 # GUI.site.folder <- "IMPROVE_GUI_Csub_15t1mdlVNi_Site"
 # prefix = "IMPROVE_Csub_15t1mdlVNi_S_"
 
+# #### IMPROVE, extreme, mean*15, MDL from random forest, 4.5 times uncertainty, use ammSO4 & ammNO3
+# # always V, Ni, (higher uncertainty if they were grouped as Bad according to current criteria
+# nonGUI.site.folder <- "IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site" ## if no OC EC subgroups, no extreme values 
+# GUI.site.folder <- "IMPROVE_GUI_Csub_15tAmmIonVNi_Site"
+# prefix = "IMPROVE_Csub_15tAmmIonVNi_S_"
+
 #### IMPROVE, extreme, mean*15, MDL from random forest, 4.5 times uncertainty, use ammSO4 & ammNO3
 # always V, Ni, (higher uncertainty if they were grouped as Bad according to current criteria
-nonGUI.site.folder <- "IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site" ## if no OC EC subgroups, no extreme values 
-GUI.site.folder <- "IMPROVE_GUI_Csub_15tAmmIonVNi_Site"
-prefix = "IMPROVE_Csub_15tAmmIonVNi_S_"
+nonGUI.site.folder <- "IMPROVE_NoGUI_NoCsub_15tAmmIonVNi_Site" ## if no OC EC subgroups, no extreme values
+GUI.site.folder <- "IMPROVE_GUI_NoCsub_15tAmmIonVNi_Site"
+prefix = "IMPROVE_NoCsub_15tAmmIonVNi_S_"
 
 # #### CSN, extreme, season 99th as threshold of outlier
 # Clusterfolder <- "CSN_NoGUI_NoCsub_99season_cluster"
@@ -1080,14 +1089,15 @@ for( site_code in unique(site_list$SiteCode)){
     second_conc_site_extreme_comp = 
       data.frame(conc_site_forExe_species > second_extreme_conc_site_exp)
     
-    # special for EC1, C-sub are not included in source apportionment
-    Csub_col_to_false <- c("EC1", "EC2", "EC3", "OP", "OC1", "OC2", "OC3", "OC4")
-    conc_site_extreme_comp[, Csub_col_to_false] =
-      lapply(conc_site_extreme_comp[, Csub_col_to_false], 
-             function(x) FALSE)
-    second_conc_site_extreme_comp[, Csub_col_to_false] =
-      lapply(second_conc_site_extreme_comp[, Csub_col_to_false], 
-             function(x) FALSE)
+    # ### ONLY WHEN USING C-Subgroups!!! 
+    # # special for EC1, C-sub are not included in source apportionment
+    # Csub_col_to_false <- c("EC1", "EC2", "EC3", "OP", "OC1", "OC2", "OC3", "OC4")
+    # conc_site_extreme_comp[, Csub_col_to_false] =
+    #   lapply(conc_site_extreme_comp[, Csub_col_to_false], 
+    #          function(x) FALSE)
+    # second_conc_site_extreme_comp[, Csub_col_to_false] =
+    #   lapply(second_conc_site_extreme_comp[, Csub_col_to_false], 
+    #          function(x) FALSE)
     
     # extract days with extremes and high values (extreme/3)
     day_extreme = 
@@ -1477,7 +1487,7 @@ for( site_code in unique(site_list$SiteCode)){
     # site.species.weak = site.species.weak[! site.species.weak %in% "PM25"]
     
     # if OC/EC/OPC is in bad, force remove to weak
-    oc.ec = c("EC", "EC1", "EC2", "EC3", 
+    oc.ec = c("EC", "EC1", "EC2", # "EC3", EC3 is almost always bad, then not reassign it as weak
               "OC", "OC1", "OC2", 
               "OC3", "OC4", "OP")
     
@@ -1890,9 +1900,11 @@ onedrive_path = "/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUnive
 # Sitefolder = "CSN_NoGUI_NoCsub_15TimesMean"
 # Sitefolder = "CSN_NoGUI_NoCsub_15t1mdl0unc"
 # Sitefolder = "CSN_NoGUI_NoCsub_15t1mdlVNi"
+# Sitefolder = "CSN_NoGUI_Csub_15t1mdlVNi"
 
 # Sitefolder = "IMPROVE_NoGUI_Csub_15t1mdlVNi"
-Sitefolder = "IMPROVE_NoGUI_Csub_15tAmmIonVNi"
+# Sitefolder = "IMPROVE_NoGUI_Csub_15tAmmIonVNi"
+Sitefolder = "IMPROVE_NoGUI_NoCsub_15tAmmIonVNi"
 
 
 # define the folder of output results
