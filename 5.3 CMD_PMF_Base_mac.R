@@ -70,7 +70,7 @@ data.prefix = "CSN_noCsub_noSeason99_"
 disp.prefix = "CSN_"
 
 
-#### 1.4 IMPROVE noCsub noExtreme - no extreme of any species#### 
+#### 1.4 IMPROVE Csub noExtreme - no extreme of any species#### 
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_nonGUI/IMPROVE_base_DISPres1")
 
 cluster_info_all = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_data_prepare/IMPROVE_noCsub_noExtreme_PMF_CMD_StrongWeakBad_Cluster.csv")
