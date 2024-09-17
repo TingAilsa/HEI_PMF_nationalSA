@@ -14,6 +14,7 @@ library(scales)
 library(dplyr)
 library(plyr)
 library(stringr)
+library(data.table)
 # library(file.copy)
 
 #### A. create cluster & sub-factor folders for sites  ####
@@ -21,8 +22,8 @@ library(stringr)
 # dataset = "CSN"
 dataset = "IMPROVE"
 
-# c_data = "_NoCsub_"
-c_data = "_Csub_"
+c_data = "_NoCsub_"
+# c_data = "_Csub_"
 
 # midfix = "15tMean_0unc"
 # midfix = "15TimesMean"
@@ -33,7 +34,7 @@ c_data = "_Csub_"
 # midfix = "15t1mdl0unc_DN"
 
 # midfix = "15t1mdlVNi_DN" # not really 1 mdl, montly MDL applied
-# midfix = "15tAmmIonVNi_DN"
+midfix = "15tAmmIonVNi_DN"
 
 dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 dropbox_site = paste0(dropbox_path, dataset, "_NoGUI", c_data, midfix, "_Site") # 
@@ -136,17 +137,29 @@ factor.number.series = c(4:11) # 3:11
 
 #### B2. edit and output new iniparams.txt ####
 
-### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization, using ammSO4, ammNO3, Csub
-site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site/IMPROVE_Csub_15tAmmIonVNi_PMF_SWB_site.csv")
-site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15tAmmIonVNi_DN_Site")
-name.prefix = "IMPROVE_Csub_15tAmmIonVNi_DN_"
-name.prefix.csv = "IMPROVE_Csub_15tAmmIonVNi_DN_"
+### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization, using ammSO4, ammNO3, total OC/EC
+site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_NoCsub_15tAmmIonVNi_Site/IMPROVE_NoCsub_15tAmmIonVNi_PMF_SWB_site.csv")
+site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_NoCsub_15tAmmIonVNi_DN_Site")
+name.prefix = "IMPROVE_NoCsub_15tAmmIonVNi_DN_"
+name.prefix.csv = "IMPROVE_NoCsub_15tAmmIonVNi_DN_"
+
+# ### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization, using ammSO4, ammNO3, Csub
+# site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15tAmmIonVNi_Site/IMPROVE_Csub_15tAmmIonVNi_PMF_SWB_site.csv")
+# site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15tAmmIonVNi_DN_Site")
+# name.prefix = "IMPROVE_Csub_15tAmmIonVNi_DN_"
+# name.prefix.csv = "IMPROVE_Csub_15tAmmIonVNi_DN_"
 
 # ### 15TimesMean, 0 extra uncertainty, monthly MDL, IMPROVE, Dispersion Normalization, using NO3, S, Csub
 # site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv")
 # site_folder_pathway = paste0(data.dir,"/IMPROVE_CMD_Csub_15t1mdlVNi_DN_Site")
 # name.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
 # name.prefix.csv = "IMPROVE_Csub_15t1mdlVNi_DN_"
+
+# ## 15TimesMean, 0 extra uncertainty, monthly MDL, CSN, C-sub, Dispersion Normalization, force to use Ni and V and Csubgroups 
+# site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_Csub_15t1mdlVNi_Site/CSN_Csub_15t1mdlVNi_PMF_SWB_site.csv")
+# site_folder_pathway = paste0(data.dir,"/CSN_CMD_Csub_15t1mdlVNi_DN_Site")
+# name.prefix = "CSN_Csub_15t1mdlVNi_DN_"
+# name.prefix.csv = "CSN_Csub_15t1mdlVNi_DN_"
 
 ### 15TimesMean, 0 extra uncertainty, monthly MDL, CSN, Dispersion Normalization
 # site_sum = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_NoCsub_15t1mdl0unc_Site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
@@ -338,3 +351,129 @@ for(site_serial in site_folder_use){
     
   }
 }
+
+
+########### C, IMPROVE & CSN, same GPS sites, till 2017.10 ########### 
+
+##### C1: Extract data until 2017.10, before C protocol change in CSN #####
+### read combined site info
+csn_improve_site = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_CSN_idential_GPS_site_rows.csv")
+### change to 3 character
+csn_improve_site$serial.No =
+  ifelse(csn_improve_site$serial.No < 100,
+         sprintf("%03d", csn_improve_site$serial.No),
+         as.character(csn_improve_site$serial.No))
+
+### path for new folders
+new_folder_path = "/Users/TingZhang/Documents/HEI HAQ PMF/CSN_IMPROVE_comp/CSN_IMPROVE_Csub_15t1mdlVNi_DN_Site"
+
+### list all original conc & unc csv files
+dropbox_share_site = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_CSN_NoGUI_Csub_15t1mdlVNi_DN"
+
+site_ci_files <- list.files(path = dropbox_share_site, pattern = ".*_S_.*\\.csv", full.names = TRUE)
+length(site_ci_files)
+
+### other settings
+factor.number.use = 6:11
+
+method = "_Csub_15t1mdlVNi_DN_"
+
+# create folder to save iniparams.txt files and copy csv files for non-GUI
+for (site_file in site_ci_files) {
+  # Extract site_cmd number from the file name
+  site_cmd <- sub(".*_(S[_-]\\d+)_.*", "\\1", basename(site_file))
+  site_serial_no = sub(".*_(\\d+)", "\\1", site_cmd)
+  
+  # Create a new folder for site_cmd 
+  site_cmd_folder <- file.path(new_folder_path, site_cmd)
+  
+  ##### C1: Extract data until 2017.10, before C protocol change in CSN #####
+  # prepare files for non-GUI PMF & site-date-PM2.5 info for later analysis, only keep data till 2017.10
+  site_file_nonGUI = fread(site_file)
+  site_file_nonGUI = subset(site_file_nonGUI, 
+                            Date < as.Date("2017-11-01"))
+  
+  colnames(site_file_nonGUI)[1] = "SerialNumber"
+
+  # row number of new files
+  file_row = nrow(site_file_nonGUI)
+  site_file_nonGUI$SerialNumber = 1:file_row
+  
+  # other info
+  variable.NO = (ncol(site_file_nonGUI) - 1)/2
+  dataset = csn_improve_site$Dataset[csn_improve_site$serial.No == site_serial_no]
+  
+  # save new non-GUI data into new path
+  path_nonGUI <- file.path(site_cmd_folder,
+                           paste0(dataset, method, site_cmd, ".csv"))
+  write.csv(site_file_nonGUI, path_nonGUI, row.names = FALSE)
+    
+  ##### C2: change row.No in the iniparams.txt files #####
+    
+    for (factor.No in factor.number.use){
+      # input and output path
+      path.CF = paste0(site_cmd_folder, "/Factor_", factor.No, "/")
+      serial_factor_txt = paste0(site_cmd, "_F_", factor.No, ".txt")
+      overall.unc = 0 # default, overall.unc = 0.05
+      
+      # path & name couples
+      base_path_name = paste0(path.CF, "iniparams_base_", serial_factor_txt)
+      BS_path_name = paste0(path.CF, "iniparams_BS_", serial_factor_txt)
+      DISP_path_name = paste0(path.CF, "iniparams_DISP_", serial_factor_txt)
+      BS_DISP_before_path_name = paste0(path.CF, "iniparams_BS_DISP_before_", serial_factor_txt)
+      BS_DISP_path_name = paste0(path.CF, "iniparams_BS_DISP_", serial_factor_txt)
+      
+      # iniparams files
+      base_par = readLines(base_path_name)
+      BS_par = readLines(BS_path_name)
+      DISP_par = readLines(DISP_path_name)
+      before_BS_DISP_par = readLines(BS_DISP_before_path_name)
+      BS_DISP_par = readLines(BS_DISP_path_name)
+      
+      # replace with the row, variable, & factor number 
+      base_par = row_var_factor(base_par, file_row, variable.NO, factor.No, overall.unc)
+      BS_par = row_var_factor(BS_par, file_row, variable.NO, factor.No, overall.unc)
+      DISP_par = row_var_factor(DISP_par, file_row, variable.NO, factor.No, overall.unc)
+      before_BS_DISP_par = row_var_factor(before_BS_DISP_par, file_row, variable.NO, factor.No, overall.unc)
+      BS_DISP_par = row_var_factor(BS_DISP_par, file_row, variable.NO, factor.No, overall.unc)
+      
+      # output new iniparams.txt
+      write.table(base_par, 
+                  file = base_path_name, 
+                  sep = "\t",
+                  quote = FALSE,
+                  row.names = FALSE,
+                  col.names = FALSE)
+      
+      write.table(BS_par, 
+                  file = BS_path_name, 
+                  sep = "\t",
+                  quote = FALSE,
+                  row.names = FALSE,
+                  col.names = FALSE)
+      
+      write.table(DISP_par, 
+                  file = DISP_path_name, 
+                  sep = "\t",
+                  quote = FALSE,
+                  row.names = FALSE,
+                  col.names = FALSE)
+      
+      write.table(before_BS_DISP_par, 
+                  file = BS_DISP_before_path_name, 
+                  sep = "\t",
+                  quote = FALSE,
+                  row.names = FALSE,
+                  col.names = FALSE)
+      
+      write.table(BS_DISP_par, 
+                  file = BS_DISP_path_name, 
+                  sep = "\t",
+                  quote = FALSE,
+                  row.names = FALSE,
+                  col.names = FALSE)
+      }
+}
+
+
+
