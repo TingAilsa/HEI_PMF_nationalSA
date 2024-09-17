@@ -118,7 +118,7 @@ pm.prefix = "CSN_noCsub_15t1mdl0unc_"
 disp.prefix = "CSN_"
 csv.suffix = "_CMD_DN.csv"
 
-#### 1.6 IMPROVE 15t1mdl0unc noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
+#### 1.6 IMPROVE 15t1mdlVNi noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
 
 ##set working directory
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15t1mdlVNi_DN/base_DISPres1/")
@@ -137,7 +137,7 @@ disp.prefix = "IMPROVE_"
 csv.suffix = "_CMD_DN.csv"
 
 
-#### 1.7 IMPROVE 15t1mdl0unc noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
+#### 1.7 IMPROVE 15tAmmIonVNi noCsub, Dispersion Normalization, overall uncertainty = 0% #### 
 
 ##set working directory
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/IMPROVE_Site_15tAmmIonVNi_DN/base_DISPres1/")
@@ -154,6 +154,74 @@ data.prefix = "IMPROVE_Csub_15tAmmIonVNi_DN_"
 pm.prefix = "IMPROVE_Csub_15tAmmIonVNi_"
 disp.prefix = "IMPROVE_"
 csv.suffix = "_CMD_DN.csv"
+
+
+#### 1.8 CSN 15t1mdlVNi Csub, Dispersion Normalization, overall uncertainty = 0% #### 
+
+##set working directory
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_Csub_15t1mdlVNi_DN/base_DISPres1/")
+data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_Csub_15t1mdlVNi_DN/base_DISPres1/"
+
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_Csub_15t1mdlVNi_Site/CSN_Csub_15t1mdlVNi_PMF_SWB_site.csv")
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+cSet_noExtreme = "CSN_NoGUI_Csub_15t1mdlVNi_DN_Site"
+data.prefix = "CSN_Csub_15t1mdlVNi_DN_"
+pm.prefix = "CSN_Csub_15t1mdlVNi_"
+disp.prefix = "CSN_"
+csv.suffix = "_CMD_DN.csv"
+
+
+#### 1.9 CSN & IMPROVE, till 2017, 15t1mdlVNi Csub, Dispersion Normalization, overall uncertainty = 0% #### 
+
+##set working directory
+### CSN
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_IMPROVE_Csub_15t1mdlVNi_DN/CSN_2017"); getwd()
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_NoGUI_Csub_15t1mdlVNi_Site/CSN_Csub_15t1mdlVNi_PMF_SWB_site_till2017.csv")
+
+cSet_noExtreme = "CSN_NoGUI_Csub_15t1mdlVNi_DN_Site"
+data.prefix = "CSN_Csub_15t1mdlVNi_DN_"
+pm.prefix = "CSN_Csub_15t1mdlVNi_"
+disp.prefix = "CSN_"
+csv.suffix = "_CMD_DN.csv"
+
+### IMPROVE
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_IMPROVE_Csub_15t1mdlVNi_DN/IMPROVE_2017"); getwd()
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site_till2017.csv")
+
+cSet_noExtreme = "IMPROVE_NoGUI_Csub_15t1mdlVNi_DN_Site"
+data.prefix = "IMPROVE_Csub_15t1mdlVNi_DN_"
+pm.prefix = "IMPROVE_Csub_15t1mdlVNi_"
+disp.prefix = "IMPROVE_"
+csv.suffix = "_CMD_DN.csv"
+
+### other info
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
+
+
+#### 1.10 IMPROVE, 2020, 15tAmmIonVNi NoCsub, Dispersion Normalization, overall uncertainty = 0% #### 
+
+### IMPROVE
+setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_IMPROVE_Csub_15t1mdlVNi_DN/IMPROVE_NoCsub_2020"); getwd()
+site_info_all = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_NoGUI_NoCsub_15tAmmIonVNi_Site/IMPROVE_NoCsub_15tAmmIonVNi_PMF_SWB_site_select.csv")
+
+cSet_noExtreme = "IMPROVE_NoGUI_NoCsub_15tAmmIonVNi_DN_Site"
+data.prefix = "IMPROVE_NoCsub_15tAmmIonVNi_DN_"
+pm.prefix = "IMPROVE_NoCsub_15tAmmIonVNi_"
+disp.prefix = "IMPROVE_"
+csv.suffix = "_CMD_DN.csv"
+
+### other info
+species_class = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/Element_ion_pha_Cgroup_sequence.csv")
+species_class$Species[nrow(species_class)] = "PM2.5"
+
+site_info_all$X = species_class$X = NULL
 
 
 #### 1.N shared process #### 
@@ -209,7 +277,7 @@ correl_r_p_summary = NULL
 summary_base = NULL
 pred_obs_compare_summary = NULL
 
-for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1]
+for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1]; site_serial_Nos[85]
   for (factor.No in 4:11) { # 5:11, # factor.No = 11
     
     # site.serial = site_serial_Nos[131]
@@ -386,7 +454,11 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
           "NO3" = "NO3Ion",
           "SO4" = "SO4Ion",
           "PM25" = "PM2.5"))
-        
+      
+      # ## extract data till 2017-11-01, only for comparison before this data, when CSN C measurement protocol did not change
+      # site_date_PM_species_conc = subset(site_date_PM_species_conc, Date < as.Date("2017-11-01"))
+      # site_date_PM_species_unc = subset(site_date_PM_species_unc, Date < as.Date("2017-11-01"))
+      
       #### estimate the uncertainty scaled residual
       daily_species_scale_residual = 
         (site_date_PM_species_conc[, site.weak.strong] - 
@@ -891,80 +963,80 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
       
       # daily_conc_plot
       
-      #### Annual
-      # annual_plot_use = subset(ts_annual_conc, Source.No != "F")
-      annual_plot_use = ts_annual_conc
-      
-      year_conc_plot <- 
-        #  ggplot(subset(annual_plot_use,
-        #                SiteCode = unique(annual_plot_use$SiteCode)[2]), 
-        ggplot(annual_plot_use,
-               aes(x = Year, y = Concentration, 
-                   group = Factor_source, color = Factor_source)) +
-        labs(x = "Year", y = format_variable("Concentration µg/m3")) +
-        facet_grid(Factor ~., scales = "free_y") +
-        geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
-                      width = 0.15) +
-        geom_point(size = 1.5, alpha = 0.8) +
-        scale_x_continuous(breaks = 
-                             pretty(annual_plot_use$Year, # pretty{base}
-                                    n = length(unique(annual_plot_use$Year)), 
-                                    min.n = 1)) +
-        scale_y_continuous(limits = c(0, NA), 
-                           breaks = function(x) pretty(x, n = 3)) + 
-        geom_text(data = middle_positions_ts, size = 4,
-                  aes(x = middle_year, y = text_y_yr, label = Factor_source_contr), 
-                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_manual(values = col_npg) +
-        theme_base() +
-        theme(
-          panel.grid = element_line(colour = "white"),
-          # remove the backgroup line
-          plot.background = element_rect(color = NA),
-          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
-          strip.background = element_blank(), strip.text = element_blank(),
-          legend.position = "none"
-        )
-      
-      # year_conc_plot
-         
-      #### Month
-      # month_plot_use = subset(ts_month_conc, Source.No != "F")
-      month_plot_use = ts_month_conc
-
-      month_conc_plot <- 
-        #  ggplot(subset(month_plot_use,
-        #                SiteCode = unique(month_plot_use$SiteCode)[2]), 
-        ggplot(month_plot_use,
-               aes(x = Month, y = Concentration, 
-                   group = Factor_source, color = Factor_source)) +
-        labs(x = "Month", y = format_variable("Concentration µg/m3")) +
-        facet_grid(Factor ~., scales = "free_y") +
-        geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
-                      width = 0.15) +
-        geom_point(size = 1.5, alpha = 0.8) +
-        scale_x_continuous(breaks = 
-                             pretty(month_plot_use$Month, # pretty{base}
-                                    n = length(unique(month_plot_use$Month)), 
-                                    min.n = 1)) +
-        scale_y_continuous(limits = c(0, NA), 
-                           breaks = function(x) pretty(x, n = 3)) + 
-        geom_text(data = middle_positions_ts, size = 4,
-                  aes(x = 6, y = text_y_mon, label = Factor_source_contr), 
-                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-        scale_color_manual(values = col_npg) +
-        theme_base() +
-        theme(
-          panel.grid = element_line(colour = "white"),
-          # remove the backgroup line
-          plot.background = element_rect(color = NA),
-          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
-          strip.background = element_blank(), strip.text = element_blank(),
-          legend.position = "none"
-        )
-      
-      # month_conc_plot
-      
+      # #### Annual
+      # # annual_plot_use = subset(ts_annual_conc, Source.No != "F")
+      # annual_plot_use = ts_annual_conc
+      # 
+      # year_conc_plot <- 
+      #   #  ggplot(subset(annual_plot_use,
+      #   #                SiteCode = unique(annual_plot_use$SiteCode)[2]), 
+      #   ggplot(annual_plot_use,
+      #          aes(x = Year, y = Concentration, 
+      #              group = Factor_source, color = Factor_source)) +
+      #   labs(x = "Year", y = format_variable("Concentration µg/m3")) +
+      #   facet_grid(Factor ~., scales = "free_y") +
+      #   geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
+      #                 width = 0.15) +
+      #   geom_point(size = 1.5, alpha = 0.8) +
+      #   scale_x_continuous(breaks = 
+      #                        pretty(annual_plot_use$Year, # pretty{base}
+      #                               n = length(unique(annual_plot_use$Year)), 
+      #                               min.n = 1)) +
+      #   scale_y_continuous(limits = c(0, NA), 
+      #                      breaks = function(x) pretty(x, n = 3)) + 
+      #   geom_text(data = middle_positions_ts, size = 4,
+      #             aes(x = middle_year, y = text_y_yr, label = Factor_source_contr), 
+      #             inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+      #   scale_color_manual(values = col_npg) +
+      #   theme_base() +
+      #   theme(
+      #     panel.grid = element_line(colour = "white"),
+      #     # remove the backgroup line
+      #     plot.background = element_rect(color = NA),
+      #     plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+      #     strip.background = element_blank(), strip.text = element_blank(),
+      #     legend.position = "none"
+      #   )
+      # 
+      # # year_conc_plot
+      #    
+      # #### Month
+      # # month_plot_use = subset(ts_month_conc, Source.No != "F")
+      # month_plot_use = ts_month_conc
+      # 
+      # month_conc_plot <- 
+      #   #  ggplot(subset(month_plot_use,
+      #   #                SiteCode = unique(month_plot_use$SiteCode)[2]), 
+      #   ggplot(month_plot_use,
+      #          aes(x = Month, y = Concentration, 
+      #              group = Factor_source, color = Factor_source)) +
+      #   labs(x = "Month", y = format_variable("Concentration µg/m3")) +
+      #   facet_grid(Factor ~., scales = "free_y") +
+      #   geom_errorbar(aes(ymin = conc_down, ymax = conc_up),
+      #                 width = 0.15) +
+      #   geom_point(size = 1.5, alpha = 0.8) +
+      #   scale_x_continuous(breaks = 
+      #                        pretty(month_plot_use$Month, # pretty{base}
+      #                               n = length(unique(month_plot_use$Month)), 
+      #                               min.n = 1)) +
+      #   scale_y_continuous(limits = c(0, NA), 
+      #                      breaks = function(x) pretty(x, n = 3)) + 
+      #   geom_text(data = middle_positions_ts, size = 4,
+      #             aes(x = 6, y = text_y_mon, label = Factor_source_contr), 
+      #             inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+      #   scale_color_manual(values = col_npg) +
+      #   theme_base() +
+      #   theme(
+      #     panel.grid = element_line(colour = "white"),
+      #     # remove the backgroup line
+      #     plot.background = element_rect(color = NA),
+      #     plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+      #     strip.background = element_blank(), strip.text = element_blank(),
+      #     legend.position = "none"
+      #   )
+      # 
+      # # month_conc_plot
+      # 
       #### year_month
       base_ts_conc_ym_conc = ts_year_month_conc
       
@@ -1061,74 +1133,74 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
         )
       # daily_percent_plot
       
-      # annual
-      year_percent_plot <-
-        ggplot(ts_annual_fraction,
-               aes(x = Year, y = Percent,
-                   group = Factor, color = Factor)) + # group = 1
-        geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
-                      width = 0.15) +
-        geom_point(size = 1.2) +
-        # the preset format_variable function, for sub-/super- scripts
-        labs(x = "Date", y = format_variable("Fraction contribution %")) +
-        facet_grid(Factor ~., scales = "free_y") +
-        # pretty function, y start from 0, and 3 breaks
-        scale_y_continuous(limits = c(0, NA), 
-                           breaks = function(x) pretty(x, n = 3)) + 
-        scale_x_continuous(breaks = 
-                             pretty(ts_annual_fraction$Year, # pretty{base}
-                                    n = length(unique(ts_annual_fraction$Year)), 
-                                    min.n = 1)) +
-        geom_text(data = middle_positions_frac_ts, size = 4,
-                  aes(x = middle_year, y = text_y_frac_yr, label = Factor_source_contr), 
-                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-         scale_color_manual(values = col_npg) +
-        theme_base() +
-        theme(
-          panel.grid = element_line(colour = "white"),
-          # remove the backgroup line
-          plot.background = element_rect(color = NA),
-          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
-          strip.background = element_blank(), strip.text = element_blank(),
-          axis.text.x = element_text(angle = 90, vjust = 0.5),
-          legend.position = "none"
-        )
-      # year_percent_plot
-      
-      # monthly
-      month_percent_plot <-
-        ggplot(ts_month_fraction,
-               aes(x = Month, y = Percent,
-                   group = Factor, color = Factor)) + # group = 1
-        geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
-                      width = 0.15) +
-        geom_point(size = 1.2) +
-        # the preset format_variable function, for sub-/super- scripts
-        labs(x = "Date", y = format_variable("Fraction contribution %")) +
-        facet_grid(Factor ~., scales = "free_y") +
-        # pretty function, y start from 0, and 3 breaks
-        scale_y_continuous(limits = c(0, NA), 
-                           breaks = function(x) pretty(x, n = 3)) + 
-        scale_x_continuous(breaks = 
-                             pretty(ts_month_fraction$Month, # pretty{base}
-                                    n = length(unique(ts_month_fraction$Month)), 
-                                    min.n = 1)) +
-        geom_text(data = middle_positions_frac_ts, size = 4,
-                  aes(x = 6.5, y = text_y_frac_mon, label = Factor_source_contr),
-                  inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
-         scale_color_manual(values = col_npg) +
-        theme_base() +
-        theme(
-          panel.grid = element_line(colour = "white"),
-          # remove the backgroup line
-          plot.background = element_rect(color = NA),
-          plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
-          strip.background = element_blank(), strip.text = element_blank(),
-          axis.text.x = element_text(angle = 90, vjust = 0.5),
-          legend.position = "none"
-        )
-      # month_percent_plot
-      
+      # # annual
+      # year_percent_plot <-
+      #   ggplot(ts_annual_fraction,
+      #          aes(x = Year, y = Percent,
+      #              group = Factor, color = Factor)) + # group = 1
+      #   geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
+      #                 width = 0.15) +
+      #   geom_point(size = 1.2) +
+      #   # the preset format_variable function, for sub-/super- scripts
+      #   labs(x = "Date", y = format_variable("Fraction contribution %")) +
+      #   facet_grid(Factor ~., scales = "free_y") +
+      #   # pretty function, y start from 0, and 3 breaks
+      #   scale_y_continuous(limits = c(0, NA), 
+      #                      breaks = function(x) pretty(x, n = 3)) + 
+      #   scale_x_continuous(breaks = 
+      #                        pretty(ts_annual_fraction$Year, # pretty{base}
+      #                               n = length(unique(ts_annual_fraction$Year)), 
+      #                               min.n = 1)) +
+      #   geom_text(data = middle_positions_frac_ts, size = 4,
+      #             aes(x = middle_year, y = text_y_frac_yr, label = Factor_source_contr), 
+      #             inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+      #    scale_color_manual(values = col_npg) +
+      #   theme_base() +
+      #   theme(
+      #     panel.grid = element_line(colour = "white"),
+      #     # remove the backgroup line
+      #     plot.background = element_rect(color = NA),
+      #     plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+      #     strip.background = element_blank(), strip.text = element_blank(),
+      #     axis.text.x = element_text(angle = 90, vjust = 0.5),
+      #     legend.position = "none"
+      #   )
+      # # year_percent_plot
+      # 
+      # # monthly
+      # month_percent_plot <-
+      #   ggplot(ts_month_fraction,
+      #          aes(x = Month, y = Percent,
+      #              group = Factor, color = Factor)) + # group = 1
+      #   geom_errorbar(aes(ymin = percent_down, ymax = percent_up),
+      #                 width = 0.15) +
+      #   geom_point(size = 1.2) +
+      #   # the preset format_variable function, for sub-/super- scripts
+      #   labs(x = "Date", y = format_variable("Fraction contribution %")) +
+      #   facet_grid(Factor ~., scales = "free_y") +
+      #   # pretty function, y start from 0, and 3 breaks
+      #   scale_y_continuous(limits = c(0, NA), 
+      #                      breaks = function(x) pretty(x, n = 3)) + 
+      #   scale_x_continuous(breaks = 
+      #                        pretty(ts_month_fraction$Month, # pretty{base}
+      #                               n = length(unique(ts_month_fraction$Month)), 
+      #                               min.n = 1)) +
+      #   geom_text(data = middle_positions_frac_ts, size = 4,
+      #             aes(x = 6.5, y = text_y_frac_mon, label = Factor_source_contr),
+      #             inherit.aes = FALSE, vjust = -0.2, hjust = 0.5) + # , fontface = "bold"
+      #    scale_color_manual(values = col_npg) +
+      #   theme_base() +
+      #   theme(
+      #     panel.grid = element_line(colour = "white"),
+      #     # remove the backgroup line
+      #     plot.background = element_rect(color = NA),
+      #     plot.title = element_text(hjust = 0.05, vjust = 0, size = 11),
+      #     strip.background = element_blank(), strip.text = element_blank(),
+      #     axis.text.x = element_text(angle = 90, vjust = 0.5),
+      #     legend.position = "none"
+      #   )
+      # # month_percent_plot
+      # 
       # Year_Month
       ym_percent_plot <-
         ggplot(ts_year_month_fraction,
@@ -1169,11 +1241,11 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
       daily_ts_plot <- 
         grid.arrange(daily_conc_plot, daily_percent_plot, ncol = 2)
 
-      month_ts_plot <- 
-        grid.arrange(month_conc_plot, month_percent_plot, ncol = 2)
-
-      year_ts_plot <- 
-        grid.arrange(year_conc_plot, year_percent_plot, ncol = 2)
+      # month_ts_plot <- 
+      #   grid.arrange(month_conc_plot, month_percent_plot, ncol = 2)
+      # 
+      # year_ts_plot <- 
+      #   grid.arrange(year_conc_plot, year_percent_plot, ncol = 2)
 
       ym_ts_plot <- 
         grid.arrange(ym_conc_plot, ym_percent_plot, ncol = 2)
@@ -1620,10 +1692,10 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
       
       ####### Output files #######
 
-      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_ts_plot, width = 13, height = 8)
-      ggsave(paste0(name.prefix, "month.pdf"), plot = month_ts_plot, width = 11, height = 7)
-      ggsave(paste0(name.prefix, "annual.pdf"), plot = year_ts_plot, width = 11, height = 7)
-      ggsave(paste0(name.prefix, "_year_month.pdf"), plot = ym_ts_plot, width = 13, height = 8)
+      ggsave(paste0(name.prefix, "daily.pdf"), plot = daily_ts_plot, width = 9, height = 5.5)
+      # ggsave(paste0(name.prefix, "month.pdf"), plot = month_ts_plot, width = 9, height = 5.5)
+      # ggsave(paste0(name.prefix, "annual.pdf"), plot = year_ts_plot, width = 9, height = 5.5)
+      ggsave(paste0(name.prefix, "_year_month.pdf"), plot = ym_ts_plot, width = 9, height = 5.5)
       ggsave(paste0(name.prefix, "overall.pdf"), plot = overall_contri, width = 9, height = 5)
       # ggsave(paste0(name.prefix, "source-PM.pdf"), plot = PM_source_daily, width = 9, height = 7)
       ggsave(paste0(name.prefix, "source_profile.pdf"), plot = source_profile, width = 5.8, height = 6,
@@ -1669,8 +1741,8 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
       write.csv(conc_percent_bsDisp_output, paste0(name.prefix, "source_profile.csv"))
 
       write.csv(ts_daily_output, paste0(name.prefix, "daily.csv"))
-      write.csv(ts_annual_output, paste0(name.prefix, "annual.csv"))
-      write.csv(ts_year_month_output, paste0(name.prefix, "month.csv"))
+      # write.csv(ts_annual_output, paste0(name.prefix, "annual.csv"))
+      # write.csv(ts_year_month_output, paste0(name.prefix, "month.csv"))
 
       write.csv(daily_species_scale_residual, paste0(name.prefix, "species_residual.csv"))
       write.csv(daily_Q_Qexp, paste0(name.prefix, "daily_Q_Qexp.csv"))
@@ -1682,39 +1754,39 @@ for (site.serial in site_serial_Nos) { # 1:25, # site.serial = site_serial_Nos[1
   }
 }
 
-#### 3. summary the fraction of converged runs in base model ####
-
-converge_percent_summary = NULL
-
-for (site.serial in site_serial_Nos) { # 1:25
-  for (factor.No in 3:11) { # 5:11
-    
-    site.serial.factor.pre = paste0("S_", site.serial, "_F_", factor.No, "_")
-    name.prefix = paste0(data.prefix, site.serial.factor.pre)
-    folder_path <- paste0("S_", site.serial, "/Factor_", factor.No, "/") # "C_"
-    
-    tryCatch({
-      
-      base_report = readLines(paste0(folder_path, 
-                                     data.prefix, 
-                                     site.serial.factor.pre,
-                                     "base_PMFreport.txt"))
-      
-      # converge condition 
-      converge_percent = lowest_Qm_task(base_report)$converge_percent
-      
-      converge_percent_info = data.frame(
-        site.serial = site.serial, factor.No = factor.No, 
-        converge_percent = converge_percent)
-      converge_percent_summary = 
-        rbind(converge_percent_summary, converge_percent_info)
-      
-      write.csv(converge_percent_summary, paste0(data.prefix, "converge_percent.csv"))
-      
-    }, error = function(e) {
-      
-      print(paste("Error at iteration", site.serial, "factor", factor.No, ":", e$message))
-    })
-  }
-}
+# #### 3. summary the fraction of converged runs in base model ####
+# 
+# converge_percent_summary = NULL
+# 
+# for (site.serial in site_serial_Nos) { # 1:25
+#   for (factor.No in 3:11) { # 5:11
+#     
+#     site.serial.factor.pre = paste0("S_", site.serial, "_F_", factor.No, "_")
+#     name.prefix = paste0(data.prefix, site.serial.factor.pre)
+#     folder_path <- paste0("S_", site.serial, "/Factor_", factor.No, "/") # "C_"
+#     
+#     tryCatch({
+#       
+#       base_report = readLines(paste0(folder_path, 
+#                                      data.prefix, 
+#                                      site.serial.factor.pre,
+#                                      "base_PMFreport.txt"))
+#       
+#       # converge condition 
+#       converge_percent = lowest_Qm_task(base_report)$converge_percent
+#       
+#       converge_percent_info = data.frame(
+#         site.serial = site.serial, factor.No = factor.No, 
+#         converge_percent = converge_percent)
+#       converge_percent_summary = 
+#         rbind(converge_percent_summary, converge_percent_info)
+#       
+#       write.csv(converge_percent_summary, paste0(data.prefix, "converge_percent.csv"))
+#       
+#     }, error = function(e) {
+#       
+#       print(paste("Error at iteration", site.serial, "factor", factor.No, ":", e$message))
+#     })
+#   }
+# }
 
