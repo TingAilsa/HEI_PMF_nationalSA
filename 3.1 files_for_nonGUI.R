@@ -361,6 +361,9 @@ csn_aqs_pm$species.sum = csn_aqs_pm$PM25_Combine =
 # the reestimation will be combined when preparing GUI/nonGUI data
 write.csv(csn_aqs_pm, "CSN_concentration_AQS.PM_PMF_C-sub_2024.03.csv")
 
+# csn_aqs_pm =  fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_concentration_AQS.PM_PMF_C-sub_2024.03.csv")
+# head(csn_aqs_pm)
+
 ##### CSN - MDL mostly based on pre-2015 #####
 csn_mdl = fread("CSN_MDL_monthly_2024.04.csv")
 csn_mdl$V1 = NULL
@@ -746,6 +749,10 @@ write.csv(species_daily_fullMDL, "CSN_MDL_C-Sub_monthly_forPMF_expand_2024.04.cs
 
 # species_conc_mdl_Site = subset(species_conc_mdl_Site, !is.na(OP))
 
+# species_conc_mdl_csn =  fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_conc_vs_MDL_C-subgroup_corrected_2024.04.csv")
+# summary(species_conc_mdl_csn)
+
+
 ##### IMPROVE - concentration vs. MDL #####
 #### missing MDLs were interpolated via random forest in 2024.07
 
@@ -799,3 +806,8 @@ dim(species_daily_fullMDL)
 write.csv(species_conc_mdl_Site, "IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.06.csv")
 write.csv(species_daily_fullMDL, "IMPROVE_MDL_C-Sub_daily_forPMF_expand_2024.06.csv")
 
+species_conc_mdl_imp =  fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/IMPROVE_conc_vs_MDL_C-subgroup_corrected_2024.06.csv")
+summary(species_conc_mdl_imp)
+
+species_daily_fullMDL =  fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/IMPROVE_MDL_C-Sub_daily_forPMF_expand_2024.06.csv")
+summary(species_daily_fullMDL)
