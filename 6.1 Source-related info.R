@@ -7,7 +7,7 @@ library(ggplot2)
 library(furrr)
 library(USAboundaries)
 library(quanteda)
-library(dplyr)
+library(tidyr)
 library(tidycensus) # ACS census
 library(terra) # .img
 library(raster) # .img
@@ -16,6 +16,7 @@ library(oro.dicom) # .vol
 library(fst)
 library(ff) # handle large files without hitting memory limits
 library(bigmemory)  # handle large files without hitting memory limits
+library(corrplot)
 
 #### Read the generated census level geometry, after ACScensus step ####
 
@@ -979,6 +980,9 @@ write.csv(census_tract_geoid_nogeom,
                    "ACS_census_tract_geoid_NO_matched_geometry.csv"))
 
 #### NLCD, land cover ####
+
+###### NLCD 1. exploration ######
+
 # download from, https://www.mrlc.gov/data,  NLCD Land Cover (CONUS) All Years
 
 setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/NLCD_landcover")
@@ -1001,6 +1005,310 @@ unique_values
 
 # Calculate the area covered by each land cover class
 class_areas <- terra::freq(ncld_year)
+
+###### NLCD 2. aggregate the land use to different resolutions, fact = 0, 5, 10, 30 based on southeast results######
+
+# Land Use Type
+# NCLD land use type
+ncld_2016_org <- terra::rast("nlcd_2016_land_cover_l48_20210604/nlcd_2016_land_cover_l48_20210604.img")
+
+dim(ncld_2016_org); crs(ncld_2016_org); res(ncld_2016_org)
+is.factor(ncld_2016_org); is.factor(ncld_2016_org$`NLCD Land Cover Class`)
+plot(ncld_2016_org)
+unique(ncld_2016_org$`NLCD Land Cover Class`)
+
+
+# Define the bounding box for the Southeast US (approximate coordinates)
+southeast_bbox <- ext(-2000000, 500000, 0, 1500000)
+
+# Crop the original raster to the Southeast bounding box
+ncld_southeast <- crop(ncld_2016_org, southeast_bbox)
+ncld_southeast_charLevel = as.factor(ncld_southeast)
+
+# Plot the cropped region to visualize the Southeast US
+plot(ncld_southeast, main = "Southeastern US Land Cover")
+ncld_southeast_df = data.frame(unique(ncld_southeast$`NLCD Land Cover Class`))
+
+freq_ncld = as.data.frame((freq(ncld_southeast_charLevel)))
+freq_ncld$fraction = freq_ncld$count/(sum(freq_ncld$count))
+
+
+## fact = 30
+ncld_southeast_app_30 = 
+  terra::aggregate(ncld_southeast, 
+                   fact = 30, 
+                   fun = modal, 
+                   expand = TRUE, 
+                   na.rm = TRUE)
+
+ncld_southeast_charLevel_30 = as.factor(ncld_southeast_app_30)
+levels(ncld_southeast_app_30); dim(ncld_southeast_app_30)
+levels(ncld_southeast_charLevel_30); dim(ncld_southeast_charLevel_30)
+# levels(ncld_southeast_charLevel_30) <- landcover_labels # incorrectly assign the labels
+
+freq_ncld_30 = as.data.frame((freq(ncld_southeast_charLevel_30)))
+freq_ncld_30$fraction = freq_ncld_30$count/(sum(freq_ncld_30$count))
+
+
+plot(ncld_southeast_app_30, main = "Southeastern US Land Cover - factor = 30")
+plot(ncld_southeast_charLevel_30, main = "Southeastern US Land Cover - factor = 30")
+
+ncld_southeast_30_df = 
+  data.frame(unique(ncld_southeast_app_30$`NLCD Land Cover Class`))
+ncld_southeast_charLevel_30_df = 
+  data.frame(unique(ncld_southeast_charLevel_30$`NLCD Land Cover Class`))
+
+
+## fact = 10
+ncld_southeast_app_10 = 
+  terra::aggregate(ncld_southeast, 
+                   fact = 10, 
+                   fun = modal, 
+                   expand = TRUE, 
+                   na.rm = TRUE)
+
+ncld_southeast_charLevel_10 = as.factor(ncld_southeast_app_10)
+levels(ncld_southeast)
+levels(ncld_southeast_app_10); dim(ncld_southeast_app_10)
+levels(ncld_southeast_charLevel_10); dim(ncld_southeast_charLevel_10)
+# levels(ncld_southeast_charLevel_10) <- landcover_labels
+
+freq_ncld_10 = as.data.frame((freq(ncld_southeast_charLevel_10)))
+freq_ncld_10$fraction = freq_ncld_10$count/(sum(freq_ncld_10$count))
+
+
+plot(ncld_southeast_app_10, main = "Southeastern US Land Cover - factor = 10")
+plot(ncld_southeast_charLevel_10, main = "Southeastern US Land Cover - factor = 10")
+
+ncld_southeast_10_df = 
+  data.frame(unique(ncld_southeast_app_10$`NLCD Land Cover Class`))
+ncld_southeast_charLevel_10_df = 
+  data.frame(unique(ncld_southeast_charLevel_10$`NLCD Land Cover Class`))
+
+
+## fact = 5
+ncld_southeast_app_5 = 
+  terra::aggregate(ncld_southeast, 
+                   fact = 5, 
+                   fun = modal, 
+                   expand = TRUE, 
+                   na.rm = TRUE)
+
+ncld_southeast_charLevel_5 = as.factor(ncld_southeast_app_5)
+levels(ncld_southeast_app_5); dim(ncld_southeast_app_5)
+levels(ncld_southeast_charLevel_5); dim(ncld_southeast_charLevel_5)
+# levels(ncld_southeast_charLevel_5) <- landcover_labels
+
+freq_ncld_5 = as.data.frame((freq(ncld_southeast_charLevel_5)))
+freq_ncld_5$fraction = freq_ncld_5$count/(sum(freq_ncld_5$count))
+
+plot(ncld_southeast_app_5, main = "Southeastern US Land Cover - factor = 5")
+plot(ncld_southeast_charLevel_5, main = "Southeastern US Land Cover - factor = 5")
+
+ncld_southeast_5_df = 
+  data.frame(unique(ncld_southeast_app_5$`NLCD Land Cover Class`))
+ncld_southeast_charLevel_5_df = 
+  data.frame(unique(ncld_southeast_charLevel_5$`NLCD Land Cover Class`))
+
+freq_ncld$fact = "fact_0"
+freq_ncld_5$fact = "fact_5"
+freq_ncld_10$fact = "fact_10"
+freq_ncld_30$fact = "fact_30"
+
+freq_ncld_comp = rbind(freq_ncld, freq_ncld_5, freq_ncld_10, freq_ncld_30)
+sapply(freq_ncld_comp, class)
+names(freq_ncld_comp)[2] = "Code"
+freq_ncld_comp_landtype = join(freq_ncld_comp, landcover_df)
+
+ggplot(freq_ncld_comp_landtype, 
+       aes(x = reorder(Description, fraction),
+           y = fraction)) +
+  geom_bar(stat = "identity",
+           fill = "steelblue",
+           alpha = 0.6,
+           width = 0.5) +
+  facet_grid(fact ~ .) +
+  coord_flip() +  # Flip coordinates to make a horizontal bar plot
+  labs(title = "Fraction of different land use type when changing the fact value",
+       x = "Land Use Type",
+       y = "Fraction (%)") +
+  theme_minimal(base_size = 16)
+
+# expand the df
+freq_ncld_comp_landtype_wide =
+  dplyr::select(freq_ncld_comp_landtype, -count, -layer, -Description) %>%
+  pivot_wider(
+    names_from = fact,
+    values_from = fraction
+  )
+
+# Calculate & plot the correlation matrix for the fraction columns
+freq_ncld_corr_matrix <- 
+  cor(freq_ncld_comp_landtype_wide[, c("fact_0", "fact_5", "fact_10", "fact_30")], 
+      use = "complete.obs")
+
+# Plot the correlation matrix using corrplot
+corrplot(freq_ncld_corr_matrix,
+         method = "color", addCoef.col = "black", tl.col = "black", tl.srt = 45)
+
+
+###### NLCD 3. aggregate the land use to fact = 30 based on southeast results######
+
+for (Year in c(2011, 2013, 2016, 2019)) {
+  
+  # Year = 2011
+  
+  # Load the SpatRaster for the respective year
+  ncld_year_org <- terra::rast(paste0("nlcd_", Year, "_land_cover_l48_20210604", 
+                                      "/nlcd_", Year, "_land_cover_l48_20210604.img"))
+  
+  # # Covert the SpatRaster (class(ncld_2016_org$NLCD Land Cover Class)) to factor for terra::resample
+  # ncld_year_org <- as.factor(ncld_year_org)
+  
+  # Check if the covertion is correct
+  # levels(ncld_year_org) 
+  # dim(ncld_year_org); plot(ncld_year_org)
+  
+  # Resample using the modal method for categorical (factor) data
+  # modal function helps determine which class appears most often when aggregating grid cells
+  ## ncld_year <- terra::resample(ncld_year_org, r_template, method = "modal"), modal no in resample
+  ncld_year <-
+    terra::aggregate(ncld_year_org, 
+                     fact = 30, 
+                     fun = modal, 
+                     expand = TRUE, 
+                     na.rm = TRUE)
+  
+  # Attach the land cover labels to the aggregated raster
+  # levels(ncld_year) <- landcover_labels # cannot correctly assign
+  
+  ncld_year_factor = as.factor(ncld_year)
+  
+  # Check the re-sampled raster
+  head(ncld_year_factor)
+  unique(ncld_year_factor$`NLCD Land Cover Class`)
+  plot(ncld_year_factor)
+  
+  # Save the aggregated raster
+  terra::writeRaster(ncld_year_factor, 
+                     # paste0("nlcd_", Year, "_fact30_landcover_resampled.tif"), 
+                     paste0("nlcd_", Year, "_fact300_landcover_resampled.tif"), 
+                     overwrite = TRUE)
+}
+
+
+###### NLCD 3. aggregate the land use to fact = 30 based on southeast results######
+
+for (Year in c(2011, 2013, 2016, 2019)) {
+  
+  # Year = 2011
+  
+  # Load the SpatRaster for the respective year
+  ncld_year_org <- terra::rast(paste0("nlcd_", Year, "_fact30_landcover_resampled.tif"))
+  
+  # # Covert the SpatRaster (class(ncld_2016_org$NLCD Land Cover Class)) to factor for terra::resample
+  # ncld_year_org <- as.factor(ncld_year_org)
+  
+  # Check if the covertion is correct
+  # levels(ncld_year_org) 
+  # dim(ncld_year_org); plot(ncld_year_org)
+  
+  # Resample using the modal method for categorical (factor) data
+  # modal function helps determine which class appears most often when aggregating grid cells
+  ## ncld_year <- terra::resample(ncld_year_org, r_template, method = "modal"), modal no in resample
+  ncld_year <-
+    terra::aggregate(ncld_year_org, 
+                     fact = 10, 
+                     fun = modal, 
+                     expand = TRUE, 
+                     na.rm = TRUE)
+  
+  # Attach the land cover labels to the aggregated raster
+  # levels(ncld_year) <- landcover_labels # cannot correctly assign
+  
+  ncld_year_factor = as.factor(ncld_year)
+  
+  # Check the re-sampled raster
+  head(ncld_year_factor)
+  unique(ncld_year_factor$`NLCD Land Cover Class`)
+  plot(ncld_year_factor)
+  
+  # Save the aggregated raster
+  terra::writeRaster(ncld_year_factor, 
+                     paste0("nlcd_", Year, "_fact300_landcover_resampled.tif"), 
+                     overwrite = TRUE)
+}
+
+###### NLCD 4. transfer 4-year NLCD to annual level ######
+
+ncld_2011 <- terra::rast("nlcd_2011_fact30_landcover_resampled.tif")
+ncld_2013 <- terra::rast("nlcd_2013_fact30_landcover_resampled.tif")
+ncld_2016 <- terra::rast("nlcd_2016_fact30_landcover_resampled.tif")
+ncld_2019 <- terra::rast("nlcd_2019_fact30_landcover_resampled.tif")
+
+# Create a list of the rasters with corresponding years
+ncld_rasters <- list(ncld_2011, ncld_2013, ncld_2016, ncld_2019)
+ncld_years <- list(c(2011, 2012), c(2013, 2014), c(2015, 2016, 2017), c(2018, 2019, 2020))
+# ncld_rasters <- list(ncld_2013, ncld_2019)
+# ncld_years <- list(c(2011, 2012, 2013, 2014, 2015), c(2016, 2017, 2018, 2019, 2020))
+
+# Initialize an empty list to store merged results
+merged_ncld_rasters <- list()
+
+# Loop through each ncld_raster and its associated years
+for (i in seq_along(ncld_rasters)) {
+  # Replicate the ncld_raster for each year in the list
+  for (ncld_year in ncld_years[[i]]) {
+    # Add year as a new layer or attribute (if needed, based on structure)
+    current_ncld_raster <- ncld_rasters[[i]]
+    current_ncld_raster$ncld_year <- ncld_year # Add year attribute
+    merged_ncld_rasters <- append(merged_ncld_rasters, list(current_ncld_raster)) # Store in list
+  }
+}
+
+# Merge all ncld_rasters into one multilayer ncld_raster 
+final_ncld_raster <- terra::merge(merged_ncld_rasters[[1]], merged_ncld_rasters[-1])
+
+ncld_raster_stack <- terra::rast(merged_ncld_rasters)
+dim(ncld_raster_stack)
+
+## Define the land cover classes based on NLCD classification
+# if running unique(ncld_2016_org$`NLCD Land Cover Class`) after the as.factor(ncld_2016_org), then got the numbers on the left side
+# The labels for the NLCD dataset are predefined
+landcover_labels <- c(
+  "0" = "Unclassified",
+  "11" = "Open Water", 
+  "12" = "Perennial Ice/Snow", 
+  "21" = "Developed, Open Space", 
+  "22" = "Developed, Low Intensity", 
+  "23" = "Developed, Medium Intensity", 
+  "24" = "Developed, High Intensity", 
+  "31" = "Barren Land", 
+  "41" = "Deciduous Forest", 
+  "42" = "Evergreen Forest", 
+  "43" = "Mixed Forest", 
+  "52" = "Shrub/Scrub", 
+  "71" = "Grassland/Herbaceous", 
+  "81" = "Pasture/Hay", 
+  "82" = "Cultivated Crops", 
+  "90" = "Woody Wetlands", 
+  "95" = "Emergent Herbaceous Wetlands"
+)
+
+# Convert the named vector into a data.frame
+landcover_df <- data.frame(
+  Code = names(landcover_labels),
+  Description = landcover_labels,
+  stringsAsFactors = FALSE # Keep the values as characters
+)
+
+# merge land use code with land use type
+final_ncld_raster_type = 
+  final_ncld_raster
+
+# Save the merged raster as a GeoTIFF file
+output_ncld_file <- "NLCD_raster_30fact_2011-20.tif"
+writeRaster(final_ncld_raster_type, filename = output_ncld_file, format = "GTiff", overwrite = TRUE)
 
 
 #### AQS air pollutants ####
@@ -1141,7 +1449,7 @@ char_52_59; char_60_68; char_102_109; char_110_118
 # BLH, planetary boundary layer height
 # "https://downloads.psl.noaa.gov/Datasets/NARR/Dailies/monolevel/hpbl.2015.nc"
 
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_NNAR")
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_NARR")
 getwd()
 
 meteo_var_need = c("rhum.2m", # RH
@@ -1248,11 +1556,442 @@ tmas_year_select = tmas_year[, c(5, 6, 7, 18, 19, 22, 23, 24, 25, 26, 27)]
 tmas_year_select = tmas_year_select[2:nrow(tmas_year_select), ]
 tmas_year_select = write_fst(tmas_year_select, "TMAS 2015/TMAS_Class_Clean_2015_select.fst")
 
+
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
+getwd()
+
+#### U.S. Traffic Volume Data, Highway ####
+
+###### Traffic Volume 1, download ###### 
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2011/2011_station_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2011/november_2011_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2012/feb_2012_tmas.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2013/mar_2013_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2014/feb_2014_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2015/jan_2015_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2016/aug_2016_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2017/sep_2017_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2018/mar_2018_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2019/feb_2019_ccs_data.zip"
+# "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2020/may_2020_ccs_data.zip"
+
+study_year = 2011
+study_month = c("january", "february", "march", "april", "may", "june",
+                "july", "august", "september", "october", "november", "december")
+
+# 2012 download separately due to different link components
+
+study_year = 2013:2020 # 2013:2020
+study_month = c("jan", "feb", "mar", "apr", "may", "jun",
+                "jul", "aug", "sep", "oct", "nov", "dec")
+
+base_dir <- getwd()
+
+# download data to local folder
+for(study_year_use in study_year) { 
+  for(study_month_use in study_month) {
+    # create url
+    url = paste0("https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/",
+                 study_year_use, "/", study_month_use, "_", study_year_use, "_ccs_data.zip")
+    
+    # Construct full destination path for the downloaded zip file
+    destfile <- file.path(base_dir, study_year_use, paste0(study_year_use, "_", study_month_use, ".zip"))
+    
+    # download data, and use tryCatch in case of missing link
+    tryCatch({
+      
+      # Download the file
+      download.file(url, destfile)
+      
+      # Extract the file contents into the year folder (study_year_use) and ignore directory structure
+      unzip(destfile, exdir = file.path(base_dir, study_year_use), junkpaths = TRUE)
+      
+      # Remove the zip file after extraction
+      unlink(destfile)
+      
+    }, error = function(e) {
+      
+      print(paste("Error at iteration", url))
+    })
+    
+  }
+}
+
+
+###### Traffic Volume 2, extract volume info ###### 
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
+getwd()
+base_dir = getwd()
+
+# set traffic volume file names
+traffic_volume_colname <-
+  c("Record_Type", "State_FIPS", "Function_Class", "Station_ID", 
+    "Travel_Direction", "Travel_Lane", "Year", "Month", "Day", 
+    "Day_of_Week", paste0("Traffic_Volume_Hour_", 1:24), "Restrictions")
+
+# study years
+study_years = 2011:2020 #  2011:2020
+
+# define the fixed-width format for included variables
+# https://github.com/policyinfo/TMAS-Traffic-Volume-Data-Rearrangement-Tool/blob/main/Tool_Document.pdf
+column_widths <- c(1, 2, 2, 6, 1, 1, 2, 2, 2, 1, rep(5, 24), 1) 
+
+
+#### using tryCatch for each year is not enough, use it for each file.
+
+# # process and save each year's data
+# for (study_year_use in study_years) {
+#   
+#   vol_list = 
+#     list.files(file.path(base_dir, study_year_use), 
+#                pattern = ".*\\.VOL$", full.names = TRUE)
+#   
+#   # Initialize an empty list to store the processed data.tables
+#   annual_traffic_volume_list <- list()
+#   
+#   # use tryCatch to process data, records of some state are sometimes zero byte
+#   tryCatch({
+#     
+#     # Process each file in vol_list using traffic_volume_process
+#     for (vol_file in vol_list) {
+#       # Process the file with function traffic_volume_process, hourly to daily
+#       traffic_vol_dt <- 
+#         traffic_volume_process(vol_file, traffic_volume_colname, column_widths)  
+#       # Add the result to the list
+#       annual_traffic_volume_list[[length(annual_traffic_volume_list) + 1]] <- traffic_vol_dt    
+#     }
+#   }, error = function(e) {
+#     
+#     print(paste("Error at iteration", vol_file))
+#   })
+#   
+#   # Combine all data.tables from the current year
+#   annual_traffic_volume <- rbindlist(annual_traffic_volume_list)
+#   
+#   # Output to .fst file for the current year
+#   fst::write_fst(annual_traffic_volume, 
+#                  file.path(base_dir, 
+#                            paste0("Traffic_Volume_", study_year_use, ".fst")))
+# }
+
+# Process and save each year's data
+for (study_year_use in study_years) {
+  
+  vol_list <- list.files(file.path(base_dir, study_year_use), 
+                         pattern = ".*\\.VOL$", full.names = TRUE)
+  
+  # Initialize an empty list to store the processed data.tables
+  annual_traffic_volume_list <- list()
+  
+  for (vol_file in vol_list) {
+    # Check if the file size is greater than zero
+    if (file.info(vol_file)$size > 0) {
+      
+      tryCatch({
+        # Process the file with function traffic_volume_process
+        traffic_vol_dt <- 
+          traffic_volume_process(vol_file, traffic_volume_colname, column_widths)
+        
+        # Add the result to the list only if it has data
+        if (nrow(traffic_vol_dt) > 0) {
+          annual_traffic_volume_list[[length(annual_traffic_volume_list) + 1]] <- traffic_vol_dt
+        } else {
+          print(paste("No rows processed for file:", vol_file))
+        }
+      }, error = function(e) {
+        # Report any error that occurs during processing
+        print(paste("Error processing file:", vol_file, ":", e$message))
+      })
+    } else {
+      print(paste("Skipped zero-byte file:", vol_file))
+    }
+  }
+  
+  # Combine all data.tables from the current year, if any valid data is available
+  if (length(annual_traffic_volume_list) > 0) {
+    annual_traffic_volume <- rbindlist(annual_traffic_volume_list)
+    
+    # Output to .fst file for the current year
+    fst::write_fst(annual_traffic_volume, 
+                   file.path(base_dir, paste0("Traffic_Volume_", study_year_use, ".fst")))
+  } else {
+    print(paste("No valid data for year:", study_year_use))
+  }
+}
+
+
+###### Traffic Volume 3, station info ###### 
+getwd()
+
+# List all txt files
+traffic_vol_station_files <-
+  list.files(
+    path = "Traffic_volume_station", pattern = "\\.txt$", full.names = TRUE)
+
+# Initialize an empty list to store the processed data frames
+traffic_vol_station_list <- list()
+
+# Loop through each txt file
+for (traffic_vol_station_path in traffic_vol_station_files) {
+  
+  # Read the file using read.fwf with column separator "|"
+  traffic_vol_station_full <- 
+    fread(traffic_vol_station_path, 
+          sep = "|", # columns are separated by "|"
+          fill = TRUE, header = TRUE)  
+  # View(traffic_vol_station_full)
+  
+  # Select columns to match stations
+  traffic_vol_station_match <- 
+    traffic_vol_station_full[, .(State_Code, Station_Id, Travel_Dir,  
+                                 Travel_Lane, Year_Record, 
+                                 Latitude, Longitude, Station_Location)]
+  
+  # Store the processed data frame in the list
+  traffic_vol_station_list[[length(traffic_vol_station_list) + 1]] <- 
+    traffic_vol_station_match
+}
+
+# Merge all data frames into one
+traffic_vol_station_all <- do.call(rbind, traffic_vol_station_list)
+# View(traffic_vol_station_all)
+write_fst(traffic_vol_station_all, "Traffic_volume_station_info_2011-20.fst")
+
+traffic_vol_station_all = read_fst("Traffic_volume_station_info_2011-20.fst")
+names(traffic_vol_station_all)[2] = "Station_ID"
+setDT(traffic_vol_station_all)
+
+# Howeve, in the following check, Station_ID-Latitude-Longitude-Station_Location infor are always consistent 
+# while the State_Code may change for the same location
+subset(traffic_vol_station_all, Station_Location == "US6 & 34 WEST OF ARAPAHOE")
+subset(traffic_vol_station_all, Station_Location == "I80 0.4 MILES EAST OF THE OVERTON INTG")
+subset(traffic_vol_station_all, Station_Location == "I 8")
+
+# File with all IDs
+traffic_vol_station_ids = 
+  traffic_vol_station_all[, .(State_Code, Station_ID, Station_Location)]
+traffic_vol_station_ids = 
+  traffic_vol_station_ids[!duplicated(traffic_vol_station_ids), ]
+dim(traffic_vol_station_ids) # 334854      5
+
+
+# File with stations with long and lat info
+traffic_vol_station_gps =
+  traffic_vol_station_all[, .(State_Code, Station_ID, Station_Location, Latitude, Longitude)]
+dim(traffic_vol_station_gps)
+traffic_vol_station_gps = 
+  subset(traffic_vol_station_gps, 
+         !(is.na(Latitude) | is.na(Latitude) | Latitude < 100))
+traffic_vol_station_gps = 
+  traffic_vol_station_gps[!duplicated(traffic_vol_station_gps), ]
+# View(traffic_vol_station_gps)
+write_fst(traffic_vol_station_gps, "Traffic_volume_station_GPS.fst")
+dim(traffic_vol_station_gps) # 20957     5
+
+
+traffic_vol_station_ids_NOgps =
+  subset(traffic_vol_station_ids, 
+         !(Station_ID %in% traffic_vol_station_gps$Station_ID))
+traffic_vol_station_ids_NOgps =
+  traffic_vol_station_ids_NOgps[!duplicated(traffic_vol_station_ids_NOgps), ]
+write_fst(traffic_vol_station_ids_NOgps, "Traffic_volume_station_Without_GPS.fst")
+dim(traffic_vol_station_ids_NOgps) # 3437    3
+
+###### Traffic Volume 4, combine volume and station GPS ###### 
+
+traf_vol_list =   
+  list.files(
+    pattern = "Traffic_Volume_\\d{4}\\.fst$", full.names = TRUE)
+print(traf_vol_list)
+
+## Via this check, we can see that the Station_ID could be repeated among States, also for the Travel_Direction & Travel_Lane
+# BUT, even though State_FIPS is repeated among States, the address and long lat are the same for the same Station_ID
+traf_vol_y1 = read_fst("Traffic_Volume_2014.fst")
+traf_vol_y2 = read_fst("Traffic_Volume_2015.fst")
+min(traf_vol_y1$Date); max(traf_vol_y1$Date)
+min(traf_vol_y2$Date); max(traf_vol_y2$Date)
+
+traf_vol_y1_station = 
+  subset(traf_vol_y1, 
+         Date == as.Date("2014-04-01") & Station_ID == "000101")
+
+traf_vol_all = 
+  rbindlist(
+    lapply(
+      traf_vol_list, read_fst, as.data.table = TRUE))
+dim(traf_vol_all)
+
+# Even though State_FIPS is repeated among States, the address and long lat are the same for the same Station_ID
+traf_vol_use =
+  traf_vol_all[, .(Date, Station_ID, Daily_Traffic_Volume)]
+dim(traf_vol_use); class(traf_vol_use)
+# length(unique(traf_vol_use$Station_ID))
+# length(unique(traf_vol_use$Date))
+sapply(traf_vol_use, class)
+
+
+# for those of different lanes or directions, add up the results
+# btw, group_by is more efficient than ddply since dplyr package is designed to handle large dataset
+traf_vol_addup <- 
+  traf_vol_use[, 
+               .(Daily_Traffic_Volume = sum(Daily_Traffic_Volume)), 
+               by = .(Date, Station_ID)]
+head(traf_vol_addup); dim(traf_vol_addup); class(traf_vol_addup)
+# nrow of traf_vol_addup is 24.4% of the traf_vol_use
+dim(traf_vol_addup[!duplicated(traf_vol_addup), ])
+
+# subset(traf_vol_use, Date == as.Date("2011-04-01") & Station_ID == "000101")
+# subset(traf_vol_addup, Date == as.Date("2011-04-01") & Station_ID == "000101")
+
+######## traffic station info
+traffic_vol_station_gps = read_fst("Traffic_volume_station_GPS.fst")
+
+# in case of wrong info in Station_Location, only use GPS 
+traffic_vol_station_gps = dplyr::select(traffic_vol_station_gps, -Station_Location, -State_Code) 
+traffic_vol_station_gps = traffic_vol_station_gps[!duplicated(traffic_vol_station_gps),]
+setDT(traffic_vol_station_gps)
+
+# remove duplication
+traffic_vol_station_gps_nodup =
+  traffic_vol_station_gps[, 
+                          .(Latitude = mean(Latitude), 
+                            Longitude = mean(Longitude)),
+                          by = .(Station_ID)]
+
+head(traffic_vol_station_gps_nodup); dim(traffic_vol_station_gps_nodup)
+dim(traffic_vol_station_gps_nodup[!duplicated(traffic_vol_station_gps_nodup), ])
+
+summary(unique(traffic_vol_station_gps$Station_ID) %in% unique(traf_vol_addup$Station_ID)) # FALSE 1909  TRUE 6898 
+summary(unique(traf_vol_addup$Station_ID) %in% unique(traffic_vol_station_gps$Station_ID)) # FALSE 202  TRUE 6898 
+
+# merge the data.table
+traf_vol_station =
+  merge(traf_vol_addup,
+        traffic_vol_station_gps_nodup, 
+        by = "Station_ID", all.x = TRUE)
+
+# get traffic volume and station info and those without station GPS info
+traf_vol_station_noGPS = 
+  subset(traf_vol_station, is.na(Latitude) | is.na(Longitude)) # 82069 5
+traf_vol_station_GPS = 
+  subset(traf_vol_station, !(is.na(Latitude) | is.na(Longitude))) # 13746889 5
+
+# get the normal Long and Lat 
+traf_vol_station_GPS$Latitude = traf_vol_station_GPS$Latitude / 1E+6
+traf_vol_station_GPS$Longitude = -traf_vol_station_GPS$Longitude / 1E+6
+summary(traf_vol_station_GPS)
+
+# grab those inside the mainland US
+# bounding box for the mainland US
+us_bbox <- list(
+  xmin = -125,  # Westernmost longitude
+  xmax = -66,   # Easternmost longitude
+  ymin = 24,    # Southernmost latitude
+  ymax = 50     # Northernmost latitude
+)
+# filter the points that fall within the bounding box
+traf_vol_station_GPS_US <- 
+  traf_vol_station_GPS %>%
+  dplyr::filter(Longitude >= us_bbox$xmin & Longitude <= us_bbox$xmax &
+                  Latitude >= us_bbox$ymin & Latitude <= us_bbox$ymax)
+dim(traf_vol_station_GPS_US) # 11528055  5
+write_fst(traf_vol_station_GPS_US, "FHWA_Traffic_Volume_2011-20.fst")
+
+# get stations with volume record and with GPS
+traf_vol_stations_withGPS =
+  dplyr::select(traf_vol_station_GPS_US, Station_ID, Latitude, Longitude)
+traf_vol_stations_withGPS =
+  traf_vol_stations_withGPS[!duplicated(traf_vol_stations_withGPS), ]
+nrow(traf_vol_stations_withGPS) # 6894, after remvoing those outside of mainland US, 6084
+
+# get the median of volume across the study period
+traf_vol_station_GPS_US_med <-
+  traf_vol_station_GPS_US[, .(Daily_Traffic_Volume = median(Daily_Traffic_Volume)),
+                          by = .(Station_ID, Latitude, Longitude)]
+
+# transfer to sf
+traf_vol_station_GPS_US_med_sf <- 
+  st_as_sf(traf_vol_station_GPS_US_med, 
+           coords = c("Longitude", "Latitude"), 
+           crs = 4326) # EPSG:4326 (WGS 84) is for longitude/latitude
+# plot(traf_vol_station_GPS_US_med_sf$Daily_Traffic_Volume)
+
+ggplot(data = traf_vol_station_GPS_US_med_sf) +
+  geom_sf(aes(color = Daily_Traffic_Volume)) +
+  scale_color_viridis_c() +
+  theme_minimal(base_size = 16) +
+  labs(title = "Median Traffic Volume by Station across 2011-2020", 
+       color = "Daily Traffic Volume")
+
 #### US Flights ####
 # https://www.transtats.bts.gov/Data_Elements.aspx?Data=1
 
 # https://data.bts.gov/stories/s/Port-Throughput-Metrics/8sfc-juwb/#:~:text=Port%20throughput%20can%20be%20measured,a%20port%20handles%20over%20time.
 # https://www.bts.gov/browse-statistical-products-and-data/freight-facts-and-figures/number-vessel-calls-type-us-ports
+
+
+#### Biodiesel Plant US 20190101 ####
+setwd("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nation_SA_data/Rasel_US_oil_gas_industry")
+getwd()
+
+shapefile_data <- st_read("Biodiesel_Plants_US_20190101/Biodiesel_Plants_US_20190101.shp")
+plot(shapefile_data)
+# PADD, Petroleum Administration for Defense District 
+# Cap_Mmgal, Annual production capacity in millions of gallons, EIA-22M (Monthly Biodiesel Production Survey)
+
+
+#### Totography ####
+# https://nrcs.app.box.com/v/gateway/folder/39640733878
+# https://gdg.sc.egov.usda.gov/Catalog/ProductDescription/NED.html
+library(foreign)
+
+topo_ned60m = st_read("/Users/TingZhang/Downloads/NED60M_SpatialMetadata/NED60M_fe2898_October2018.shp")
+head(topo_ned60m)
+attributes_data <- read.dbf("/Users/TingZhang/Downloads/NED60M_SpatialMetadata/NED60M_fe2898_October2018.dbf")
+head(attributes_data)
+
+# topo_ned60m = st_read("NED60M_SpatialMetadata/NED60M_fe2898_October2018.shp")
+plot(topo_ned60m)
+# ullat and ullon, "Upper Left Latitude" and "Upper Left Longitude," defining the geographic coordinates of the upper-left corner of the raster or grid.
+# lrlat and lrlon: these might represent the "Lower Right Latitude" and "Lower Right Longitude," which define the geographic coordinates of the lower-right corner of the raster or grid.
+# xshift and yshift, adjustments made to the x (longitude) and y (latitude) coordinates
+# horizres_m, Horizontal resolution in meters
+# s_date, start date of the data collection
+# i_date: The issue or creation date of the dataset
+# hdatum, Horizontal datum, which is the reference system
+# utmzone, UTM zone
+# vdatum, Vertical datum, which refers to the reference system for elevations 
+# UTM, Vertical datum, which refers to the reference system for elevations 
+# zstep, increment or step size in the z-dimension (elevation). It could define how finely the elevation data is categorized.
+# zshift, vertical shift 
+# zsigma, standard deviation 
+# absx and absy, absolute horizontal accuracy
+# absz, absolute vertical accuracy
+# abspts, number of points used to calculate the absolute accuracy.
+# quaddate, date associated with a specific quadrangle (quad) or tile in the dataset
+# meta_p_are, metadata polygon area?
+# meta_p_per, metadata polygon perimeter
+# pts_id, ID for a specific point?
+
+# grab those inside the mainland US
+# bounding box for the mainland US
+us_bbox <- list(
+  xmin = -125,  # Westernmost longitude
+  xmax = -66,   # Easternmost longitude
+  ymin = 24,    # Southernmost latitude
+  ymax = 50     # Northernmost latitude
+)
+
+# filter the points that fall within the bounding box
+topo_ned60m_US <- 
+  topo_ned60m %>%
+  dplyr::filter(ullon >= us_bbox$xmin & ullon <= us_bbox$xmax &
+                  ullat >= us_bbox$ymin & ullat <= us_bbox$ymax)
+
+
+topo_ned60m_use =
+  dplyr::select(topo_ned60m, zmean, geometry)
+
 
 
 ########################################################################

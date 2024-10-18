@@ -21,7 +21,7 @@
 #SBATCH --time=00-02:00  # Total time needed for job: Days-Hours:Minutes
 
 #load modules
-module load gnu10/10.3.0-ya
+module load gnu10/10.3.0-ya # GNU Compiler Collection (GCC) module, provides the necessary compilers and libraries required for building and running R
 module load r
 
 # Set up a personal R library path in your home directory
