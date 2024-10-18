@@ -1441,3 +1441,217 @@ day_of_year_toDate <- function(day_of_year) {
   return(dates)
 }
 
+#### Extract selected variable from .nc file (CMAQ results), add crs and date and return the corresponding raster brick ####
+select_cmaq_var_add_date <- 
+  function(nc_file, cmaq_var, lon, lat, p4s) {
+    
+    # Open the .nc file
+    nc_cmaq_month <- nc_open(nc_file)
+    
+    # Extract the variable from the NetCDF file (dimensions: 442, 265, 30)
+    pollu_var_array <- ncvar_get(nc_cmaq_month, cmaq_var)
+    
+    # get the number of days in the file and the start day (day of the year)
+    nday <- dim(ncvar_get(nc_cmaq_month, "TFLAG"))[3]
+    start_day_intg <- ncatt_get(nc_cmaq_month, varid = 0)$SDATE
+    
+    # convert the start day to date, create a sequence of all dates
+    start_day = day_of_year_toDate(start_day_intg)
+    day_seq <- seq.Date(start_day, by = "day", length.out = nday)
+    
+    # Convert the 3D array to a raster brick (30 layers representing 30 days)
+    pollu_var_brick <- brick(pollu_var_array, 
+                             xmn = min(lon), xmx = max(lon), 
+                             ymn = min(lat), ymx = max(lat), 
+                             crs = p4s)
+    
+    # Only use the day information to rename the layers
+    names(pollu_var_brick) <- paste0("Date_", day_seq)
+    
+    # Close the .nc file after processing
+    nc_close(nc_cmaq_month)
+    
+    # Return the raster brick
+    return(pollu_var_brick)
+  }
+
+#### Complete the character digits ####
+fix_char_digits <-
+  function(df, variable, digit_num) {
+    df[[variable]] <- 
+      ifelse(
+        nchar(as.character(df[[variable]])) < digit_num,
+        sprintf(paste0("%0", digit_num, "s"), as.character(df[[variable]])),
+        as.character(df[[variable]])
+      )
+    return(df)
+  }
+
+#### Process traffic volume data from fhwa.dot.gov.com ####
+
+traffic_volume_process <-
+  function(state_year_traff_path, traffic_volume_colname, column_widths) {
+    
+    # Read the file using read.fwf to split the fields based on column widths
+    state_year_traff <- 
+      read.fwf(state_year_traff_path, 
+               widths = column_widths, 
+               header = FALSE, stringsAsFactors = FALSE)
+    
+    state_year_traff_dt <- as.data.table(state_year_traff)
+    
+    # Rename the files
+    names(state_year_traff_dt) = traffic_volume_colname
+    
+    # Calculate daily sum of traffic volume
+    state_year_traff_dt[, Daily_Traffic_Volume := rowSums(.SD, na.rm = TRUE), 
+                        .SDcols = paste0("Traffic_Volume_Hour_", 1:24)]
+    
+    # Remove columns not to be used
+    state_year_traff_dt[, c("Day_of_Week", paste0("Traffic_Volume_Hour_", 1:24)) := NULL]
+    
+    # convert selected column to pre-set character digits
+    state_year_traff_dt = fix_char_digits(state_year_traff_dt, "Station_ID", 6)
+    state_year_traff_dt = fix_char_digits(state_year_traff_dt, "State_FIPS", 2)
+    state_year_traff_dt = fix_char_digits(state_year_traff_dt, "Month", 2)
+    state_year_traff_dt = fix_char_digits(state_year_traff_dt, "Day", 2)
+    
+    # generate Date info
+    state_year_traff_dt$Date <- 
+      as.Date(paste0("20", state_year_traff_dt$Year, "-", 
+                     state_year_traff_dt$Month, "-", 
+                     state_year_traff_dt$Day), 
+              format = "%Y-%m-%d")
+    state_year_traff_dt[, c("Year", "Month", "Day") := NULL] 
+    
+    return(state_year_traff_dt)
+  }
+
+###### convert day or year'YYYYDDD' format to date YYYY-MM-DD ###### 
+day_of_year_toDate <- function(day_of_year) {
+  year <- as.numeric(substr(day_of_year, 1, 4))  # Extract the year
+  day <- as.numeric(substr(day_of_year, 5, 7))   # Extract the day of the year
+  
+  # Convert to date using the year and day of year
+  dates = as.Date(day - 1, origin = paste0(year, "-01-01"))  # Subtract 1 since day 001 is January 1st
+  
+  return(dates)
+}
+
+###### Function to get NetCDF grid info and create CRS ###### 
+get_nc_grid_create_crs <- function(nc_file) {
+  # Open the .nc file
+  nc_cmaq_file <- nc_open(nc_file)
+  
+  # Extract grid information
+  xorig <- ncatt_get(nc_cmaq_file, varid = 0, 'XORIG')$value
+  yorig <- ncatt_get(nc_cmaq_file, varid = 0, 'YORIG')$value
+  ncols <- ncatt_get(nc_cmaq_file, varid = 0, 'NCOLS')$value
+  nrows <- ncatt_get(nc_cmaq_file, varid = 0, 'NROWS')$value
+  xcell <- ncatt_get(nc_cmaq_file, varid = 0, 'XCELL')$value
+  ycell <- ncatt_get(nc_cmaq_file, varid = 0, 'YCELL')$value
+  p_alp <- ncatt_get(nc_cmaq_file, varid = 0, 'P_ALP')$value
+  p_bet <- ncatt_get(nc_cmaq_file, varid = 0, 'P_BET')$value
+  xcent <- ncatt_get(nc_cmaq_file, varid = 0, 'XCENT')$value
+  ycent <- ncatt_get(nc_cmaq_file, varid = 0, 'YCENT')$value
+  
+  # create p4s CRS
+  #https://forum.cmascenter.org/t/equates-grid-coordinates/3018/3
+  # p4s <- "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +a=6370000 +b=6370000"
+  p4s <- paste( '+proj=lcc', # projection type: Lambert Conformal Conic
+                paste0( 'lat_1=', p_alp),
+                paste0( 'lat_2=', p_bet),
+                paste0( 'lat_0=', ycent),
+                paste0( 'lon_0=', xcent),
+                'a=6370000 +b=6370000', # Ellipsoid parameters (radius of Earth)
+                sep = ' +')
+  
+  # Describe grids from grid description
+  #define lat & lon in meters based on origin and cell size
+  lon <- seq( from = xorig, by = xcell, length.out = ncols)
+  lat <- seq( from = yorig, by = ycell, length.out = nrows)
+  # min(lon); max(lon); min(lat); max(lat); length(lon); length(lat)
+  
+  # Close the .nc file after extracting information
+  nc_close(nc_cmaq_file)
+  
+  # Return a list of grid info
+  return(list(lon = lon, lat = lat, p4s = p4s))
+}
+
+###### Daily, extract selected variable from .nc file, add crs and date and return the corresponding raster brick ###### 
+daily_cmaq_var_add_date <- 
+  function(nc_file, cmaq_var, lon, lat, p4s) {
+    
+    # Open the .nc file
+    nc_cmaq_file <- nc_open(nc_file)
+    
+    # Extract the variable from the NetCDF file (dimensions: 442, 265, 30)
+    pollu_var_array <- ncvar_get(nc_cmaq_file, cmaq_var)
+    
+    # get the number of days in the file and the start day (day of the year)
+    n_time <- dim(ncvar_get(nc_cmaq_file, "TFLAG"))[3]
+    start_day_intg <- ncatt_get(nc_cmaq_file, varid = 0)$SDATE
+    
+    # convert the start day to date, create a sequence of all dates
+    start_day = day_of_year_toDate(start_day_intg)
+    day_seq <- seq.Date(start_day, by = "day", length.out = n_time)
+    
+    # Convert the 3D array to a raster brick (30 layers representing 30 days)
+    pollu_var_brick <- brick(pollu_var_array, 
+                             xmn = min(lon), xmx = max(lon), 
+                             ymn = min(lat), ymx = max(lat), 
+                             crs = p4s)
+    
+    # Only use the day information to rename the layers
+    names(pollu_var_brick) <- paste0("Date_", day_seq)
+    
+    # Close the .nc file after processing
+    nc_close(nc_cmaq_file)
+    
+    # Return the raster brick
+    return(pollu_var_brick)
+  }
+
+###### Hourly, extract selected variable from .nc file, add crs and date and return the corresponding raster brick ###### 
+hourly_daily_cmaq_var_add_date <-
+  function(nc_file, cmaq_var, lon, lat, p4s) {
+    
+    # Open the .nc file
+    nc_cmaq_file <- nc_open(nc_file)
+    
+    # Extract the variable from the NetCDF file (dimensions: 442, 265, 24*nday)
+    pollu_var_array <- ncvar_get(nc_cmaq_file, cmaq_var)
+    
+    # get the number of days in the file and the start day (day of the year)
+    n_time <- dim(ncvar_get(nc_cmaq_file, "TFLAG"))[3]
+    hours_per_day <- 24
+    nday <- n_time / hours_per_day
+    start_day_intg <- ncatt_get(nc_cmaq_file, varid = 0)$SDATE
+    
+    # convert the start day to date, create a sequence of all dates
+    start_day = day_of_year_toDate(start_day_intg)
+    day_seq <- seq.Date(start_day, by = "day", length.out = nday)
+    
+    # Convert the 3D array to a raster brick (24*nday layers representing 24*nday hours)
+    pollu_var_brick <- brick(pollu_var_array, 
+                             xmn = min(lon), xmx = max(lon), 
+                             ymn = min(lat), ymx = max(lat), 
+                             crs = p4s)
+    
+    # Aggregate the hourly data to daily data by averaging each 24-hour block
+    pollu_var_daily_brick <- 
+      stackApply(pollu_var_brick, 
+                 indices = rep(1:nday, each = hours_per_day), 
+                 fun = mean)
+    
+    # Only use the day information to rename the layers
+    names(pollu_var_daily_brick) <- paste0("Date_", day_seq)
+    
+    # Close the .nc file after processing
+    nc_close(nc_cmaq_file)
+    
+    # Return the raster brick
+    return(pollu_var_daily_brick)
+  }
+
