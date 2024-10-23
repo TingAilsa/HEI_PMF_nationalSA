@@ -23,17 +23,27 @@ sapply(date_use, class)
 pmf_source$Date = as.Date(pmf_source$Date)
 pmf_source = base::merge(pmf_source, date_use, all.x = TRUE)
 
+# Raster does not include date, convert date to integer and change back later
+# pmf_source$Date <- as.integer(format(pmf_source$Date, "%Y%m%d"))
+
+# change the characters to factor
+pmf_source$Source_aftermanual = as.factor(pmf_source$Source_aftermanual)
+pmf_source$day_of_week = as.factor(pmf_source$day_of_week)
+pmf_source$is_holiday = as.factor(pmf_source$is_holiday)
+sapply(pmf_source, class)
+
+#### rasterize can only contain numeric, integer, and logical values, pmf_source is y, so not rasterize, merge it in the last step
 # Convert pmf_single_source to sf with crs 4326
 # here, cannot use crs = st_crs(cmaq_single_source_sf), 
 #       which will treat long and lat as the projected CRS in CMAQ dataset, 
 #       causing the coordinates to appear incorrectly in a much smaller area.
-pmf_source_sf <- 
-  st_as_sf(pmf_source, 
-           coords = c("Longitude", "Latitude"), 
+pmf_source_date <-
+  st_as_sf(pmf_source,
+           coords = c("Longitude", "Latitude"),
            crs = 4326) # EPSG:4326 (WGS 84) is for longitude/latitude
+head(pmf_source_date)
 
-# Merge date info with source info
-pmf_source_date = base::merge(pmf_source_sf, date_use, all.x = TRUE)
+###### instead of SF, convert to RASTER for easier merging later
 
 # ###### 2 Census varaibles for Aim3 modeling preparation ######
 # # Geometry of each GEOID at the included census tract level
@@ -111,7 +121,7 @@ pmf_source_date = base::merge(pmf_source_sf, date_use, all.x = TRUE)
 #                     "US_Census_ACS_tract_commute_2011-2020.fst"))
 
 ######### 3 Create grid-like data, something can be done later ########
-# #Define the approximate bounding box for mainland U.S.
+#Define the approximate bounding box for mainland U.S.
 # us_bbox <- c(xmin = -125, xmax = -66, ymin = 24, ymax = 50)
 # crs_proj <- "+proj=longlat +datum=WGS84 +no_defs"
 # 
@@ -121,6 +131,11 @@ pmf_source_date = base::merge(pmf_source_sf, date_use, all.x = TRUE)
 # # Create the raster grid with a desired resolution (e.g., 0.1 degrees)
 # us_grid_raster <- raster(ext = us_extent, resolution = 0.1)
 # crs(us_grid_raster) <- crs_proj
+# dim(us_grid_raster)
+# writeRaster(us_grid_raster, "US_O.1_grid_raster.tif", 
+#             format = "GTiff", 
+#             options = "COMPRESS=LZW", 
+#             overwrite = TRUE)
 # 
 # # convert the grid to an sf object
 # us_grid_sf <- st_as_sf(as(us_grid_raster, "SpatialPolygons"))
@@ -152,6 +167,14 @@ us_grid_censusGeo_sf <-
   st_read(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/",
                     "US_O.1_grid_censusID.gpkg"))
 st_crs(us_grid_censusGeo_sf)
+dim(us_grid_censusGeo_sf)
+length(unique(us_grid_censusGeo_sf$geom))
+
+# Load the US 0.1 Degree raster
+us_grid_raster <- raster("US_O.1_grid_raster.tif")
+head(us_grid_raster)
+crs(us_grid_raster)
+dim(us_grid_raster)
 
 # # check if mainland US has been covered by GEOID
 # plot(us_grid_censusGeo_sf["GEOID"])
@@ -199,19 +222,10 @@ for (ncld_group in ncld_year_groups) { # ncld_group = ncld_year_groups[[1]]
   # NLCD raster for this group
   ncld_raster <- ncld_group$ncld_raster
   
-  # Reproject the NLCD raster to match the grid's CRS (use raster, more efficient for reproject and for merging)
-  ncld_raster <- terra::project(ncld_raster, crs(us_grid_censusGeo_sf))
-  
-  # Convert NLCD raster to polygons for spatial joins
-  # allow for more flexible spatial operations with point & multipolygon data 
-  ncld_poly <- as.polygons(ncld_raster) %>% st_as_sf()
-  # head(ncld_poly); dim(ncld_poly); class(ncld_poly)
-
-  # ncld_centroids <- st_centroid(ncld_poly)
-  
-  # # Simplify ncld_poly with a tolerance of 0.001 degrees (for CRS in degrees)
-  ncld_poly_simplified <- st_simplify(ncld_poly, dTolerance = 0.001)
-  
+  # projectRaster the ncld_raster with the project 0.1*0.1 degree grid raster
+  # projectRaster takes the first argument and reprojects it to match the CRS of the second 
+  us_grid_ncld_raster <- projectRaster( ncld_raster, us_grid_raster)
+    
   # Process each year in the group
   for (study_year in ncld_group$years) { # study_year = ncld_group$years[1]
     # Filter pmf_source_date and census_acs_geom for the current year
@@ -222,14 +236,10 @@ for (ncld_group in ncld_year_groups) { # ncld_group = ncld_year_groups[[1]]
     # dim(pmf_source_year); dim(pmf_source_date)
     # head(census_acs_year); dim(census_acs_year)
     
-    # Ensure data are in the same CRS, same WG84, no need to check here
-    # pmf_source_year <- st_transform(pmf_source_year, st_crs(us_grid_censusGeo_sf))
-
     # Spatial join with grid - pmf_source_date, ncld_poly
     pmf_grid <- 
       st_join(us_grid_censusGeo_sf, pmf_source_year, join = st_intersects, left = TRUE)
-    # pmf_grid_va <- st_make_valid(pmf_grid)  # Ensure geometries are valid
-    
+
     # The current merge would lose grids of those with no info such as PMF and/or others
     # pmf_ncld_grid <-
     #   st_join(pmf_grid, ncld_poly, join = st_intersects, left = TRUE)
