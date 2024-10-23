@@ -306,12 +306,12 @@ source.test = "Soil/Dust"
 
 ##### Traffic
 # prepare traffic volume and roadiness data
-traffic_vol_sf = st_transform(traffic_vol_sf, crs = st_crs(pmf_cmaq_traffic))
+# traffic_vol_sf = st_transform(traffic_vol_sf, crs = st_crs(pmf_cmaq_traffic))
 roadiness_sf = st_transform(roadiness_sf, crs = st_crs(pmf_cmaq_traffic))
-traffic_vol_sf = subset(traffic_vol_sf, 
-                        Date %in% pmf_cmaq_traffic$Date)
-summary(traffic_vol_sf$Date %in% pmf_cmaq_traffic$Date)
-summary(pmf_cmaq_traffic$Date %in% traffic_vol_sf$Date)
+# traffic_vol_sf = subset(traffic_vol_sf, 
+#                         Date %in% pmf_cmaq_traffic$Date)
+# summary(traffic_vol_sf$Date %in% pmf_cmaq_traffic$Date)
+# summary(pmf_cmaq_traffic$Date %in% traffic_vol_sf$Date)
 
 # st_join traffic volume and roadiness data via st_nearest_feature
 nearest_index_road <- st_nearest_feature(pmf_cmaq_traffic, roadiness_sf)
@@ -321,23 +321,25 @@ summary(pmf_cmaq_traffic_road)
 length(unique(pmf_cmaq_traffic_road$Date))
 length(unique(pmf_cmaq_traffic_road$geom))
 
-nearest_index_road_vol <- st_nearest_feature(pmf_cmaq_traffic_road, traffic_vol_sf)
-pmf_cmaq_traffic_volume_road <- cbind(pmf_cmaq_traffic_road, traffic_vol_sf[nearest_index_road_vol, ])
-pmf_cmaq_traffic_volume_road <-
-  pmf_cmaq_traffic_volume_road %>%
-  filter(Date == Date.1)
-summary(pmf_cmaq_traffic_volume_road)
-length(unique(pmf_cmaq_traffic_volume_road$Date))
-length(unique(pmf_cmaq_traffic_volume_road$geom))
+# nearest_index_road_vol <- st_nearest_feature(pmf_cmaq_traffic_road, traffic_vol_sf)
+# pmf_cmaq_traffic_volume_road <- cbind(pmf_cmaq_traffic_road, traffic_vol_sf[nearest_index_road_vol, ])
+# pmf_cmaq_traffic_volume_road <-
+#   pmf_cmaq_traffic_volume_road %>%
+#   filter(Date == Date.1)
+# summary(pmf_cmaq_traffic_volume_road)
+# length(unique(pmf_cmaq_traffic_volume_road$Date))
+# length(unique(pmf_cmaq_traffic_volume_road$geom))
 
-pmf_cmaq_traffic_volume_road$Date.1 = pmf_cmaq_traffic_volume_road$Station_ID = 
-  pmf_cmaq_traffic_volume_road$geometry.1 = NULL
+# pmf_cmaq_traffic_volume_road$Date.1 = pmf_cmaq_traffic_volume_road$Station_ID = 
+#   pmf_cmaq_traffic_volume_road$geometry.1 = NULL
 
-summary(pmf_cmaq_traffic_volume_road)
+pmf_cmaq_traffic_road$Station_ID = pmf_cmaq_traffic_road$geom = NULL
+
+summary(pmf_cmaq_traffic_road)
 # replace the NAs in commute_time by 0
-pmf_cmaq_traffic_volume_road$commute_time[is.na(pmf_cmaq_traffic_volume_road$commute_time)] = 0
+pmf_cmaq_traffic_road$commute_time[is.na(pmf_cmaq_traffic_road$commute_time)] = 0
 
-pmf_cmaq_for_model = pmf_cmaq_traffic_volume_road
+pmf_cmaq_for_model = pmf_cmaq_traffic_road
 source.test = "Traffic"
 
 ######## common data preparation steps
@@ -414,6 +416,10 @@ mtry_use = 26
 model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Traffic.fst"))
 source.test = "Traffic"
 summary(model_input); dim(model_input)
+mtry_use = 2
+
+length(unique(model_input$Date))
+length(unique(model_input$X, model_input$Y))
 
 # original data
 conc_plot_data <- data.frame(
@@ -436,7 +442,7 @@ train_control <- trainControl(method = "cv", number = 5)
 # Fit the Random Forest model
 rf_model_cv <- caret::train(
   PMF_conc ~ ., #  + year if needed
-  data = dplyr::select(model_input, -Date),
+  data = dplyr::select(model_input, -Date), # dplyr::select(model_input, -Date), # model_input_train, 
   method = "rf",
   trControl = train_control,
   importance = TRUE
@@ -450,6 +456,19 @@ caret.rf.mtry = rf_model_cv$bestTune$mtry
 caret.rf.ntree = rf_model_cv$finalModel$ntree
 summary(rf_model_cv$finalModel)
 rf_model_cv$bestTune
+rf_model_cv$modelInfo$library
+rf_model_cv$modelInfo$type
+rf_model_cv$modelInfo$fit
+rf_model_cv$modelInfo$prob
+rf_model_cv$modelInfo$predict
+rf_model_cv$modelInfo$predictors
+rf_model_cv$modelInfo$levels
+rf_model_cv$modelInfo$tags
+rf_model_cv$modelInfo$oob
+rf_model_cv$modelType
+rf_model_cv$pred
+rf_model_cv$call
+rf_model_cv$method
 
 print(caret.rf.mtry); print(caret.rf.ntree)
 
@@ -459,7 +478,7 @@ rf_cv_predictions <- predict(rf_model_cv, model_input)
 # Evaluate the model performance
 rf_cv_performance <- 
   postResample(rf_cv_predictions, model_input$PMF_conc)
-print(rf_performance)
+print(rf_cv_performance)
 
 # Extract performance metrics
 rmse_rf <- round(rf_cv_performance["RMSE"], 3)
@@ -588,15 +607,25 @@ rf_cv_daily <-
     values_to = "Concentration"
   ) %>%
   group_by(Date, Variable) %>%
-  summarize(
-    median_Conc = median(Concentration, na.rm = TRUE),
-    lower_CI = quantile(Concentration, probs = 0.025, na.rm = TRUE),
-    upper_CI = quantile(Concentration, probs = 0.975, na.rm = TRUE),
+  dplyr::summarize(
+    median_Conc = round(median(Concentration, na.rm = TRUE), 7),
+    lower_CI = round(quantile(Concentration, probs = 0.025, na.rm = TRUE), 7),
+    upper_CI = round(quantile(Concentration, probs = 0.775, na.rm = TRUE), 7), 
     .groups = "drop"
   )
 
+summary(rf_cv_daily$lower_CI <= rf_cv_daily$median_Conc)
+summary(rf_cv_daily$median_Conc <= rf_cv_daily$upper_CI)
+
+# # set gap in date if there is no data for > 7 days
+# rf_cv_daily <- 
+#   rf_cv_daily %>%
+#   arrange(Date) %>%
+#   mutate(gap = c(0, diff(as.numeric(Date))) > 7, # calculate gaps, convert Date to numeric for diff
+#          group = cumsum(gap)) # Cumulative sum to create a new group after each gap
+
 pmf_rf_daily_plot <-
-  ggplot(rf_cv_daily, 
+  ggplot(rf_cv_daily, # , Date > as.Date("2011-04-01")
          aes(x = Date, y = median_Conc, 
              color = Variable, fill = Variable)) +
   geom_line() +
@@ -612,6 +641,7 @@ pmf_rf_daily_plot <-
         legend.background = element_blank(),
         legend.title = element_text(size = 0))
 
+# Combine the figure
 title_text <- paste0(model.method, " for ", 
                      source.test, 
                      ": RMSE, ", rmse_rf,
@@ -625,6 +655,11 @@ combined_rf_cv_plot <-
                   theme = theme(plot.title = element_text(size = 20, hjust = 0.5)))
 combined_rf_cv_plot
 
+# Output the figure
+ggsave(paste0("RF cross-validation_", source.test, "_", cmaq_period, ".pdf"), 
+       plot = combined_rf_cv_plot, 
+       width = 14.5, height = 8)
+
 ###### 5.2 Random Forest, Holdout Analyses ###### 
 
 site_info = dplyr::select(model_input, X, Y)
@@ -633,8 +668,24 @@ dim(site_info)
 site_info$Station_ID = 1:nrow(site_info)
 site_info$Station_ID = as.factor(site_info$Station_ID)
 
-model_input = merge(model_input, site_info)
-head(model_input); dim(model_input)
+model_input_site = merge(model_input, site_info)
+head(model_input_site); dim(model_input_site)
+length(unique(model_input_site$X, model_input_site$Y))
+length(unique(model_input_site$Date))
+
+# # check if sites are correctly merged
+# model_merged_site = dplyr::select(model_input_site, X, Y, Station_ID)
+# model_merged_site = model_merged_site[!duplicated(model_merged_site), ]
+# site_info_org = site_info
+# 
+# model_merged_site = model_merged_site[with(model_merged_site, order(X, Y)), ]
+# site_info_org = site_info_org[with(site_info_org, order(X, Y)), ]
+# 
+# head(model_merged_site); head(site_info_org)
+# 
+# summary(model_merged_site$X == site_info_org$X & 
+#           model_merged_site$Y == site_info_org$Y &
+#           model_merged_site$Station_ID == site_info_org$Station_ID)
 
 # Create an empty list to store results from 50 iterations
 all_rf_predictions <- list()
@@ -654,15 +705,15 @@ for (i in 1:n_iterations) {
   
   # Split data into 80% train and 20% test based on unique Station_ID
   set.seed(i)  # for reproducibility
-  unique_sites <- unique(model_input$Station_ID)
+  unique_sites <- unique(model_input_site$Station_ID)
   
   # Randomly select 80% of sites for training
   train_sites <- sample(unique_sites, size = floor(0.8 * length(unique_sites)))
   # length(unique_sites); length(train_sites)
   
   # Create training and test datasets
-  train_data <- model_input %>% filter(Station_ID %in% train_sites)
-  test_data <- model_input %>% filter(!Station_ID %in% train_sites)
+  train_data <- model_input_site %>% filter(Station_ID %in% train_sites)
+  test_data <- model_input_site %>% filter(!Station_ID %in% train_sites)
   
   # Set up training input for modeling
   model_input_train <- dplyr::select(train_data, -Station_ID, -Date)
@@ -674,10 +725,12 @@ for (i in 1:n_iterations) {
   rf_model_rfp <- randomForest(
     PMF_conc ~ . ,
     data = model_input_train,
-    ntree = 1000,  # Number of trees in the forest
-    mtry = mtry_use, # with mtry = 15, very high R-square
+    ntree = 500,  # Number of trees in the forest
+    mtry = mtry_use, # mtry_use
     importance = TRUE  # To track variable importance
   )
+  rf_test_predictions <- predict(rf_model_rfp, model_input_test)
+  postResample(rf_test_predictions, model_input_test$PMF_conc)
   
   # Store variable importance for this iteration
   rf_rfp_var_imp <- data.frame(Importance = rf_model_rfp$importance[, "IncNodePurity"],
@@ -714,14 +767,18 @@ for (i in 1:n_iterations) {
 combined_rf_predictions <- bind_rows(all_rf_predictions)
 
 # Calculate the average predictions per site
-final_rf_predictions <- combined_rf_predictions %>%
+final_rf_predictions <- 
+  combined_rf_predictions %>%
   group_by(Station_ID, Date) %>%
-  summarize(Mean_RF_Prediction = mean(RF_Prediction, na.rm = TRUE),
-            Actual_PMF = mean(PMF_conc, na.rm = TRUE))
+  summarize(
+    Mean_RF_Prediction = mean(RF_Prediction, na.rm = TRUE),
+    Actual_PMF = mean(PMF_conc, na.rm = TRUE))
 
 # Calculate overall RMSE, MAE, R-squared using the averaged predictions
 final_rf_performance <- 
   postResample(final_rf_predictions$Mean_RF_Prediction, final_rf_predictions$Actual_PMF)
+
+cor(final_rf_predictions$Mean_RF_Prediction, final_rf_predictions$Actual_PMF)
 
 # Output performance metrics
 final_rf_rmse <- round(final_rf_performance["RMSE"], 3)
@@ -793,7 +850,7 @@ shapley_summary_rf_rfp_imp<-
        y = "Mean Shapley Value (phi)") +
   theme_minimal(base_size = 16)
 
-# the combined figure
+# The combined figure
 overall_title =
   title = paste0(source.test, ": PMF vs. Averaged RF Predictions (50 Holdout Iterations)",
                 "\nRMSE:", final_rf_rmse, 
@@ -805,7 +862,7 @@ combined_plot_rf_rfp =
                   theme = theme(plot.title = element_text(size = 20, hjust = 0.5)))
 combined_plot_rf_rfp
 
-# output the photo
+# Output the figure
 ggsave(paste0("RF holdout_", source.test, "_", cmaq_period, ".pdf"), 
        plot = combined_plot_rf_rfp, 
        width = 14.5, height = 8)
