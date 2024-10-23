@@ -1993,12 +1993,89 @@ topo_ned60m_use =
   dplyr::select(topo_ned60m, zmean, geometry)
 
 
+#### Meteorology, GRIDMET ####
+# GRIDMET: University of Idaho Gridded Surface Meteorological Dataset
+# file downloaded with Python
 
-########################################################################
-####  Aim3 predictor transferring - to gridded data ####
-########################################################################
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET_2")
+getwd()
+tif_directory = getwd()
 
+# rm(list = ls()) # Removes all objects in the environment
+# gc() # Triggers garbage collection
 
+# Define the date range for each year
+study_years <- 2016:2020 # 2011:2020   2011:2015
+
+# Define the list of variables you want to download
+meteo_variables <- 
+  c("tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
+    "vs", "th", # vs, wind velocity at 10m; th, wind direction
+    "fm100", "fm1000", "bi", # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
+    "pr", "vpd", "etr") # pr, Precipitation amount; vpd, Mean vapor pressure deficit; etr, Daily alfalfa reference evapotranspiration
+
+# b = raster("vs_2011_01_01.tif")
+# a = raster("vs_2011_merged.tif")
+# plot(a)
+
+# Initialize an empty vector to store the names of files that return NULL
+# some downloaded .tif cannot be read directly via raster() or terra::rast()
+failed_files <- c()
+
+# Merge and output file by meteorological variable and by year
+for (meteo_var in meteo_variables) {
+  for (meteo_year in study_years) {
+    
+    # List all .tif files for the specific variable and year
+    tif_files <- 
+      list.files(
+        tif_directory, 
+        pattern = paste0(meteo_var, "_", meteo_year, ".*\\.tif$"), 
+        full.names = TRUE)
+    
+    if (length(tif_files) > 0) {
+      # Initialize an empty list to store successfully loaded rasters
+      rasters <- list()
+      
+      # Try reading each .tif file and skip the ones that cannot be read
+      for (tif_file in tif_files) {
+        raster_data <- tryCatch({
+          rast(tif_file)  # Use rast() from terra to read the raster file
+        }, error = function(e) {
+          message(paste("Error reading file:", tif_file, "- skipping"))
+          failed_files <- c(failed_files, tif_file)
+          return(NULL)  # Return NULL if there is an error
+        })
+        
+        # Only add successfully loaded rasters to the list
+        if (!is.null(raster_data)) {
+          rasters <- c(rasters, list(raster_data))
+        }
+      }
+      
+      # Only proceed if there are valid rasters to stack
+      if (length(rasters) > 0) {
+        # Stack the valid rasters into a multi-layer raster (stacked temporally)
+        meteo_merged_raster <- rast(rasters)
+        
+        # Define the output filename
+        meter_merged_filename <- 
+          file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked", 
+                    paste0(meteo_var, "_", meteo_year, "_stacked.tif")) 
+        
+        # Save the stacked raster to a new .tif file
+        writeRaster(
+          meteo_merged_raster,
+          filename = meter_merged_filename, 
+          overwrite = TRUE)
+        
+        print(paste0("File saved: ", meter_merged_filename))
+      } else {
+        print(paste0("No valid rasters to stack for ", meteo_var, " in ", meteo_year))
+      }
+    }
+  }
+}
 
 
 
