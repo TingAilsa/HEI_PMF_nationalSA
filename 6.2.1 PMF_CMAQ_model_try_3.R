@@ -448,27 +448,27 @@ rf_model_cv <- caret::train(
   importance = TRUE
 )
 
-summary(rf_model_cv)
+# summary(rf_model_cv)
 print(rf_model_cv)
 
 # Check the hyperparameter setting
 caret.rf.mtry = rf_model_cv$bestTune$mtry
 caret.rf.ntree = rf_model_cv$finalModel$ntree
 summary(rf_model_cv$finalModel)
-rf_model_cv$bestTune
-rf_model_cv$modelInfo$library
-rf_model_cv$modelInfo$type
-rf_model_cv$modelInfo$fit
-rf_model_cv$modelInfo$prob
-rf_model_cv$modelInfo$predict
-rf_model_cv$modelInfo$predictors
-rf_model_cv$modelInfo$levels
-rf_model_cv$modelInfo$tags
-rf_model_cv$modelInfo$oob
-rf_model_cv$modelType
-rf_model_cv$pred
-rf_model_cv$call
-rf_model_cv$method
+# rf_model_cv$bestTune
+# rf_model_cv$modelInfo$library
+# rf_model_cv$modelInfo$type
+# rf_model_cv$modelInfo$fit
+# rf_model_cv$modelInfo$prob
+# rf_model_cv$modelInfo$predict
+# rf_model_cv$modelInfo$predictors
+# rf_model_cv$modelInfo$levels
+# rf_model_cv$modelInfo$tags
+# rf_model_cv$modelInfo$oob
+# rf_model_cv$modelType
+# rf_model_cv$pred
+# rf_model_cv$call
+# rf_model_cv$method
 
 print(caret.rf.mtry); print(caret.rf.ntree)
 
@@ -694,7 +694,7 @@ rf_rsq_list <- c()
 rf_mae_list <- c()
 
 # Lists to store variable importance from each iteration
-rf_rfp_var_imp_list <- list()
+rf_ct_var_imp_list <- list()
 shapley_results_list <- list()
 
 # Number of iterations
@@ -722,39 +722,67 @@ for (i in 1:n_iterations) {
   model_input_test <- dplyr::select(test_data, -Station_ID, -Date)
   
   # Fit the Random Forest model on training data
-  rf_model_rfp <- randomForest(
-    PMF_conc ~ . ,
-    data = model_input_train,
-    ntree = 500,  # Number of trees in the forest
-    mtry = mtry_use, # mtry_use
-    importance = TRUE  # To track variable importance
+  train_control <- trainControl(method = "none")
+  # train_control <- trainControl(method = "cv", number = 5)
+  
+  rf_model_ct <- caret::train(
+    PMF_conc ~ ., #  + year if needed
+    data = model_input_train, 
+    method = "rf",
+    trControl = train_control,  # Disable resampling
+    importance = TRUE,
+    ntree = 500
   )
-  rf_test_predictions <- predict(rf_model_rfp, model_input_test)
+  
+  # rf_model_rfp <- randomForest(
+  #   PMF_conc ~ . ,
+  #   data = model_input_train,
+  #   ntree = 500,  # Number of trees in the forest
+  #   mtry = mtry_use, # mtry_use
+  #   importance = TRUE  # To track variable importance
+  # )
+  
+  rf_test_predictions <- predict(rf_model_ct, model_input_test)
   postResample(rf_test_predictions, model_input_test$PMF_conc)
+  # rf_model_ct$bestTune$mtry; rf_model_ct$finalModel$ntree
   
   # Store variable importance for this iteration
-  rf_rfp_var_imp <- data.frame(Importance = rf_model_rfp$importance[, "IncNodePurity"],
-                               Variable = rownames(rf_model_rfp$importance))
-  rf_rfp_var_imp$Iteration <- i
-  rf_rfp_var_imp_list[[i]] <- rf_rfp_var_imp
+  rf_ct_var_imp <- 
+    data.frame(
+      Importance = rf_model_ct$finalModel$importance[, "IncNodePurity"],
+      Variable = rownames(rf_model_ct$finalModel$importance))
+
+  rf_ct_var_imp$Iteration <- i
+  rf_ct_var_imp_list[[i]] <- rf_ct_var_imp
   
   # Extract Shapley values for one observation (you can loop over multiple observations)
-  predictor_rf_rfp <- iml::Predictor$new(rf_model_rfp, data = model_input_train)
-  shapley_rf_rfp <- Shapley$new(predictor_rf_rfp, x.interest = model_input_train[1,])  # First observation
+  predictor_rf_ct <- 
+    iml::Predictor$new(rf_model_ct, 
+                       data = model_input_train,
+                       y = model_input_train$PMF_conc)
+
+  # Compute Shapley values for a specific observation (or loop over multiple observations)
+  shapley_rf_ct <- 
+    Shapley$new(predictor_rf_ct, 
+                x.interest = model_input_train[1,])  # Example for first observation
   
   # Store Shapley results
-  shapley_results_rfp <- shapley_rf_rfp$results
-  shapley_results_rfp$Iteration <- i  # Add iteration info
-  shapley_results_list[[i]] <- shapley_results_rfp  # Store results
+  # phi, quantifies the contribution of that feature
+  #      negative phi values indicate that the feature is decreasing the prediction values
+  # phi.var, the variance of the Shapley value (phi) for the feature
+  shapley_results_ct <- shapley_rf_ct$results
+  shapley_results_ct$Iteration <- i  # Add iteration info
+  shapley_results_list[[i]] <- shapley_results_ct  # Store results
   
   # Predict on the test data
-  rf_test_predictions <- predict(rf_model_rfp, model_input_test)
+  rf_test_predictions <- predict(rf_model_ct, model_input_test)
   
   # Store the predictions and actual values
-  all_rf_predictions[[i]] <- data.frame(Station_ID = test_data$Station_ID,
-                                        Date = test_data$Date,
-                                        PMF_conc = test_data$PMF_conc,
-                                        RF_Prediction = rf_test_predictions)
+  all_rf_predictions[[i]] <- 
+    data.frame(Station_ID = test_data$Station_ID,
+               Date = test_data$Date,
+               PMF_conc = test_data$PMF_conc,
+               RF_Prediction = rf_test_predictions)
   
   # Evaluate performance metrics for this iteration
   rf_performance <- postResample(rf_test_predictions, model_input_test$PMF_conc)
@@ -776,7 +804,8 @@ final_rf_predictions <-
 
 # Calculate overall RMSE, MAE, R-squared using the averaged predictions
 final_rf_performance <- 
-  postResample(final_rf_predictions$Mean_RF_Prediction, final_rf_predictions$Actual_PMF)
+  postResample(final_rf_predictions$Mean_RF_Prediction, 
+               final_rf_predictions$Actual_PMF)
 
 cor(final_rf_predictions$Mean_RF_Prediction, final_rf_predictions$Actual_PMF)
 
@@ -801,7 +830,7 @@ rf_predictions_vs_pmf <-
 
 ##### Relative variable importance
 # Combine all variable importance results into one dataframe
-combined_var_imp <- bind_rows(rf_rfp_var_imp_list)
+combined_var_imp <- bind_rows(rf_ct_var_imp_list)
 
 # Calculate the mean and standard deviation of variable importance across iterations
 final_var_imp_summary <- combined_var_imp %>%
@@ -828,7 +857,7 @@ relative_var_imp_rf <-
 combined_shapley_results <- bind_rows(shapley_results_list)
 
 # Summary of Shapley results for all variables
-shapley_summary_rf_rfp <- 
+shapley_summary_rf_ct <- 
   combined_shapley_results %>%
   group_by(feature) %>%
   summarize(Mean_Contribution = mean(phi),
@@ -836,8 +865,8 @@ shapley_summary_rf_rfp <-
             .groups = 'drop')
 
 # Plot the average Shapley values (quantitative contribution) with variance
-shapley_summary_rf_rfp_imp<-
-  ggplot(shapley_summary_rf_rfp, 
+shapley_summary_rf_ct_imp<-
+  ggplot(shapley_summary_rf_ct, 
          aes(x = reorder(feature, Mean_Contribution), 
              y = Mean_Contribution)) +
   geom_bar(stat = "identity", fill = "steelblue", width = 0.5) +
@@ -856,13 +885,34 @@ overall_title =
                 "\nRMSE:", final_rf_rmse, 
                 " , MAE:", final_rf_mae, 
                 " , R-squared:", final_rf_rsq)
-combined_plot_rf_rfp =
-  rf_predictions_vs_pmf + relative_var_imp_rf + shapley_summary_rf_rfp_imp +
+combined_plot_rf_ct =
+  rf_predictions_vs_pmf + relative_var_imp_rf + shapley_summary_rf_ct_imp +
   plot_annotation(title = overall_title,
                   theme = theme(plot.title = element_text(size = 20, hjust = 0.5)))
-combined_plot_rf_rfp
+combined_plot_rf_ct
 
 # Output the figure
 ggsave(paste0("RF holdout_", source.test, "_", cmaq_period, ".pdf"), 
-       plot = combined_plot_rf_rfp, 
+       plot = combined_plot_rf_ct, 
        width = 14.5, height = 8)
+
+# Overall performance
+rf_perfomance_overall = data.frame(conc_RMSE = rf_rmse_list, RSquare = rf_rsq_list, conc_MAE = rf_mae_list)
+
+rf_perfomance_overall =
+  rf_perfomance_overall %>%
+  pivot_longer(
+    cols = c("conc_RMSE", "RSquare", "conc_MAE"),
+    names_to = "Model_Validations",
+    values_to = "Values"
+  )
+
+ggplot(rf_perfomance_overall,
+       aes(x = Model_Validations, y = Values)) +
+  geom_boxplot(linewidth = 0.6, width = 0.5) +
+  geom_jitter(aes(color = Model_Validations), 
+              width = 0.18, alpha = 0.5, size = 1.5)+
+  theme_minimal(base_size = 16)
+
+
+
