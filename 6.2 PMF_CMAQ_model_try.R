@@ -80,7 +80,7 @@ summary(names(imp_source) == names(csn_source))
 
 # combine and only keep columns to be used for modeling
 pmf_source = rbind(csn_source, imp_source)
-pmf_source = pmf_source[, .(Date, Latitude, Longitude, Source_aftermanual, Concentration)]
+pmf_source = pmf_source[, .(SiteCode, Date, Latitude, Longitude, Source_aftermanual, Concentration)]
 write.csv(pmf_source, 
           "PMF_results/CSN_IMPROVE_source_daily_contribution.csv", 
           row.names=FALSE)

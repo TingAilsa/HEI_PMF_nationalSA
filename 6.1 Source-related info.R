@@ -17,6 +17,7 @@ library(fst)
 library(ff) # handle large files without hitting memory limits
 library(bigmemory)  # handle large files without hitting memory limits
 library(corrplot)
+library(tiff)
 
 #### Read the generated census level geometry, after ACScensus step ####
 
@@ -1997,7 +1998,10 @@ topo_ned60m_use =
 # GRIDMET: University of Idaho Gridded Surface Meteorological Dataset
 # file downloaded with Python
 
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET_2")
+###### GRIDMET 1, combine daily to annual by variable by year ###### 
+
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET")
+setwd("/groups/HAQ_LAB/tzhang/gridmet_daily")
 getwd()
 tif_directory = getwd()
 
@@ -2005,7 +2009,7 @@ tif_directory = getwd()
 # gc() # Triggers garbage collection
 
 # Define the date range for each year
-study_years <- 2016:2020 # 2011:2020   2011:2015
+study_years <- 2011:2020 # 2011:2020   2011:2015
 
 # Define the list of variables you want to download
 meteo_variables <- 
@@ -2013,6 +2017,13 @@ meteo_variables <-
     "vs", "th", # vs, wind velocity at 10m; th, wind direction
     "fm100", "fm1000", "bi", # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
     "pr", "vpd", "etr") # pr, Precipitation amount; vpd, Mean vapor pressure deficit; etr, Daily alfalfa reference evapotranspiration
+
+# meteo_variables = "bi"
+
+us_grid_raster_01 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_01.tif"))
+us_grid_raster_001 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_001.tif"))
+
+us_grid_raster = us_grid_raster_01
 
 # b = raster("vs_2011_01_01.tif")
 # a = raster("vs_2011_merged.tif")
@@ -2037,8 +2048,11 @@ for (meteo_var in meteo_variables) {
       # Initialize an empty list to store successfully loaded rasters
       rasters <- list()
       
-      # Try reading each .tif file and skip the ones that cannot be read
       for (tif_file in tif_files) {
+        # Extract the name and use it as rast name
+        rast.name = sub("\\.tif$", "", basename(tif_file))
+        
+        # Try reading each .tif file and skip the ones that cannot be read
         raster_data <- tryCatch({
           rast(tif_file)  # Use rast() from terra to read the raster file
         }, error = function(e) {
@@ -2060,7 +2074,8 @@ for (meteo_var in meteo_variables) {
         
         # Define the output filename
         meter_merged_filename <- 
-          file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked", 
+          # file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked", 
+          file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/GRIDMET_stacked", 
                     paste0(meteo_var, "_", meteo_year, "_stacked.tif")) 
         
         # Save the stacked raster to a new .tif file
@@ -2074,6 +2089,97 @@ for (meteo_var in meteo_variables) {
         print(paste0("No valid rasters to stack for ", meteo_var, " in ", meteo_year))
       }
     }
+  }
+}
+
+###### GRIDMET 2, combine varaibles used for different sources by year ###### 
+
+# Set the paths for reading and saving files
+gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
+gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
+
+# Define the date range for each year
+study_years <- 2011:2020 # 2011:2020   2011:2015
+
+# Start with 2011 data with 365 days, for the rest, need recheck!!! and add the lost days inside!!!
+tmmx_year = raster("tmmx_2011_stacked.tif")
+tmmn_year = raster("tmmn_2011_stacked.tif")
+rmax_year = raster("rmax_2011_stacked.tif")
+rmin_year = raster("rmin_2011_stacked.tif")
+vs_year = raster("vs_2011_stacked.tif")
+th_year = raster("th_2011_stacked.tif")
+pr_year = raster("pr_2011_stacked.tif")
+tmmx_year; tmmn_year
+rmax_year; rmin_year
+vs_year; th_year
+
+crs_meteo = st_crs(th_year)
+# names(tmmx_year) 
+
+meteo_var_comm <- 
+  c("tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
+    "vs", "th") # vs, wind velocity at 10m; th, wind direction; pr, Precipitation amoun
+
+
+# Loop through each year and combine the selected variables
+for (met_year in study_years) { # met_year = 2011
+  
+  # Initialize an empty list to store rasters for this year
+  rasters_to_merge <- list()
+  
+  # Loop through each selected variable
+  for (meteo_var in meteo_var_comm) { # meteo_var = meteo_var_comm[1]
+    # Construct the file path for the stacked raster of this variable and year
+    file_path <- 
+      file.path(gridmet_stack_path, 
+                paste0(meteo_var, "_", met_year, "_stacked.tif"))
+    
+    # Check if the file exists
+    if (file.exists(file_path)) {
+      # Read the raster using terra::rast
+      raster_data <- rast(file_path)
+      
+      # Check the number of layers (bands) in the raster (representing days)
+      num_layers <- nlyr(raster_data)
+      
+      # Create the custom band names as dates for eachh year
+      start_date <- as.Date(paste0(met_year, "-01-01"))
+      custom_names <- 
+        paste0(meteo_var, "_", 
+               as.character(
+                 seq(start_date, by = "day", length.out = num_layers)))
+      
+      # Assign these names to the layers
+      names(raster_data) <- custom_names
+      
+      # Add the raster to the list
+      rasters_to_merge[[meteo_var]] <- raster_data
+    } else {
+      message(paste0("File not found: ", file_path))
+    }
+  }
+  
+  # Ensure there are rasters to merge
+  if (length(rasters_to_merge) > 0) {
+    # Stack the rasters together by corresponding bands (days)
+    merged_rasters <- c(rasters_to_merge[[1]])
+    for (i in 2:length(rasters_to_merge)) {
+      merged_rasters <- c(merged_rasters, rasters_to_merge[[i]])
+    }
+    
+    # Define output file name
+    combined_filename <- 
+      file.path(gridmet_stack_source_path, 
+                paste0("Common_GRIDMET_", met_year, "_stacked.tif"))
+    
+    # Save the combined raster stack to a new .tif file
+    writeRaster(merged_rasters, 
+                filename = combined_filename, 
+                overwrite = TRUE)
+    
+    print(paste0("Combined file saved: ", combined_filename))
+  } else {
+    print(paste0("No valid rasters to combine for year ", year))
   }
 }
 

@@ -2522,11 +2522,26 @@ grid_layout_fraction <- grid.arrange(
 #### 4.4 performance summary ####
 `
 # PMF performance direct summary
-PMF_base_summary = fread("IMPROVE_Site_15t1mdlVNi_DN_PMF_2024-07-23.csv")
+PMF_base_imp = fread("IMPROVE_Site_15t1mdlVNi_DN_PMF_2024-07-23.csv")
+PMF_base_csn = fread("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv")
 
+# Select columns to use
+PMF_base_imp = 
+  select(PMF_base_imp, 
+         Dataset, SiteCode, serial.No, Factor.No, 
+         median_PMF_PM2.5, median_obs_PM2.5, 
+         cor_PMF.obs_PM, RMSE_PM2.5, R2_PM2.5)
 
-# select only columns related to performance
-site_perform = PMF_base_summary[, 2:14]
+PMF_base_csn = 
+  select(PMF_base_csn, 
+         Dataset, SiteCode, serial.No, Factor.No, 
+         median_PMF_PM2.5, median_obs_PM2.5, 
+         cor_PMF.obs_PM, RMSE_PM2.5, R2_PM2.5)
+
+summary(names(PMF_base_imp) == names(PMF_base_csn))
+
+# Combine datasets
+site_perform = rbind(PMF_base_imp, PMF_base_csn)
 
 # PMF predicted PM2.5 vs. observations
 cor_overall_obs_pmf = 
@@ -2539,8 +2554,8 @@ cor_overall_obs_pmf
 
 pmf_obs <- 
   ggplot(site_perform, 
-         aes(x = median_obs_PM2.5, y = median_PMF_PM2.5)) +
-  geom_point() +
+         aes(x = median_obs_PM2.5, y = median_PMF_PM2.5, shape = Dataset)) +
+  geom_point(alpha = 0.25) +
   geom_abline(intercept = 0, slope = 1, color = "red") +
   scale_x_continuous(limits = c(0, NA), breaks = c(0, 4, 8, 12)) +
   scale_y_continuous(limits = c(0, NA), breaks = c(0, 4, 8, 12)) +
@@ -2553,7 +2568,7 @@ pmf_obs
 # other validation parameter distribution
 site_perform_estimated = 
   select(site_perform, 
-         SiteCode, serial.No, Factor.No,
+         Dataset, SiteCode, serial.No, Factor.No,
          cor_PMF.obs_PM, RMSE_PM2.5,  R2_PM2.5)
 
 # convert to longer version
@@ -2569,7 +2584,7 @@ head(site_perform_estimated)
 r2_r2 <- 
   ggplot(subset(site_perform_estimated,
                 Validation_method != "RMSE_PM2.5"), 
-         aes(x = Validation_method, y = Performance)) +
+         aes(x = Validation_method, y = Performance, shape = Dataset)) +
   geom_jitter(width = 0.2, alpha = 0.25, size = 2)+
   geom_boxplot(outlier.shape = NA, fill = NA,
                linewidth = 0.6, width = 0.5) +
@@ -2582,8 +2597,9 @@ r2_r2
 rmse_pm <- 
   ggplot(subset(site_perform_estimated,
                 Validation_method == "RMSE_PM2.5"), 
-         aes(x = Performance)) +
-  geom_histogram(alpha = 0.8) +
+         aes(x = Performance, fill = Dataset)) +  # moved fill into aes()
+  geom_histogram(alpha = 0.8, position = "stack") +  # added position = "stack"
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e")) +
   labs(x = format_variable("RMSE  µg/m3"), y = "Count") +
   theme_bw(base_size = 20)
 rmse_pm

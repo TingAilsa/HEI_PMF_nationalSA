@@ -15,8 +15,7 @@ library(randomForest)
 # library(torch)
 library(ggplot2)
 library(patchwork)
-library(randomForest)
-library(iml)
+# library(iml)
 library(doParallel) # parallel backend
 
 # Detect the number of cores available on the server
@@ -146,6 +145,24 @@ pmf_census_nlcd_Traffic = st_read(paste0("PMF_Traffic_NCLD_land_ACS_Census_2011.
 cmaq_sulfate = st_read(paste0("CMAQ_Sulfate_2011.gpkg"))
 cmaq_dust = st_read(paste0("CMAQ_Dust_2011.gpkg"))
 cmaq_traffic = st_read(paste0("CMAQ_Traffic_2011.gpkg"))
+class(cmaq_traffic); head(cmaq_traffic)
+
+# Load the US 0.1 Degree grid and census tract ID
+us_grid_censusGeo_sf <- 
+  st_read(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/",
+                    "US_O.1_grid_censusID.gpkg"))
+st_crs(us_grid_censusGeo_sf)
+dim(us_grid_censusGeo_sf)
+length(unique(us_grid_censusGeo_sf$geom))
+
+# Load the US 0.1 Degree raster
+us_grid_raster <- raster("US_O.1_grid_raster.tif")
+head(us_grid_raster)
+crs(us_grid_raster)
+dim(us_grid_raster)
+
+cmaq_traffic = st_transform(cmaq_traffic, crs = st_crs(us_grid_censusGeo_sf))
+traffic_grid<- st_join(us_grid_censusGeo_sf, cmaq_traffic, join = st_within, left = TRUE)
 
 # combine pmf_nlcd with CMAQ for each source category, & remove not matched Date, nearest point
 # sulfate
@@ -180,6 +197,9 @@ pmf_cmaq_dust$Date.1 = pmf_cmaq_dust$geometry.1 = pmf_cmaq_dust$geometry = NULL
 summary(pmf_cmaq_dust)
 
 # traffic
+
+us_grid_ncld_raster <- projectRaster( cmaq_traffic, us_grid_raster)
+
 nearest_index_traffic <- st_nearest_feature(pmf_census_nlcd_Traffic, cmaq_traffic)
 pmf_cmaq_traffic <- cbind(pmf_census_nlcd_Traffic, cmaq_traffic[nearest_index_traffic, ])
 dim(pmf_census_nlcd_Traffic); dim(pmf_cmaq_traffic)
@@ -208,18 +228,19 @@ write_sf(pmf_cmaq_traffic, paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Traffi
 #### 4 Model common input prepare ####
 
 ###### 4.1 traffic info ######
-traffic_vol = read_fst("Traffic_volume/FHWA_Traffic_Volume_2011-20.fst")
-setDT(traffic_vol)
-traffic_vol_year = subset(traffic_vol, Date < as.Date("2012-01-01"))
+# traffic_vol = read_fst("Traffic_volume/FHWA_Traffic_Volume_2011-20.fst")
+# setDT(traffic_vol)
+# traffic_vol_year = subset(traffic_vol, Date < as.Date("2012-01-01"))
 
 roadiness = read_fst("Roadiness/us_roadiness_longlat.fst")
 setDT(roadiness)
+head(roadiness)
 
 # convert to sf
-traffic_vol_sf <-
-  st_as_sf(traffic_vol, 
-           coords = c("Longitude", "Latitude"), 
-           crs = 4326) # EPSG:4326 (WGS 84) is for longitude/latitude
+# traffic_vol_sf <-
+#   st_as_sf(traffic_vol, 
+#            coords = c("Longitude", "Latitude"), 
+#            crs = 4326) # EPSG:4326 (WGS 84) is for longitude/latitude
 roadiness_sf <-
   st_as_sf(roadiness, 
            coords = c("Longitude", "Latitude"), 
@@ -398,28 +419,46 @@ write_fst(model_input, paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Traffic.fs
 ######################################################
 ############### Modeling ###################
 ######################################################
-cmaq_period = "2011-02_2011-08"
+# cmaq_period = "2011-02_2011-08"
+cmaq_period = "2011-02_2011-09"
 
 # Sulfate
-model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Sulfate.fst"))
+# model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Sulfate.fst"))
+model_input = read_fst(paste0("Sulfate_only_PMF_points_input_", cmaq_period, ".fst"))
 source.test = "Secondary Sulfate"
 summary(model_input); dim(model_input)
-mtry_use = 15
+
+# Rename
+model_input <-
+  plyr::rename(model_input, 
+               c("Concentration" = "PMF_conc",
+                 "PM25_TOT_EGU" = "CMAQ_conc"))
+head(model_input)
 
 # Dust
-model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Dust.fst"))
+# model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Dust.fst"))
+model_input = read_fst(paste0("Dust_only_PMF_points_input_", cmaq_period, ".fst"))
 source.test = "Dust"
 summary(model_input); dim(model_input)
-mtry_use = 26
+
+# Rename
+model_input <-
+  plyr::rename(model_input, 
+               c("Concentration" = "PMF_conc",
+                 "PM25_TOT_DUST" = "CMAQ_conc"))
+head(model_input)
 
 # Traffic
-model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Traffic.fst"))
+# model_input = read_fst(paste0("PMF_CMAQ_NLCD_Census_", cmaq_period, "_Traffic.fst"))
+model_input = read_fst(paste0("Traffic_only_PMF_points_input_", cmaq_period, ".fst"))
 source.test = "Traffic"
 summary(model_input); dim(model_input)
-mtry_use = 2
 
-length(unique(model_input$Date))
-length(unique(model_input$X, model_input$Y))
+model_input <-
+  plyr::rename(model_input, 
+               c("Concentration" = "PMF_conc",
+                 "PM25_TOT_ONR" = "CMAQ_conc"))
+head(model_input)
 
 # original data
 conc_plot_data <- data.frame(
@@ -441,8 +480,8 @@ train_control <- trainControl(method = "cv", number = 5)
 
 # Fit the Random Forest model
 rf_model_cv <- caret::train(
-  PMF_conc ~ ., #  + year if needed
-  data = dplyr::select(model_input, -Date), # dplyr::select(model_input, -Date), # model_input_train, 
+  PMF_conc ~ ., #  + year 
+  data = dplyr::select(model_input, -Date, -Source_aftermanual, -Dataset, -year), # dplyr::select(model_input, -Date), # model_input_train, 
   method = "rf",
   trControl = train_control,
   importance = TRUE
@@ -717,19 +756,24 @@ for (i in 1:n_iterations) {
   
   # Set up training input for modeling
   model_input_train <- dplyr::select(train_data, -Station_ID, -Date)
+  summary(model_input_train)
+  cor.test(model_input_train$PMF_conc, model_input_train$CMAQ_conc)
+  cor.test(model_input_train$PMF_conc, model_input_train$PM25_TOT_ONR)
+  cor.test(model_input_train$PMF_conc, model_input_train$sRoadiness.1.)
   
   # Set up test input for prediction
   model_input_test <- dplyr::select(test_data, -Station_ID, -Date)
   
   # Fit the Random Forest model on training data
+  # Disable resampling
   train_control <- trainControl(method = "none")
   # train_control <- trainControl(method = "cv", number = 5)
   
   rf_model_ct <- caret::train(
-    PMF_conc ~ ., #  + year if needed
+    PMF_conc ~ ., 
     data = model_input_train, 
     method = "rf",
-    trControl = train_control,  # Disable resampling
+    trControl = train_control,  
     importance = TRUE,
     ntree = 500
   )
@@ -742,10 +786,44 @@ for (i in 1:n_iterations) {
   #   importance = TRUE  # To track variable importance
   # )
   
+  summary(rf_model_ct)
+  print(rf_model_ct)
+  rf_model_ct$finalModel
+  rf_model_ct$bestTune
+  rf_model_ct$pred
+  rf_model_ct$coefnames
+  
   rf_test_predictions <- predict(rf_model_ct, model_input_test)
   postResample(rf_test_predictions, model_input_test$PMF_conc)
   # rf_model_ct$bestTune$mtry; rf_model_ct$finalModel$ntree
+
+  ##### partial importance plot  
+
   
+  
+  
+  # library(maps)
+  # 
+  # # Get the US map data
+  # us_map <- map_data("state")
+  # us_map_sf <- st_as_sf(us_map, coords = c("long", "lat"), crs = 4326)  # Convert to sf object with WGS84 CRS
+  # us_map_sf <- st_transform(us_map_sf, crs = 32633)
+  # us_coords <- as.data.frame(st_coordinates(us_map_sf)) 
+  # us_map_sf = cbind(us_map_sf, us_coords)
+  # 
+  # # Plot the points on the US map
+  # ggplot() +
+  #   # Plot the US map
+  #   geom_polygon(data = us_map_sf, aes(x = X, y = Y, group = group), 
+  #                fill = "lightgray", color = "white") +
+  #   # Overlay PMF concentrations
+  #   geom_point(data = model_input_train, 
+  #              aes(x = X, y = Y, color = PMF_conc), 
+  #              size = 2, alpha = 0.7) +
+  #   scale_color_viridis_c(option = "plasma") +  # You can change the color palette as needed
+  #   coord_quickmap() +
+  #   theme_minimal(base_size = 15)
+
   # Store variable importance for this iteration
   rf_ct_var_imp <- 
     data.frame(
@@ -892,7 +970,11 @@ combined_plot_rf_ct =
 combined_plot_rf_ct
 
 # Output the figure
-ggsave(paste0("RF holdout_", source.test, "_", cmaq_period, ".pdf"), 
+# ggsave(paste0("RF holdout_", source.test, "_", cmaq_period, ".pdf"), 
+#        plot = combined_plot_rf_ct, 
+#        width = 14.5, height = 8)
+
+ggsave(paste0("RF holdout_caret_", source.test, "_", cmaq_period, ".pdf"), 
        plot = combined_plot_rf_ct, 
        width = 14.5, height = 8)
 
@@ -906,6 +988,15 @@ rf_perfomance_overall =
     names_to = "Model_Validations",
     values_to = "Values"
   )
+
+rf_perfomance_overall$interaction = rep(1:50, each = 3)
+
+rf_perfomance_weak = base::subset(rf_perfomance_overall, 
+                                  Model_Validations == "RSquare" &
+                                    Values < 0.1)
+rf_perfomance_strong = base::subset(rf_perfomance_overall, 
+                                    Model_Validations == "RSquare" &
+                                      Values > 0.5)
 
 ggplot(rf_perfomance_overall,
        aes(x = Model_Validations, y = Values)) +

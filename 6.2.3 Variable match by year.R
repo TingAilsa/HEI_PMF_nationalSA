@@ -49,10 +49,13 @@ head(pmf_source_date)
 # # Geometry of each GEOID at the included census tract level
 # census_tract_geo =
 #   st_read(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
-#                     "ACS_census_tract_geoid_geometry_4326.gpkg"))
+#                     "ACS_census_tract_geoid_geometry_4326.fgb"))
 # st_geometry(census_tract_geo) <- "geometry"
 # head(census_tract_geo)
-# 
+# st_write(census_tract_geo, 
+#          file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
+#                                         "ACS_census_tract_geoid_geometry_4326.fgb"))
+                    
 # # Census tract level info
 # census_tract_acs =
 #   fread(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
@@ -121,17 +124,17 @@ head(pmf_source_date)
 #                     "US_Census_ACS_tract_commute_2011-2020.fst"))
 
 ######### 3 Create grid-like data, something can be done later ########
-#Define the approximate bounding box for mainland U.S.
-# us_bbox <- c(xmin = -125, xmax = -66, ymin = 24, ymax = 50)
-# crs_proj <- "+proj=longlat +datum=WGS84 +no_defs"
-# 
-# # Convert the bounding box to an extent object for the raster package
-# us_extent <- extent(us_bbox["xmin"], us_bbox["xmax"], us_bbox["ymin"], us_bbox["ymax"])
-# 
-# # Create the raster grid with a desired resolution (e.g., 0.1 degrees)
-# us_grid_raster <- raster(ext = us_extent, resolution = 0.1)
-# crs(us_grid_raster) <- crs_proj
-# dim(us_grid_raster)
+# Define the approximate bounding box for mainland U.S.
+us_bbox <- c(xmin = -125, xmax = -66, ymin = 24, ymax = 50)
+crs_proj <- "+proj=longlat +datum=WGS84 +no_defs"
+
+# Convert the bounding box to an extent object for the raster package
+us_extent <- extent(us_bbox["xmin"], us_bbox["xmax"], us_bbox["ymin"], us_bbox["ymax"])
+
+# Create the raster grid with a desired resolution (e.g., 0.1 degrees)
+us_grid_raster <- raster(ext = us_extent, resolution = 0.1)
+crs(us_grid_raster) <- crs_proj
+dim(us_grid_raster)
 # writeRaster(us_grid_raster, "US_O.1_grid_raster.tif", 
 #             format = "GTiff", 
 #             options = "COMPRESS=LZW", 
