@@ -396,78 +396,219 @@ st_write(csn_imp_site_with_nearest,
 # 
 # write_fst(gridmet_us_grid_mean, file.path("pmf_ncld_meteo_census/GRIDMET_commom_2011_in_US_grid_01.fst"))
 
-###### 4 NCLD info ######
-##### !!!Different grid-like files are easier to combine when reading NCLD data via raster compared with terra::rast
-##### !!! Efficient grid file combination via raster than terra::rast !!!
-# ncld_2011 <- raster("NLCD_landcover/nlcd_2011_fact30_landcover_resampled.tif")
-# ncld_2013 <- raster("NLCD_landcover/nlcd_2013_fact30_landcover_resampled.tif")
-# ncld_2016 <- raster("NLCD_landcover/nlcd_2016_fact30_landcover_resampled.tif")
-# ncld_2019 <- raster("NLCD_landcover/nlcd_2019_fact30_landcover_resampled.tif")
+#### NLCD Land use type ####
 
-ncld_2011 <- raster("NLCD_landcover/nlcd_2011_fact300_landcover_resampled.tif")
-ncld_2013 <- raster("NLCD_landcover/nlcd_2013_fact300_landcover_resampled.tif")
-ncld_2016 <- raster("NLCD_landcover/nlcd_2016_fact300_landcover_resampled.tif")
-ncld_2019 <- raster("NLCD_landcover/nlcd_2019_fact300_landcover_resampled.tif")
+project_categorical_raster <- function(source_raster, target_raster) {
+  require(raster)
 
-# plot(ncld_2011)
+  # Get factor levels from source raster
+  source_levels <- levels(source_raster)[[1]]
+  source_vals <- as.numeric(source_raster[])
 
-###### 5 merge PMF, Census & NCLD for each year ######
-census_acs_wide = 
-  read_fst(
-    file.path(
-      "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
-      "US_Census_ACS_tract_commute_2011-2020.fst"))
+  # Transform source coordinates to target CRS
+  source_coords <- xyFromCell(source_raster, 1:ncell(source_raster))
+  source_points_sp <- SpatialPoints(
+    coords = source_coords,
+    proj4string = crs(source_raster)
+  )
 
-# check if crs match
-# crs(pmf_source_date); crs(census_acs_wide); crs(ncld_2011) 
-# class(pmf_source_date); class(census_acs_wide); class(ncld_2011) 
-# head(pmf_source_date); head(census_acs_wide); head(ncld_2011) 
+  # Transform to target CRS
+  source_points_transformed <- spTransform(source_points_sp, crs(target_raster))
+  source_coords_transformed <- coordinates(source_points_transformed)
 
-# Define year groups for NLCD usage, using preloaded rasters
-ncld_year_groups <- list(
-  list(years = c(2011, 2012), ncld_raster = ncld_2011),
-  list(years = c(2013, 2014), ncld_raster = ncld_2013),
-  list(years = c(2015, 2016, 2017), ncld_raster = ncld_2016),
-  list(years = c(2018, 2019, 2020), ncld_raster = ncld_2019)
+  # Create source points dataframe with transformed coordinates
+  valid_idx <- !is.na(source_vals)
+  source_points <- data.frame(
+    x = source_coords_transformed[valid_idx, 1],
+    y = source_coords_transformed[valid_idx, 2],
+    value = source_vals[valid_idx]
+  )
+
+  # Get target coordinates
+  target_coords <- xyFromCell(target_raster, 1:ncell(target_raster))
+
+  message("Finding nearest neighbors for all target cells...")
+
+  # Find nearest neighbor function
+  find_nearest <- function(point, source_points) {
+    dists <- sqrt((source_points$x - point[1])^2 +
+                    (source_points$y - point[2])^2)
+    return(source_points$value[which.min(dists)])
+  }
+
+  # Process in chunks
+  chunk_size <- 1000
+  n_chunks <- ceiling(nrow(target_coords) / chunk_size)
+  result_values <- numeric(nrow(target_coords))
+
+  for(i in 1:n_chunks) {
+    if(i %% 10 == 0) message(sprintf("Processing chunk %d of %d", i, n_chunks))
+
+    start_idx <- (i - 1) * chunk_size + 1
+    end_idx <- min(i * chunk_size, nrow(target_coords))
+    chunk_idx <- start_idx:end_idx
+
+    for(j in seq_along(chunk_idx)) {
+      result_values[chunk_idx[j]] <- find_nearest(
+        target_coords[chunk_idx[j], ],
+        source_points
+      )
+    }
+  }
+
+  # Create output raster
+  result_raster <- target_raster
+  values(result_raster) <- result_values
+
+  # Set factor levels
+  result_raster <- ratify(result_raster)
+  levels(result_raster) <- source_levels
+
+  return(result_raster)
+}
+
+# Find nearest neighbor function for points in two grid cooridnates
+find_nearest <-
+  function(point, ncld_year_points) {
+    dists <- sqrt((ncld_year_points$x - point[1])^2 +
+                    (ncld_year_points$y - point[2])^2)
+    return(ncld_year_points$value[which.min(dists)])
+  }
+
+####### NLCD 1, basic files #########
+# Read original file
+ncld_2011 <- raster("pmf_ncld_meteo_census/nlcd_2011_fact300_landcover_resampled.tif")
+ncld_2013 <- raster("pmf_ncld_meteo_census/nlcd_2013_fact300_landcover_resampled.tif")
+ncld_2016 <- raster("pmf_ncld_meteo_census/nlcd_2016_fact300_landcover_resampled.tif")
+ncld_2019 <- raster("pmf_ncld_meteo_census/nlcd_2019_fact300_landcover_resampled.tif")
+
+# Select the year to use
+ncld_year_use = 2011
+ncld_year = ncld_2011
+
+ncld_year_use = 2013
+ncld_year = ncld_2013
+
+ncld_year_use = 2016
+ncld_year = ncld_2016
+
+ncld_year_use = 2019
+ncld_year = ncld_2019
+
+####### NLCD 2, project the NLCD category raster to US grid raster #########
+# Choose the US grid
+us_grid_raster = us_grid_raster_01
+# us_grid_raster = us_grid_raster_001
+
+# Convert to factor
+ncld_year_factor <- ratify(ncld_year)
+ncld_year_use
+
+# Get factor levels from ncld_year raster
+ncld_year_levels <- levels(ncld_year)[[1]]
+ncld_year_vals <- as.numeric(ncld_year[])
+
+# Transform ncld_year coordinates to target CRS
+ncld_year_coords <- xyFromCell(ncld_year, 1:ncell(ncld_year))
+ncld_year_points_sp <- SpatialPoints(
+  coords = ncld_year_coords,
+  proj4string = crs(ncld_year)
 )
+head(ncld_year_points_sp)
 
-# Iterate over each group of years and process data
-for (ncld_group in ncld_year_groups) { # ncld_group = ncld_year_groups[[1]]
-  # NLCD raster for this group
-  ncld_raster <- ncld_group$ncld_raster
-  
-  # projectRaster the ncld_raster with the project 0.1*0.1 degree grid raster
-  # projectRaster takes the first argument and reprojects it to match the CRS of the second 
-  us_grid_ncld_raster <- projectRaster( ncld_raster, us_grid_raster)
-  
-  # Process each year in the group
-  for (study_year in ncld_group$years) { # study_year = ncld_group$years[1]
-    # Filter pmf_source_date and census_acs_geom for the current year
-    pmf_source_year <- subset(pmf_source_date, year == study_year)
-    census_acs_year <- subset(census_acs_wide, year == study_year)
-    
-    # head(pmf_source_year); unique(pmf_source_year$year); unique(census_acs_year$year)
-    # dim(pmf_source_year); dim(pmf_source_date)
-    # head(census_acs_year); dim(census_acs_year)
-    
-    # Spatial join with grid - pmf_source_date, ncld_poly
-    pmf_grid <- 
-      st_join(us_grid_censusGeo_sf, pmf_source_year, join = st_intersects, left = TRUE)
-    
-    # The current merge would lose grids of those with no info such as PMF and/or others
-    # pmf_ncld_grid <-
-    #   st_join(pmf_grid, ncld_poly, join = st_intersects, left = TRUE)
-    pmf_ncld_grid <- 
-      st_join(pmf_grid, ncld_poly_simplified, join = st_within, left = TRUE)
-    
-    # Merge with census_acs_year
-    pmf_census_ncld_grid <-
-      base::merge(pmf_ncld_grid, census_acs_year)
-    
-    # Save the result for this year with spatial information
-    st_write(pmf_census_ncld_grid, paste0("PMF_source_NCLD_land_ACS_Census_", study_year, ".gpkg"))
+# Transform to target CRS
+ncld_year_points_transformed <- spTransform(ncld_year_points_sp, crs(us_grid_raster))
+ncld_year_coords_transformed <- coordinates(ncld_year_points_transformed)
+
+# Create ncld_year points dataframe with transformed coordinates
+ncld_valid_idx <- !is.na(ncld_year_vals)
+summary(ncld_valid_idx)
+
+ncld_year_points <- data.frame(
+  x = ncld_year_coords_transformed[ncld_valid_idx, 1],
+  y = ncld_year_coords_transformed[ncld_valid_idx, 2],
+  value = ncld_year_vals[ncld_valid_idx]
+)
+head(ncld_year_points)
+
+# Get target coordinates
+us_grid_coords <- xyFromCell(us_grid_raster, 1:ncell(us_grid_raster))
+
+print("Finding nearest neighbors for all target cells")
+
+####### Process in chunks
+# settings for chunks
+chunk_size <- 10000
+n_chunks <- ceiling(nrow(us_grid_coords) / chunk_size)
+us_grid_ncld_values <- numeric(nrow(us_grid_coords))
+
+# process
+for(i in 1:n_chunks) {
+  if(i %% 10 == 0) message(sprintf("Processing chunk %d of %d", i, n_chunks))
+
+  start_idx <- (i - 1) * chunk_size + 1
+  end_idx <- min(i * chunk_size, nrow(us_grid_coords))
+  chunk_idx <- start_idx:end_idx
+
+  for(j in seq_along(chunk_idx)) {
+    us_grid_ncld_values[chunk_idx[j]] <- find_nearest(
+      us_grid_coords[chunk_idx[j], ],
+      ncld_year_points
+    )
   }
 }
+
+# Create output raster
+us_grid_ncld_raster <- us_grid_raster
+values(us_grid_ncld_raster) <- us_grid_ncld_values
+
+# Set factor levels
+us_grid_ncld_raster <- ratify(us_grid_ncld_raster)
+levels(us_grid_ncld_raster) <- ncld_year_levels
+
+# # Project the raster preserving factor levels
+# us_grid_ncld_raster <-
+#   project_categorical_raster(ncld_year_factor, us_grid_raster_01)
+
+# Check the results
+table(values(ncld_year_factor)); table(values(us_grid_ncld_raster))
+summary(ncld_year_factor); dim(ncld_year_factor)
+summary(us_grid_ncld_raster); dim(us_grid_ncld_raster)
+
+# Get coordinates and values of us_grid_ncld_raster
+us_grid_ncld_coords = xyFromCell(us_grid_ncld_raster, 1:ncell(us_grid_ncld_raster))
+us_grid_ncld_values <- values(us_grid_ncld_raster)
+
+# Create dataframe
+us_grid_ncld_df <- data.frame(
+  Longitude = us_grid_ncld_coords[,1],
+  Latitude = us_grid_ncld_coords[,2],
+  NLCD.Land.Cover.Class = us_grid_ncld_values
+)
+us_grid_ncld$NLCD.Land.Cover.Class = as.factor(us_grid_ncld_df$NLCD.Land.Cover.Class)
+summary(us_grid_ncld_df); dim(us_grid_ncld_df)
+
+# Make sure there are only two digits for coordinates
+us_grid_ncld_df$Longitude = round(us_grid_ncld_df$Longitude, 2)
+us_grid_ncld_df$Latitude = round(us_grid_ncld_df$Latitude, 2)
+
+# Get the sf file for future use (in case)
+us_grid_ncld_df$long = us_grid_ncld_df$Longitude
+us_grid_ncld_df$lat = us_grid_ncld_df$Latitude
+
+us_grid_ncld_sf =
+  st_as_sf(us_grid_ncld_df,
+           coords = c("long", "lat"),
+           crs = st_crs(us_grid_raster_01))  # use the same CRS as your raster
+
+# Save the file
+st_write(us_grid_ncld_sf,
+         file.path(
+           paste0("pmf_ncld_meteo_census/NCLD_", ncld_year_use, "_in_US_grid_01.fgb")))
+write_fst(us_grid_ncld_df,
+         file.path(
+           paste0("pmf_ncld_meteo_census/NCLD_", ncld_year_use, "_in_US_grid_01.fst")))
+
 
 #### Roadiness ####
 # us_grid_sf_01
