@@ -490,6 +490,26 @@ annual_source_site <-
   annual_source_gps_conc_perc_sf %>%
   st_join(us_states_region_sf, join = st_within)
 
+# Site by state
+site_state = 
+  dplyr::select(annual_source_site, SiteCode, state_abbr)
+site_state = site_state[!duplicated(site_state), ]
+subset(site_state, state_abbr == "TX")
+site_state_count = data.frame(table(site_state$state_abbr))
+
+site_state_source = 
+  dplyr::select(annual_source_site, SiteCode, state_abbr, Source_aftermanual)
+site_state_source = site_state_source[!duplicated(site_state_source), ]
+subset(site_state_source, state_abbr == "TX" & Source_aftermanual == "F1-Traffic")
+site_state_source_count = data.frame(table(site_state_source$state_abbr))
+
+site_state_2011 = 
+  dplyr::select(annual_source_site, Year, SiteCode, state_abbr, Source_aftermanual) %>%
+  subset(Year == 2011)
+site_state_2011 = site_state_2011[!duplicated(site_state_2011), ]
+subset(site_state_2011, state_abbr == "TX" & Source_aftermanual == "F1-Traffic")
+site_state_2011_count = data.frame(table(site_state_2011$state_abbr))
+
 # Get regional median
 annual_source_region <-
   annual_source_site %>%
