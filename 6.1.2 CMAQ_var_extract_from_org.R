@@ -175,7 +175,7 @@ for (study_year in included_years){ # study_year = 2017
   print("The months and years to process:")
   study_year; included_month_folders
   
-  for(study_month in included_month_folders) { # study_month = included_month_folders[10]
+  for(study_month in included_month_folders) { # study_month = included_month_folders[12]
     
     month_folder = paste0(study_month, "/POST")
     
