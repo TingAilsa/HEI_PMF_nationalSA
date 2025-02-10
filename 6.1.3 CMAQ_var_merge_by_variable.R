@@ -9,7 +9,7 @@ getwd()
 # Define the list of cmaq_var values
 cmaq_var_rds_list = c("PM25_TOT_EGU", "PM25_TOT_OTA",
                      "PM25_TOT_ONR", "PM25_TOT_NRD",  "PM25_TOT_ACM",
-                     "PM25_TOT_ASEA", "PM25_TOT_DUST", "PM25_TOT_ARS",
+                     "PM25_TOT_ASEA", "PM25_TOT_ARS", # "PM25_TOT_DUST", 
                      "PM25_TOT_BIOG", "PM25_TOT_AFI",
                      "O3", "NH3", "SO2", "NO2")
 
