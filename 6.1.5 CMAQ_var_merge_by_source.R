@@ -172,7 +172,7 @@ length(unique(pmf_oprich$SiteCode))
 # cmaq_period = "2011-02_2011-09"
 # cmaq_period = "2011-02_2011-12"
 # cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
-cmaq_period = "2017-01_2017-11"; cmaq_year = 2017
+cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
 print(paste0("Study period: ", cmaq_period, " & year ", cmaq_year))
 
 ###### Read CMAQ variable rds of a study period ######
