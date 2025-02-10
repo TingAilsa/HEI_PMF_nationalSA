@@ -17,7 +17,7 @@ base_dir = getwd()
 #### 1. Modeling Input ####
 
 cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
-# cmaq_period = "2017-01_2017-11"; cmaq_year = 2017
+# cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
 
 # All date related predictors 
 date_use = read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Date_DOW_Holiday_2011-20.fst")
