@@ -9,19 +9,19 @@ getwd()
 # Define the list of cmaq_var values
 cmaq_var_rds_list = c("PM25_TOT_EGU", "PM25_TOT_OTA",
                      "PM25_TOT_ONR", "PM25_TOT_NRD",  "PM25_TOT_ACM",
-                     "PM25_TOT_ASEA", "PM25_TOT_ARS", # "PM25_TOT_DUST", 
+                     "PM25_TOT_ASEA", "PM25_TOT_ARS", "PM25_TOT_DUST", 
                      "PM25_TOT_BIOG", "PM25_TOT_AFI",
                      "O3", "NH3", "SO2", "NO2")
 
 # cmaq_var_rds_list = c("PM25_TOT_OTA",
 #                       "PM25_TOT_ACM",
 #                       "PM25_TOT_ARS",
-#                       "PM25_TOT_BIOG"#, "PM25_TOT_AFI"
+#                       "PM25_TOT_BIOG", "PM25_TOT_AFI"
 # )
 # 
-# cmaq_var_rds_list = "PM25_TOT_ARS"
+# cmaq_var_rds_list = c("PM25_TOT_DUST", "PM25_TOT_ARS")
 
-cmaq_var_years = c( 2017) # 2011,
+cmaq_var_years = c(2011, 2017) #
 
 for (cmaq_year in cmaq_var_years){ # cmaq_year = cmaq_var_years[2]
   
@@ -35,6 +35,12 @@ for (cmaq_year in cmaq_var_years){ # cmaq_year = cmaq_var_years[2]
     cmaq_rds_files <- 
       list.files(pattern = paste0(cmaq_var, name_pattern), 
                  full.names = TRUE)
+    
+    # Skip if certain variable in cmaq_var_rds_list does not exit in CMAQ outputs
+    if (length(cmaq_rds_files) == 0) {
+      print(paste("No files found for variable:", cmaq_var))
+      next
+    }
     
     # Initialize an empty list to store the data frames
     cmaq_data_list <- list()
