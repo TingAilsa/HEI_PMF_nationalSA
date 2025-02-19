@@ -238,7 +238,7 @@ hms_shp_all_valid_us <-
       hms_shp_all_valid, apprx_bbox, sparse = FALSE), ]
 
 st_write(hms_shp_all_valid_us,
-         "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/HMS_SMOKE/NOAA_HMS_CSN_IMPROVE_daily_match_2011-20.gpkg")
+         "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/HMS_SMOKE/NOAA_HMS_all_daily_match_2011-20.gpkg")
 
 ggplot(data = hms_shp_all_valid) +
   geom_sf(aes(fill = Severity)) + 
@@ -2020,8 +2020,10 @@ meteo_variables <-
 
 # meteo_variables = "bi"
 
-us_grid_raster_01 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_01.tif"))
-us_grid_raster_001 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_001.tif"))
+# us_grid_raster_01 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_01.tif"))
+# us_grid_raster_001 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_001.tif"))
+
+us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
 
 us_grid_raster = us_grid_raster_01
 
@@ -2092,57 +2094,15 @@ for (meteo_var in meteo_variables) {
   }
 }
 
-###### GRIDMET 2, combine varaibles used for different sources by year ###### 
+###### GRIDMET 2.1, combine shared variables used for all source prediction ###### 
+# rm(list = ls())
 
-# The raster for projection
-us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
-us_grid_raster = us_grid_raster_01
-# us_grid_raster = rast(us_grid_raster_01)
-
-# Set the paths for reading and saving files
-gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
-gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
-
-# Define the date range for each year
-study_years <- 2011:2020 # 2011:2020   2011:2015
-
-# # Start with 2011 data with 365 days, for the rest, need recheck!!! and add the lost days inside!!!
-# tmmx_year = rast(file.path(gridmet_stack_path, "tmmx_2011_stacked.tif"))
-# tmmn_year = rast(file.path(gridmet_stack_path, "tmmn_2011_stacked.tif"))
-# rmax_year = rast(file.path(gridmet_stack_path, "rmax_2011_stacked.tif"))
-# rmin_year = rast(file.path(gridmet_stack_path, "rmin_2011_stacked.tif"))
-# vs_year = rast(file.path(gridmet_stack_path, "vs_2011_stacked.tif"))
-# th_year = rast(file.path(gridmet_stack_path, "th_2011_stacked.tif"))
-# pr_year = rast(file.path(gridmet_stack_path, "pr_2011_stacked.tif"))
-# tmmx_year; tmmn_year
-# rmax_year; rmin_year
-# vs_year; th_year
-
-# Annual data, use rast not raster to read, otherwise, the date info is not shown
-tmmx_year = rast(file.path(gridmet_stack_path, "tmmx_2017_stacked.tif"))
-tmmn_year = rast(file.path(gridmet_stack_path, "tmmn_2017_stacked.tif"))
-rmax_year = rast(file.path(gridmet_stack_path, "rmax_2017_stacked.tif"))
-rmin_year = rast(file.path(gridmet_stack_path, "rmin_2017_stacked.tif"))
-vs_year = rast(file.path(gridmet_stack_path, "vs_2017_stacked.tif"))
-th_year = rast(file.path(gridmet_stack_path, "th_2017_stacked.tif"))
-pr_year = rast(file.path(gridmet_stack_path, "pr_2017_stacked.tif"))
-tmmx_year; tmmn_year
-rmax_year; rmin_year
-vs_year; th_year
-
-crs_meteo = st_crs(th_year)
-# names(tmmx_year) 
-
-meteo_var_comm <- 
-  c("tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
-    "vs", "th") # vs, wind velocity at 10m; th, wind direction; pr, Precipitation amoun
-
-
+# Function for projection to US raster and extract date info
 brick_var_date_project <- 
   function(rast_file_path, grid_raster) { 
     # Open the rast file, use brick for multi-band file!!
     rast_file <- brick(rast_file_path)
-
+    
     # Extract the layer names and dates
     layer_names <- names(rast_file)
     layer_dates <- gsub(".*_(\\d{4})_(\\d{2})_(\\d{2})", "\\1-\\2-\\3", layer_names)
@@ -2155,7 +2115,7 @@ brick_var_date_project <-
                                           grid_raster, 
                                           method = "bilinear")
     # extent(rast_file); extent(grid_raster); extent(projected_var_raster)
-
+    
     # Only use the day information to rename the layers
     names(projected_var_raster) <- paste0("Date_", layer_dates)
     # plot( projected_var_raster[[c(1,10,20)]])
@@ -2164,10 +2124,53 @@ brick_var_date_project <-
     return(projected_var_raster = projected_var_raster)
   }
 
+# The raster for projection
+us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+us_grid_raster = us_grid_raster_01
+# us_grid_raster = rast(us_grid_raster_01)
+
+# Set the paths for reading and saving files
+gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
+gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
+
+# crs_meteo = st_crs(tmmx_year)
+# names(tmmx_year) 
+
+# Define the date range for each year
+study_years <- 2016 # 2011:2020   2011:2015
+
+# Use rast to read, not raster, so as to directly get date info 
+# Annual data, some variables may miss some days or grids, need to check every time!!!
+# need recheck!!! and add the lost days inside!!!
+tmmx_year = rast(file.path(gridmet_stack_path, paste0("tmmx_", study_years, "_stacked.tif")))
+tmmx_year # 2014, tmmx 364; 2015, tmmx 364
+
+tmmn_year = rast(file.path(gridmet_stack_path, paste0("tmmn_", study_years, "_stacked.tif")))
+tmmn_year
+
+rmax_year = rast(file.path(gridmet_stack_path, paste0("rmax_", study_years, "_stacked.tif")))
+rmax_year # 2013, rmax 364
+
+rmin_year = rast(file.path(gridmet_stack_path, paste0("rmin_", study_years, "_stacked.tif")))
+rmin_year # 2012, rmin 365; 
+
+vs_year = rast(file.path(gridmet_stack_path, paste0("vs_", study_years, "_stacked.tif")))
+vs_year # 2012, vs 365; 
+
+th_year = rast(file.path(gridmet_stack_path, paste0("th_", study_years, "_stacked.tif")))
+th_year
+
+# Meteorological variables
+meteo_var_comm <- 
+  c("tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
+    "vs", "th") # vs, wind velocity at 10m; th, wind direction; pr, Precipitation amoun
+
+# meteo_var_comm = "th"
+
 # Initialize a list to store data.tables for each variable
 meteo_var_list <- list()
 
-# study_years = 2017
+# study_years = 2016
 
 # Loop through each year and combine the selected variables
 for (met_year in study_years) { # met_year = 2017
@@ -2218,23 +2221,23 @@ for (met_year in study_years) { # met_year = 2017
     meteo_var_list[[meteo_var]] <- meteo_var_long
   }
   
-  # Merge all variables for this year
-  meteo_merged_year <- 
-    Reduce(function(x, y) {
-    merge(x, y, by = c("x", "y", "Date"), all = TRUE)
-  }, meteo_var_list)
-  # meteo_merged_year$Date = as.Date(meteo_merged_year$Date)
-  
-  # meteo_merged_year_wide =
-  #   meteo_merged_year %>%
-    
-  print("Check the file for the all variable in this year")
-  head(meteo_merged_year); dim(meteo_merged_year)
-  
-  # Save the merged data for this year
-  write_fst(meteo_merged_year, 
-            file.path(gridmet_stack_source_path, 
-                      paste0("Common_GRIDMET_", met_year, "_stacked.fst")))
+  # # Merge all variables for this year
+  # meteo_merged_year <- 
+  #   Reduce(function(x, y) {
+  #   merge(x, y, by = c("x", "y", "Date"), all = TRUE)
+  # }, meteo_var_list)
+  # # meteo_merged_year$Date = as.Date(meteo_merged_year$Date)
+  # 
+  # # meteo_merged_year_wide =
+  # #   meteo_merged_year %>%
+  #   
+  # print("Check the file for the all variable in this year")
+  # head(meteo_merged_year); dim(meteo_merged_year)
+  # 
+  # # Save the merged data for this year
+  # write_fst(meteo_merged_year, 
+  #           file.path(gridmet_stack_source_path, 
+  #                     paste0("Common_GRIDMET_", met_year, "_stacked.fst")))
 
   
   # Save the single meteo data one by one for this year
@@ -2261,37 +2264,49 @@ for (met_year in study_years) { # met_year = 2017
   gc()
 }
 
+###### GRIDMET 2.2, separately read and then combine shared variables, and interpolated if necessary ######  
+
+# rm(list = ls())
+
+# Set the paths for reading and saving files
+gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
+gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
+
+met_year = 2016 # 2015
+
+# Year 2015, lack one day
+
 tmmx_year = 
   read_fst(file.path(gridmet_stack_source_path, 
-                     paste0("Common_GRIDMET_", "tmmx", "_", 2017, "_stacked.fst")))
+                     paste0("Common_GRIDMET_", "tmmx", "_", met_year, "_stacked.fst")))
 tmmn_year = 
   read_fst(file.path(gridmet_stack_source_path, 
-                     paste0("Common_GRIDMET_", "tmmn", "_", 2017, "_stacked.fst")))
+                     paste0("Common_GRIDMET_", "tmmn", "_", met_year, "_stacked.fst")))
 rmax_year = 
   read_fst(file.path(gridmet_stack_source_path, 
-                     paste0("Common_GRIDMET_", "rmax", "_", 2017, "_stacked.fst")))
+                     paste0("Common_GRIDMET_", "rmax", "_", met_year, "_stacked.fst")))
 rmin_year =
   read_fst(file.path(gridmet_stack_source_path, 
-                     paste0("Common_GRIDMET_", "rmin", "_", 2017, "_stacked.fst")))
+                     paste0("Common_GRIDMET_", "rmin", "_", met_year, "_stacked.fst")))
 vs_year = 
   read_fst(file.path(gridmet_stack_source_path, 
-                     paste0("Common_GRIDMET_", "vs", "_", 2017, "_stacked.fst")))
+                     paste0("Common_GRIDMET_", "vs", "_", met_year, "_stacked.fst")))
 th_year = 
   read_fst(file.path(gridmet_stack_source_path, 
-                     paste0("Common_GRIDMET_", "th", "_", 2017, "_stacked.fst")))
+                     paste0("Common_GRIDMET_", "th", "_", met_year, "_stacked.fst")))
 
 summary(tmmx_year$Longitude == tmmn_year$Longitude & 
           tmmx_year$Latitude == tmmn_year$Latitude & 
           tmmx_year$Date == tmmn_year$Date)
-summary(tmmx_year$Longitude == rmax_year$Longitude & 
-          tmmx_year$Latitude == rmax_year$Latitude & 
-          tmmx_year$Date == rmax_year$Date)
-summary(tmmx_year$Longitude == vs_year$Longitude & 
-          tmmx_year$Latitude == vs_year$Latitude & 
-          tmmx_year$Date == vs_year$Date)
-summary(tmmx_year$Longitude == th_year$Longitude & 
-          tmmx_year$Latitude == th_year$Latitude & 
-          tmmx_year$Date == th_year$Date)
+# summary(tmmx_year$Longitude == rmax_year$Longitude & 
+#           tmmx_year$Latitude == rmax_year$Latitude & 
+#           tmmx_year$Date == rmax_year$Date)
+# summary(tmmx_year$Longitude == vs_year$Longitude & 
+#           tmmx_year$Latitude == vs_year$Latitude & 
+#           tmmx_year$Date == vs_year$Date)
+# summary(tmmx_year$Longitude == th_year$Longitude & 
+#           tmmx_year$Latitude == th_year$Latitude & 
+#           tmmx_year$Date == th_year$Date)
 
 meteo_year_all = tmmx_year
 meteo_year_all$tmmn = tmmn_year$tmmn
@@ -2299,12 +2314,12 @@ meteo_year_all$rmax = rmax_year$rmax
 meteo_year_all$rmin = rmin_year$rmin
 meteo_year_all$vs = vs_year$vs
 meteo_year_all$th = th_year$th
-head(meteo_year_all); summary(meteo_year_all); dim(meteo_year_all)
+head(meteo_year_all); dim(meteo_year_all) # summary(meteo_year_all); 
 
 # Save the merged data for this year
 write_fst(meteo_year_all, 
           file.path(gridmet_stack_source_path, 
-                    paste0("Common_GRIDMET_", 2017, "_stacked.fst")))
+                    paste0("GRIDMET_commom_", met_year, "_in_US_grid_01.fst")))
 
 
 library(USAboundaries)
@@ -2322,67 +2337,243 @@ ggplot() +
   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE)
 
 
-# # Loop through each year and combine the selected variables
-# for (met_year in study_years) { # met_year = 2017
-#   
-#   # Initialize an empty list to store rasters for this year
-#   rasters_to_merge <- list()
-#   
-#   # Loop through each selected variable
-#   for (meteo_var in meteo_var_comm) { # meteo_var = meteo_var_comm[1]
-#     # Construct the file path for the stacked raster of this variable and year
-#     file_path <- 
-#       file.path(gridmet_stack_path, 
-#                 paste0(meteo_var, "_", met_year, "_stacked.tif"))
-#     
-#     # Check if the file exists
-#     if (file.exists(file_path)) {
-#       # Read the raster using terra::rast
-#       raster_data <- rast(file_path)
-#       
-#       # Check the number of layers (bands) in the raster (representing days)
-#       num_layers <- nlyr(raster_data)
-#       
-#       # Create the custom band names as dates for eachh year
-#       start_date <- as.Date(paste0(met_year, "-01-01"))
-#       custom_names <- 
-#         paste0(meteo_var, "_", 
-#                as.character(
-#                  seq(start_date, by = "day", length.out = num_layers)))
-#       
-#       # Assign these names to the layers
-#       names(raster_data) <- custom_names
-#       
-#       # Add the raster to the list
-#       rasters_to_merge[[meteo_var]] <- raster_data
-#     } else {
-#       message(paste0("File not found: ", file_path))
-#     }
-#   }
-#   
-#   # Ensure there are rasters to merge
-#   if (length(rasters_to_merge) > 0) {
-#     # Stack the rasters together by corresponding bands (days)
-#     merged_rasters <- c(rasters_to_merge[[1]])
-#     for (i in 2:length(rasters_to_merge)) {
-#       merged_rasters <- c(merged_rasters, rasters_to_merge[[i]])
-#     }
-#     
-#     # Define output file name
-#     combined_filename <- 
-#       file.path(gridmet_stack_source_path, 
-#                 paste0("Common_GRIDMET_", met_year, "_stacked.tif"))
-#     
-#     # Save the combined raster stack to a new .tif file
-#     writeRaster(merged_rasters, 
-#                 filename = combined_filename, 
-#                 overwrite = TRUE)
-#     
-#     print(paste0("Combined file saved: ", combined_filename))
-#   } else {
-#     print(paste0("No valid rasters to combine for year ", year))
-#   }
-# }
+###### GRIDMET 3.1, combine variables used for special sources ###### 
+# rm(list = ls())
+
+# Function for projection to US raster and extract date info
+brick_var_date_project <- 
+  function(rast_file_path, grid_raster) { 
+    # Open the rast file, use brick for multi-band file!!
+    rast_file <- brick(rast_file_path)
+    
+    # Extract the layer names and dates
+    layer_names <- names(rast_file)
+    layer_dates <- gsub(".*_(\\d{4})_(\\d{2})_(\\d{2})", "\\1-\\2-\\3", layer_names)
+    # print("First five dates in in layers:")
+    # layer_dates[1:5]
+    
+    # Then project to match the target US grid of 0.1 or 0.01 degree
+    # When using projectRaster, both rast file should be from 
+    projected_var_raster <- projectRaster(rast_file, 
+                                          grid_raster, 
+                                          method = "bilinear")
+    # extent(rast_file); extent(grid_raster); extent(projected_var_raster)
+    
+    # Only use the day information to rename the layers
+    names(projected_var_raster) <- paste0("Date_", layer_dates)
+    # plot( projected_var_raster[[c(1,10,20)]])
+    
+    # Return the raster brick
+    return(projected_var_raster = projected_var_raster)
+  }
+
+# The raster for projection
+us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+us_grid_raster = us_grid_raster_01
+# us_grid_raster = rast(us_grid_raster_01)
+
+# Set the paths for reading and saving files
+gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
+gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
+
+# Define the date range for each year
+study_years <- 2012 # 2011:2020   2011:2015
+
+# Use rast to read, not raster, so as to directly get date info 
+# Annual data, some variables may miss some days or grids, need to check every time!!!
+# need recheck!!! and add the lost days inside!!!
+fm100_year = rast(file.path(gridmet_stack_path, paste0("fm100_", study_years, "_stacked.tif")))
+fm100_year
+
+fm1000_year = rast(file.path(gridmet_stack_path, paste0("fm1000_", study_years, "_stacked.tif")))
+fm1000_year # 2014, 363; 
+
+bi_year = rast(file.path(gridmet_stack_path, paste0("bi_", study_years, "_stacked.tif")))
+bi_year # 2014, 363; 2016, 365
+
+# crs_biomass = st_crs(fm100_year)
+# names(fm100_year) 
+
+biomass_var_list <- 
+  c("fm100", "fm1000", "bi") # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
+    # "pr", "vpd", "etr") # pr, Precipitation amount; vpd, Mean vapor pressure deficit; etr, Daily alfalfa reference evapotranspiration
+
+# Initialize a list to store data.tables for each variable
+meteo_biomass_list <- list()
+
+# Loop through each year and combine the selected variables
+for (met_year in study_years) { # met_year = 2017
+  print(paste("GRIDMET year to be used:", met_year))
+  
+  # Initialize an empty list to store rasters for this year
+  rasters_to_merge <- list()
+  
+  # Loop through each selected variable
+  for (biomass_var in biomass_var_list) { # biomass_var = biomass_var_list[1]
+    print(paste("GRIDMET Variable to be used:", biomass_var))
+    
+    # Construct the file path for the stacked raster of this variable and year
+    file_path <- 
+      file.path(gridmet_stack_path, 
+                paste0(biomass_var, "_", met_year, "_stacked.tif"))
+    
+    # Process the variable to create the raster brick
+    met_biomass_project <- 
+      brick_var_date_project(
+        file_path, 
+        us_grid_raster)
+    
+    # Extract spatial information and values
+    meteo_biomass_dt = 
+      as.data.table(as.data.frame(met_biomass_project, xy = TRUE, na.rm = TRUE))
+    # head(meteo_biomass_dt); dim(meteo_biomass_dt)
+    
+    # Reshape data from wide to long format (each variable in a single column)
+    meteo_biomass_long <- 
+      melt(meteo_biomass_dt, 
+           id.vars = c("x", "y"), 
+           variable.name = "Layer", 
+           value.name = biomass_var,
+           na.rm = TRUE)
+    
+    # Add Date 
+    meteo_biomass_long[, Date := 
+                     gsub(".*_(\\d{4}).(\\d{2}).(\\d{2})", 
+                          "\\1-\\2-\\3", 
+                          Layer)]
+    meteo_biomass_long[, Layer := NULL]
+    
+    print("Check the file for the applied biomass_var")
+    head(meteo_biomass_long); summary(meteo_biomass_long)
+    
+    # Store in list
+    meteo_biomass_list[[biomass_var]] <- meteo_biomass_long
+  }
+  
+  # # Merge all variables for this year
+  # meteo_merged_year <- 
+  #   Reduce(function(x, y) {
+  #     merge(x, y, by = c("x", "y", "Date"), all = TRUE)
+  #   }, meteo_biomass_list)
+  # # meteo_merged_year$Date = as.Date(meteo_merged_year$Date)
+  # 
+  # # meteo_merged_year_wide =
+  # #   meteo_merged_year %>%
+  # 
+  # print("Check the file for the all variable in this year")
+  # head(meteo_merged_year); dim(meteo_merged_year)
+  # 
+  # # Save the merged data for this year
+  # write_fst(meteo_merged_year, 
+  #           file.path(gridmet_stack_source_path, 
+  #                     paste0("Biomass_GRIDMET_", met_year, "_stacked.fst")))
+  
+  
+  # Save the single meteo data one by one for this year
+  for (biomass_var in biomass_var_list) { # biomass_var = biomass_var_list[2]
+    
+    meteo_biomass_year = meteo_biomass_list[[biomass_var]]
+    meteo_biomass_year = 
+      meteo_biomass_year[with(meteo_biomass_year, order(Date, x, y)), ]
+    names(meteo_biomass_year)[1:2]
+    names(meteo_biomass_year)[1:2] = c("Longitude", "Latitude")
+    dim(meteo_biomass_year)
+    
+    print(paste("Check the output file for a single biomass_var", 
+                head(meteo_biomass_year)
+    ))
+    
+    write_fst(meteo_biomass_year, 
+              file.path(gridmet_stack_source_path, 
+                        paste0("Biomass_GRIDMET_", biomass_var, "_", met_year, "_stacked.fst")))
+  }
+  
+  # Clear memory
+  rm(meteo_merged_year, meteo_biomass_list)
+  gc()
+}
+
+###### GRIDMET 3.2, separately read and then combine biomass variables, and interpolated if necessary ######  
+# Read data of each variable and combine them into one
+# Otherwise it takes too much memory and the computer cannot handle that
+
+# rm(list = ls())
+
+# Set the paths for reading and saving files
+gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
+gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
+
+met_year = 2015 # 2015
+
+fm100_year = 
+  read_fst(file.path(gridmet_stack_source_path, 
+                     paste0("Biomass_GRIDMET_", "fm100", "_", met_year, "_stacked.fst")))
+fm1000_year = 
+  read_fst(file.path(gridmet_stack_source_path, 
+                     paste0("Biomass_GRIDMET_", "fm1000", "_", met_year, "_stacked.fst")))
+bi_year = 
+  read_fst(file.path(gridmet_stack_source_path, 
+                     paste0("Biomass_GRIDMET_", "bi", "_", met_year, "_stacked.fst")))
+
+dim(fm100_year); dim(fm1000_year); dim(bi_year)
+
+##### Interpolation for the variable that lack days of records
+# File of complete of the year
+# 2016
+biomass_full_date = fm100_year 
+
+# 2015
+biomass_full_date = fm100_year 
+
+# 2014
+biomass_full_date = fm100_year 
+
+# 2013
+biomass_full_date = fm100_year 
+
+# 2012
+biomass_full_date = fm100_year 
+
+
+# Prepare complete date file of the year 
+biomass_date = data.frame(table(biomass_full_date$Date))
+names(biomass_date)[1] = "Date"
+biomass_date$Freq = NULL
+head(biomass_date); dim(biomass_date)
+
+## 2016
+bi_year = merge(biomass_date, bi_year, all.x = TRUE)
+dim(biomass_full_date); dim(bi_year)
+
+
+
+# Combine to get the final output
+meteo_year_biomass = fm100_year
+meteo_year_biomass$fm1000 = fm1000_year$fm1000
+meteo_year_biomass$bi = bi_year$bi
+head(meteo_year_biomass); dim(meteo_year_biomass) # ; summary(meteo_year_biomass)
+sapply(meteo_year_biomass, class)
+
+# Save the merged data for this year
+write_fst(meteo_year_biomass, 
+          file.path(gridmet_stack_source_path, 
+                    paste0("GRIDMET_Biomass_", met_year, "_in_US_grid_01.fst")))
+
+
+library(USAboundaries)
+us_states = USAboundaries::us_states()
+us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
+
+ggplot() +
+  geom_point(data = subset(meteo_year_biomass,
+                           Date == "2017-04-21"),
+             aes(x = Longitude, y = Latitude, color = rmax),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "rmax", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE)
+
 
 
 
