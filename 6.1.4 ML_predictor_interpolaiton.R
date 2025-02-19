@@ -1062,7 +1062,7 @@ for (census_year in 2013:2020){ # census_year = 2011, 2011:2020
 # 
 # 
 # 
-# #### Census: match via nearest point #### 
+# ###### Census: match via nearest point ###### 
 # 
 # # file to save GEOID-geometry-year match for 2011-2020
 # grid_cTract_final_all = NULL
@@ -1354,5 +1354,211 @@ for (census_year in 2013:2020){ # census_year = 2011, 2011:2020
 #             )
 # }
 
+####  HMS SMOKE ####
+setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/HMS_SMOKE/")
+# setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/")
+getwd()
 
+# The raster for projection
+us_grid_raster_01 = rast(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+us_grid_raster = us_grid_raster_01
+head(us_grid_raster)
+
+### Below two files only include points matching CSN and IMPROVE sites, no grid
+hms_shp_all_valid_us =
+  st_read("NOAA_HMS_all_daily_match_2011-20.gpkg")
+hms_shp_all_valid_us
+hms_shp_all_valid_us[260, ]
+
+# hms_shp_all_valid_us_csv =
+#   read.csv( "NOAA_HMS_CSN_IMPROVE_daily_match_2011-20.csv")
+# hms_shp_all_valid_us_csv$X = NULL
+# View(hms_shp_all_valid_us_csv)
+# hms_shp_all_valid_us_csv[260, ]
+
+# Get date info
+hms_shp_all_valid_us$Date_str = 
+  substr(hms_shp_all_valid_us$Start, 1, 7)
+
+st_geometry(hms_shp_all_valid_us) <- "geometry"
+
+# Extract dataset for interpolation
+hms_us_org = 
+  dplyr::select(hms_shp_all_valid_us,
+                Date_str, Severity, geometry)
+names(hms_us_org)[2] = "smoke_level"
+hms_us_org
+
+# Check validity of geometries
+invalid_polys <- hms_us_org[!st_is_valid(hms_us_org), ]
+print(unique(invalid_polys$Date_str))
+
+######  HMS: rasterize the smoke level by day, and spatial projection ######
+# Get unique day to split polygons by Date
+hms_dates <- unique(hms_us_org$Date_str)
+length(hms_dates); head(hms_dates)
+hms_stack_project <- list()
+
+for (hms_day in hms_dates[580:1460]) { # hms_day = hms_dates[200], hms_dates incldue 1460 dates in total
+  # 2015081, 2015105, 2015106
+  # Subset polygons for the current hms_day
+  hms_daily_poly <- hms_us_org[hms_us_org$Date_str == hms_day, ]
+  
+  # Skip if no polygons exist for this hms_day (result will be NA grid)
+  if (nrow(hms_daily_poly) == 0) {
+    hms_daily_raster <- us_grid_raster
+    values(hms_daily_raster) <- NA
+    
+  } else {
+    # Convert SF to SpatVector and rasterize
+    hms_daily_raster <- 
+      rasterize(
+      vect(hms_daily_poly), 
+      us_grid_raster, 
+      field = "smoke_level",
+      fun = "max" # Choose "max", "min", or "last" for overlapping polygons
+    )
+    # plot(hms_daily_raster)
+  }
+  
+  # Name the layer after the date and add to stack
+  names(hms_daily_raster) <- hms_day
+  hms_stack_project[[hms_day]] <- hms_daily_raster
+}
+
+#### Handle problematic polygons
+hms_problem_day = c("2015081", "2015105", "2015106")
+for (hms_prom_day in hms_problem_day){ # hms_prom_day = hms_problem_day[1]
+  hms_daily_poly_promb <- hms_us_org[hms_us_org$Date_str == hms_prom_day, ]
+  hms_daily_poly_promb_fix <- st_buffer(hms_daily_poly_promb, 0)
+  
+  # Skip if no polygons exist for this hms_prom_day (result will be NA grid)
+  if (nrow(hms_daily_poly_promb_fix) == 0) {
+    hms_daily_poly_promb_fix <- us_grid_raster
+    values(hms_daily_poly_promb_fix) <- NA
+    
+  } else {
+    # Convert SF to SpatVector and rasterize
+    hms_daily_poly_promb_fix <- 
+      rasterize(
+        vect(hms_daily_poly), 
+        us_grid_raster, 
+        field = "smoke_level",
+        fun = "max" # Choose "max", "min", or "last" for overlapping polygons
+      )
+    # plot(hms_daily_poly_promb_fix)
+  }
+  
+  # Name the layer after the date and add to stack
+  names(hms_daily_poly_promb_fix) <- hms_prom_day
+  hms_stack_project[[hms_prom_day]] <- hms_daily_poly_promb_fix
+}
+
+# Check the enrolled days
+length(hms_stack_project) # 1459, 1 less than the original one
+
+# Combine all layers into a single SpatRaster
+hms_final_stack <- rast(hms_stack_project)
+
+# Save as GeoTIFF 
+writeRaster(hms_final_stack, "HMS_US_grids_01_2011-2020.tif", overwrite=TRUE)
+
+######  HMS: to df format, and date match ######
+#### Convert to df with coordinates and values
+
+# Get coordinates
+hms_coords <- xyFromCell(hms_final_stack, 1:ncell(hms_final_stack))
+hms_coords_df <- data.table(hms_coords)
+names(hms_coords_df) <- c("Longitude", "Latitude")
+head(hms_coords_df)
+
+# Get values for all dates
+# Loop through each layer (hms_datestr) in the stack
+for (hms_datestr in names(hms_final_stack)) { # hms_datestr = names(hms_final_stack)[2]
+  # Extract smoke levels for this hms_datestr
+  smoke_values <- values(hms_final_stack[[hms_datestr]], mat = FALSE)
+  # summary(smoke_values)
+  
+  # Add smoke levels and hms_datestr to the data.table
+  hms_coords_df[, (hms_datestr) := smoke_values]
+}
+
+# Convert to long format
+hms_coords_long <-
+  hms_coords_df %>%
+  pivot_longer(
+    cols = -c(Longitude, Latitude),
+    names_to = "Date_str",
+    values_to = "smoke_level"
+  )
+head(hms_coords_long); dim(hms_coords_long)
+
+write_fst(hms_coords_long, "HMS_US_grids_01_2011-2020.fst")
+
+#### Extract Date info, beyong mac storage, run it on HOPPER
+#### 
+# hms_coords_long = read_fst("HMS_US_grids_01_2011-2020.fst")
+# hms_coords_long = read_fst("pmf_ncld_meteo_census/HMS_US_grids_01_2011-2020.fst")
+setDT(hms_coords_long)
+
+hms_date = as.data.table(table(hms_coords_long$Date_str))
+names(hms_date)[1] = "Date_str"
+hms_date[, Date := as.Date(Date_str, format = "%Y%j")]
+hms_date$N = NULL
+head(hms_date)
+
+## Merge with the date info
+# # sapply(hms_coords_long, class)
+# # sapply(hms_date, class)
+# hms_coords_long = 
+#   merge(hms_coords_long, hms_date)
+# 
+# hms_coords_long$Date_str = NULL
+# 
+# # Replace NaN with 0 in smoke_level column
+# hms_coords_long[is.nan(smoke_level), smoke_level := 0]
+
+## Merge with the date info with chunks
+# Process in chunks
+chunk_size = 5000000  
+total_rows = nrow(hms_coords_long)
+num_chunks = ceiling(total_rows/chunk_size)
+
+# Initialize an empty list to store processed chunks
+hms_processed_chunks = vector("list", num_chunks)
+
+for(i in 1:num_chunks) {
+  # Calculate chunk indices
+  start_idx = ((i-1) * chunk_size) + 1
+  end_idx = min(i * chunk_size, total_rows)
+  
+  # Process chunk - merge with date
+  hms_chunk = hms_coords_long[start_idx:end_idx, ]
+  hms_chunk = merge(hms_chunk, hms_date, by="Date_str")
+  hms_chunk[, Date_str := NULL]
+  
+  # Process chunk - replace NaN with 0 in smoke_level column
+  hms_chunk[is.nan(smoke_level), smoke_level := 0]
+  
+  # Store processed chunk
+  hms_processed_chunks[[i]] = hms_chunk
+  
+  # Optional: Print progress
+  cat(sprintf("Processed chunk %d of %d\n", i, num_chunks))
+}
+
+# Combine all chunks
+hms_coords_long_final = rbindlist(hms_processed_chunks)
+head(hms_coords_long_final); summary(hms_coords_long_final)
+
+# Clean up
+rm(hms_processed_chunks, chunk)
+gc()
+
+# Save file
+# write_fst(hms_coords_long_final, "HMS_US_grids_01_2011-2020_final.fst")
+write_fst(hms_coords_long_final, "pmf_ncld_meteo_census/HMS_US_grids_01_2011-2020_final.fst")
+
+hms_coords_long_final = read_fst("pmf_ncld_meteo_census/HMS_US_grids_01_2011-2020_final.fst")
+head(hms_coords_long_final)
 
