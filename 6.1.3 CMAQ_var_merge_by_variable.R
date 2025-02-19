@@ -38,7 +38,7 @@ for (cmaq_year in cmaq_var_years){ # cmaq_year = cmaq_var_years[2]
     
     # Skip if certain variable in cmaq_var_rds_list does not exit in CMAQ outputs
     if (length(cmaq_rds_files) == 0) {
-      print(paste("No files found for variable:", cmaq_var))
+      message(paste("No files found for variable:", cmaq_var))
       next
     }
     
