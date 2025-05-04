@@ -28,9 +28,94 @@ getwd()
 
 dir_path = getwd()
 
+####  Function to calculate geometric mean #### 
+geom_mean <- function(x) {
+  exp(mean(log(x), na.rm = TRUE))
+}
+
+#### Function to get geometric mean of 2 values before and 2 after #### 
+replace_na_with_geom_mean <- function(dt, col_name) {
+  # Make a copy of the original values
+  values <- dt[[col_name]]
+  n <- length(values)
+  
+  # Find NA positions
+  na_positions <- which(is.na(values))
+  
+  for (pos in na_positions) {
+    # Get indices for 2 values before and 2 after
+    before_idx <- max(1, pos-2):max(1, pos-1)
+    after_idx <- min(pos+1, n):min(pos+2, n)
+    
+    # Get the values
+    surrounding_values <- values[c(before_idx, after_idx)]
+    
+    # Calculate geometric mean and replace NA
+    if (length(surrounding_values[!is.na(surrounding_values)]) > 0) {
+      values[pos] <- geom_mean(surrounding_values)
+    }
+  }
+  
+  # Update the data.table
+  dt[, (col_name) := values]
+}
+
+# Function to fill NA values with average of 2 days before and 2 days after
+fill_na_with_adjacent_days <- function(df, variable_name, na_date) {
+  # Convert to data.table for faster processing
+  dt <- as.data.table(df)
+  
+  # Convert Date to proper Date format 
+  na_date = as.Date(na_date)
+  
+  # Create a vector of the dates we want to use for averaging
+  date_vector <- c(
+    na_date - 2,
+    na_date - 1,
+    na_date + 1, 
+    na_date + 2
+  )
+  
+  # Subset the data to only include the dates we need
+  reference_data <- dt[Date %in% date_vector]
+  
+  # Group by location and calculate average for each location
+  variable_sym <- sym(variable_name)
+  avg_values <- reference_data %>%
+    dplyr::group_by(Longitude, Latitude) %>%
+    dplyr::summarize(avg_value = mean(!!variable_sym, na.rm = TRUE),
+              .group = "drop")
+  
+  # Create a template of NA rows that need to be filled
+  na_rows <- dt[Date == na_date]
+  na_rows[, eval(variable_name) := NA]
+  
+  # Join the average values to the NA rows
+  na_rows <- merge(na_rows, avg_values, by = c("Longitude", "Latitude"), all.x = TRUE)
+  
+  # Apply the calculated average value to the original variable
+  na_rows[, eval(variable_name) := avg_value]
+  na_rows[, avg_value := NULL]
+  
+  # Remove the NA rows from the original data
+  clean_dt <- dt[Date != na_date]
+  
+  # Combine the datasets
+  result_dt <- rbind(clean_dt, na_rows)
+  
+  # Sort by Date, Longitude, Latitude to restore original order
+  setorder(result_dt, Date, Longitude, Latitude)
+  
+  return(result_dt)
+}
+
+
 # Mainland US coordinates of 0.1 * 0.1 degree
 us_point_coord = 
   read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Long_lat_Mainland_US_0.1_degree.fst")
+# us_point_coord = 
+#   read.fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+# plot(us_point_coord$Longitude, us_point_coord$Latitude)
 
 #### Create grid-like data ####
 # Define the approximate bounding box for mainland U.S.
@@ -155,12 +240,12 @@ us_grid_raster_001 = raster(file.path("base_raster_grid_sf/us_grid_raster_001.ti
 ###### Read PMF source data for ML inputs ######
 
 pmf_traffic = read_fst("pmf_ncld_meteo_census/PMF_F1-Traffic.fst")
-pmf_nitrate = read_fst("pmf_ncld_meteo_census/PMF_F2-Secondary_Nitrate.fst")
 pmf_sulfate = read_fst("pmf_ncld_meteo_census/PMF_F3-Secondary_Sulfate.fst")
-pmf_industry = read_fst("pmf_ncld_meteo_census/PMF_F5-Industry.fst")
-pmf_salt = read_fst("pmf_ncld_meteo_census/PMF_F6-Salt.fst")
 pmf_biomass = read_fst("pmf_ncld_meteo_census/PMF_F8-Biomass.fst")
 pmf_dust = read_fst("pmf_ncld_meteo_census/PMF_F9-Soil_Dust.fst")
+pmf_industry = read_fst("pmf_ncld_meteo_census/PMF_F5-Industry.fst")
+pmf_nitrate = read_fst("pmf_ncld_meteo_census/PMF_F2-Secondary_Nitrate.fst")
+pmf_salt = read_fst("pmf_ncld_meteo_census/PMF_F6-Salt.fst")
 pmf_nontailpipe = read_fst("pmf_ncld_meteo_census/PMF_F7-Non-tailpipe.fst")
 pmf_oprich = read_fst("pmf_ncld_meteo_census/PMF_F10-OP-rich.fst")
 
@@ -172,7 +257,12 @@ length(unique(pmf_oprich$SiteCode))
 
 #### CMAQ data ####
 # cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
-cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
+# cmaq_period = "2012-01_2012-12"; cmaq_year = 2012
+# cmaq_period = "2013-01_2013-12"; cmaq_year = 2013
+cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
+# cmaq_period = "2015-01_2015-12"; cmaq_year = 2015
+# cmaq_period = "2016-01_2016-12"; cmaq_year = 2016
+# cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
 print(paste0("Study period: ", cmaq_period, " & year ", cmaq_year))
 
 ###### Read CMAQ variable rds of a study period ######
@@ -206,42 +296,42 @@ cmaq_O3_rds <- readRDS(rds_period[grepl("O3", rds_period, fixed = T)])
 # summary(cmaq_O3_rds)
 
 # DUST
-cmaq_DUST_rds <- readRDS(rds_period[grepl("TOT_DUST", rds_period, fixed = T)])
+# cmaq_DUST_rds <- readRDS(rds_period[grepl("TOT_DUST", rds_period, fixed = T)])
 # summary(cmaq_DUST_rds)
 
-# EGU
+# EGU, sulfate & industry, Electricity generating units (coal, gas, oil)
 cmaq_EGU_rds <- readRDS(rds_period[grepl("TOT_EGU", rds_period, fixed = T)])
 # summary(cmaq_EGU_rds)
 
-# NRD
+# NRD, traffic, On-road and nonroad diesel
 cmaq_NRD_rds <- readRDS(rds_period[grepl("TOT_NRD", rds_period, fixed = T)])
 # summary(cmaq_NRD_rds)
 
-# ONR
+# ONR, traffic, On-road and nonroad gasoline
 cmaq_ONR_rds <- readRDS(rds_period[grepl("TOT_ONR", rds_period, fixed = T)])
 # summary(cmaq_ONR_rds)
 
-# OTA
+# OTA, sulfate & industry, Non-point emission, NonIPM
 cmaq_OTA_rds <- readRDS(rds_period[grepl("TOT_OTA", rds_period, fixed = T)])
 # summary(cmaq_OTA_rds)
 
-# ACM
+# ACM, traffic, Onroad Mexico, airports, rail, commercial Marine vessels
 cmaq_ACM_rds <- readRDS(rds_period[grepl("TOT_ACM", rds_period, fixed = T)])
 # summary(cmaq_ACM_rds)
 
-# ASEA
+# ASEA, salt, Seaspray emissions 
 cmaq_ASEA_rds <- readRDS(rds_period[grepl("TOT_ASEA", rds_period, fixed = T)])
 # summary(cmaq_ASEA_rds)
 
-# ARS
+# ARS, dust, Area fugitive dust, windblown dust, agriculture
 cmaq_ARS_rds <- readRDS(rds_period[grepl("TOT_ARS", rds_period, fixed = T)])
 # summary(cmaq_ARS_rds)
 
-# BIOG
+# BIOG, biomass, Biogenic emissions 
 cmaq_BIOG_rds <- readRDS(rds_period[grepl("TOT_BIOG", rds_period, fixed = T)])
 # summary(cmaq_BIOG_rds)
 
-# AFI
+# AFI, biomass, Wildfires, agricultural fires, fire grass, other fires, residential wood combustion
 cmaq_AFI_rds <- readRDS(rds_period[grepl("TOT_AFI", rds_period, fixed = T)])
 # summary(cmaq_AFI_rds)
 
@@ -260,7 +350,7 @@ cmaq_ACM_rds <- cmaq_ACM_rds[order(Date, x, y)]
 
 cmaq_ASEA_rds <- cmaq_ASEA_rds[order(Date, x, y)]
 cmaq_ARS_rds <- cmaq_ARS_rds[order(Date, x, y)]
-cmaq_DUST_rds <- cmaq_DUST_rds[order(Date, x, y)]
+# cmaq_DUST_rds <- cmaq_DUST_rds[order(Date, x, y)]
 cmaq_BIOG_rds <- cmaq_BIOG_rds[order(Date, x, y)]
 cmaq_AFI_rds <- cmaq_AFI_rds[order(Date, x, y)]
 
@@ -289,10 +379,10 @@ cmaq_traffic_rds = cbind(
 )
 head(cmaq_traffic_rds)
 
-if(file.exists(rds_period[grepl("TOT_ARS", rds_period, fixed = T)])){# not ifelse, ifelse() is vectorized 
+if(file.exists(rds_period[grepl("TOT_ARS", rds_period, fixed = T)])){# not ifelse, ifelse() is vectorized
   cmaq_DUSTars_rds = cmaq_ARS_rds
 } else {
-  cmaq_DUSTars_rds = cmaq_DUST_rds 
+  cmaq_DUSTars_rds = cmaq_DUST_rds
 }
 head(cmaq_DUSTars_rds)
 
@@ -313,13 +403,15 @@ names(cmaq_biom_rds)[1:2] = c("Longitude", "Latitude")
 #### Remove the extremes, which DIFFERE from Year TO Year, and from Source to Source! ALWAYS CHECK!
 
 ########## Sulfate
-# 2011, June; 2017, Jan
-quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.99999)
-quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.01)
-sulfate_extreme_all = 
-  subset(cmaq_sulfate_rds, 
-         PM25_TOT_EGU > quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.99999) |
-           PM25_TOT_EGU < quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.01))
+summary(cmaq_sulfate_rds)
+# 2011, 0.9935 & 0.00001; 2012, 0.9955; 2014, 1 & 0.15; 2015, 0.999893; 2016, 0.9992; 2017, 0.9999925
+quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 1)
+quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.15)
+
+sulfate_extreme_all =
+  subset(cmaq_sulfate_rds,
+         PM25_TOT_EGU > quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 1) |
+           PM25_TOT_EGU < quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.15))
 
 # Check and save distribution of extremes
 sulfate_extreme_freq20 =
@@ -328,40 +420,70 @@ sulfate_extreme_freq20 =
       sulfate_extreme_all$Longitude, sulfate_extreme_all$Latitude)) %>%
   subset(Freq > 20)
 head(sulfate_extreme_freq20)
-write_fst(sulfate_extreme_freq20, 
-          file.path(paste0("base_raster_grid_sf/CMAQ_Sulfate_Extreme_combine_20more", cmaq_period, ".fst")))
+write_fst(sulfate_extreme_freq20,
+          file.path(paste0("base_raster_grid_sf/CMAQ_sulfate_Extreme_combine_20more", cmaq_period, ".fst")))
 
 # Exclude extremes from data for modeling
-max_sulfate_exe = 0.99999
-min_sulfate_exe = 0.01
-cmaq_sulfate_rds_noExe =
-  subset(cmaq_sulfate_rds, 
-         PM25_TOT_EGU <= quantile(cmaq_sulfate_rds$PM25_TOT_EGU, max_sulfate_exe) &
-           PM25_TOT_EGU >= quantile(cmaq_sulfate_rds$PM25_TOT_EGU, min_sulfate_exe))
-dim(cmaq_sulfate_rds); dim(cmaq_sulfate_rds_noExe)
+max_sulfate_EGU = quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 1)
+min_sulfate_EGU = quantile(cmaq_sulfate_rds$PM25_TOT_EGU, 0.15)
+
+# Replace extremes by NA step-by-step
+cmaq_sulfate_rds_na = copy(cmaq_sulfate_rds)
+cmaq_sulfate_rds_na[PM25_TOT_EGU < min_sulfate_EGU | PM25_TOT_EGU > max_sulfate_EGU,
+                    PM25_TOT_EGU := NA]
+summary(cmaq_sulfate_rds_na)
+
+# OTA
+# 2011, 0.99245 & 0.00001; 2012, 0.992; 2014, 0.99999986 & 0.05; 2015, 0.99969; 2016, 0.998; 2017, 0.99997;
+max_sulfate_OTA = quantile(cmaq_sulfate_rds_na$PM25_TOT_OTA, 0.99999986) 
+min_sulfate_OTA = quantile(cmaq_sulfate_rds_na$PM25_TOT_OTA, 0.05)
+max_sulfate_OTA; min_sulfate_OTA
+
+cmaq_sulfate_rds_na[PM25_TOT_OTA < min_sulfate_OTA | PM25_TOT_OTA > max_sulfate_OTA,
+                    PM25_TOT_OTA := NA]
+summary(cmaq_sulfate_rds_na)
+
+# NH3
+# 2011, 0.9999985; 2012, 0.999993; 2014, 0.9999973 & 0.01; 2015, 0.999982; 2016, 0.999995; 2017, 0.999975;
+max_sulfate_NH3 = quantile(cmaq_sulfate_rds_na$NH3, 0.9999973) 
+min_sulfate_NH3 = quantile(cmaq_sulfate_rds_na$NH3, 0.01)
+max_sulfate_NH3; min_sulfate_NH3
+
+cmaq_sulfate_rds_na[NH3 < min_sulfate_NH3 | NH3 > max_sulfate_NH3,
+                    NH3 := NA]
+summary(cmaq_sulfate_rds_na)
+
+# Reorder
+cmaq_sulfate_rds_na =
+  cmaq_sulfate_rds_na[with(cmaq_sulfate_rds_na,
+                           order(Longitude, Latitude, Date)), ]
+
+# Interpolate, geometric mean of 2 values before and after, use "copy" to for data.table assignment!!!!!
+# !!! for data.table, if using "=" with assignment like dt2 = dt1, dt2 point to the same data as dt1.
+# When modifying dt2, dt1 also change because they are the same object!!!
+cmaq_sulfate_rds_noExe = copy(cmaq_sulfate_rds_na)
+replace_na_with_geom_mean(cmaq_sulfate_rds_noExe, "PM25_TOT_EGU")
+replace_na_with_geom_mean(cmaq_sulfate_rds_noExe, "PM25_TOT_OTA")
+replace_na_with_geom_mean(cmaq_sulfate_rds_noExe, "NH3")
 summary(cmaq_sulfate_rds_noExe)
 
-# # Further deal with PM25_TOT_OTA
-# quantile(cmaq_sulfate_rds_noExe$PM25_TOT_OTA, 0.99998)
-# cmaq_sulfate_rds_noExe =
-#   subset(cmaq_sulfate_rds_noExe, 
-#          PM25_TOT_OTA <= quantile(cmaq_sulfate_rds_noExe$PM25_TOT_OTA, 0.99998) &
-#            PM25_TOT_OTA >= quantile(cmaq_sulfate_rds_noExe$PM25_TOT_OTA, 0))
-# # summary(cmaq_sulfate_rds_noExe)
-
-sulfate_exe_fra = 100-100*nrow(cmaq_sulfate_rds_noExe)/nrow(cmaq_sulfate_rds)
+# Fraction of extremes
+sulfate_exe_fra =
+  100 * sum(is.na(cmaq_sulfate_rds_na)) / nrow(cmaq_sulfate_rds_noExe) / 3
 print(paste0("Exetrem values fraction (%) in sulfate: ", sulfate_exe_fra))
+# 2011, 0.4690; 2012, 0.4169; 2013, 0.00017; 2014, 7.00009; 2015, 0.0145; 2016, 0.094%; 2017, 0.0016%;
 
 write_fst(cmaq_sulfate_rds_noExe,
           file.path(paste0("base_raster_grid_sf/CMAQ_Sulfate_", cmaq_period, ".fst")))
 
 ########## Dust
-quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.99999)
-quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.0005)
-DUSTars_extreme_all = 
-  subset(cmaq_DUSTars_rds, 
-         PM25_TOT_ARS > quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.99999) |
-           PM25_TOT_ARS < quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.0005))
+summary(cmaq_DUSTars_rds)
+quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 1) # 2011, 0.99354; 2012, 0.99635; 2014, 1; 2015, 0.999869; 2016, 0.9984; 2017, 0.9999945;
+quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.05) # 2011, 0.05; 2017, 0.0005;
+DUSTars_extreme_all =
+  subset(cmaq_DUSTars_rds,
+         PM25_TOT_ARS > quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 1) |
+           PM25_TOT_ARS < quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.05))
 
 # Check and save distribution of extremes
 DUSTars_extreme_freq20 =
@@ -370,31 +492,48 @@ DUSTars_extreme_freq20 =
       DUSTars_extreme_all$Longitude, DUSTars_extreme_all$Latitude)) %>%
   subset(Freq > 20)
 head(DUSTars_extreme_freq20)
-write_fst(DUSTars_extreme_freq20, 
+write_fst(DUSTars_extreme_freq20,
           file.path(paste0("base_raster_grid_sf/CMAQ_Dust_Extreme_combine_20more", cmaq_period, ".fst")))
 
-# Exclude extremes from data for modeling
-max_DUSTars_exe = 0.99999
-min_DUSTars_exe = 0.0005
-cmaq_DUSTars_rds_noExe =
-  subset(cmaq_DUSTars_rds, 
-         PM25_TOT_ARS <= quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, max_DUSTars_exe) &
-           PM25_TOT_ARS >= quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, min_DUSTars_exe))
-dim(cmaq_DUSTars_rds); dim(cmaq_DUSTars_rds_noExe)
+##### Replace extremes by NA and refilling by geometric mean
+max_DUSTars = quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 1)
+min_DUSTars = quantile(cmaq_DUSTars_rds$PM25_TOT_ARS, 0.05)
+
+# Replace extremes by NA
+cmaq_DUSTars_rds_na = copy(cmaq_DUSTars_rds)
+cmaq_DUSTars_rds_na[PM25_TOT_ARS < min_DUSTars | PM25_TOT_ARS > max_DUSTars,
+                       PM25_TOT_ARS := NA]
+summary(cmaq_DUSTars_rds_na)
+
+# Reorder
+cmaq_DUSTars_rds_na =
+  cmaq_DUSTars_rds_na[with(cmaq_DUSTars_rds_na,
+                              order(Longitude, Latitude, Date)), ]
+head(cmaq_DUSTars_rds_na)
+
+# Interpolate, geometric mean of 2 values before and after
+cmaq_DUSTars_rds_noExe = copy(cmaq_DUSTars_rds_na)
+replace_na_with_geom_mean(cmaq_DUSTars_rds_noExe, "PM25_TOT_ARS")
 summary(cmaq_DUSTars_rds_noExe)
-dust_exe_fra = 100-100*nrow(cmaq_DUSTars_rds_noExe)/nrow(cmaq_DUSTars_rds)
+
+# Fraction of extremes
+dust_exe_fra =
+  100 * sum(is.na(cmaq_DUSTars_rds_na)) / nrow(cmaq_DUSTars_rds_noExe)
 print(paste0("Exetrem values fraction (%) in dust: ", dust_exe_fra))
+# 2011, 5.6460; 2012, 0.3650; 2014, 5.00; 2015, 0.013; 2016, 0.16%; 2017, 0.051%;
 
 write_fst(cmaq_DUSTars_rds_noExe,
-          file.path(paste0("base_raster_grid_sf/CMAQ_DUST_", cmaq_period, ".fst")))
+          file.path(paste0("base_raster_grid_sf/CMAQ_Dust_", cmaq_period, ".fst")))
 
 ########## Traffic
-quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.99996)
-quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.009)
-traffic_extreme_all = 
-  subset(cmaq_traffic_rds, 
-         PM25_TOT_NRD > quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.99996) |
-           PM25_TOT_NRD < quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.009))
+summary(cmaq_traffic_rds)
+quantile(cmaq_traffic_rds$PM25_TOT_NRD, 1) # 2011, 0.99279; 2012, 0.99; 2014, 1; 2015, 0.99959; 2016, 0.9989; 2017, 0.999964;
+quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.05) # 2011, 0.05; 2014, 0.05; 2017, 0.0009;
+
+traffic_extreme_all =
+  subset(cmaq_traffic_rds,
+         PM25_TOT_NRD > quantile(cmaq_traffic_rds$PM25_TOT_NRD, 1) |
+           PM25_TOT_NRD < quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.05))
 
 # Check and save distribution of extremes
 traffic_extreme_freq20 =
@@ -403,40 +542,77 @@ traffic_extreme_freq20 =
       traffic_extreme_all$Longitude, traffic_extreme_all$Latitude)) %>%
   subset(Freq > 20)
 head(traffic_extreme_freq20)
-write_fst(traffic_extreme_freq20, 
+write_fst(traffic_extreme_freq20,
           file.path(paste0("base_raster_grid_sf/CMAQ_Traffic_Extreme_combine_20more", cmaq_period, ".fst")))
 
 # Exclude extremes from data for modeling
-max_traffic_exe = 0.99996
-min_traffic_exe = 0.009
-cmaq_traffic_rds_noExe =
-  subset(cmaq_traffic_rds, 
-         PM25_TOT_NRD <= quantile(cmaq_traffic_rds$PM25_TOT_NRD, max_traffic_exe) &
-           PM25_TOT_NRD >= quantile(cmaq_traffic_rds$PM25_TOT_NRD, min_traffic_exe))
-dim(cmaq_traffic_rds); dim(cmaq_traffic_rds_noExe)
+max_traffic_NRD = quantile(cmaq_traffic_rds$PM25_TOT_NRD, 1)
+min_traffic_NRD = quantile(cmaq_traffic_rds$PM25_TOT_NRD, 0.05)
+
+# Replace extremes by NA step-by-step
+cmaq_traffic_rds_na = copy(cmaq_traffic_rds)
+cmaq_traffic_rds_na[PM25_TOT_NRD < min_traffic_NRD | PM25_TOT_NRD > max_traffic_NRD,
+                    PM25_TOT_NRD := NA]
+summary(cmaq_traffic_rds_na)
+
+# ONR
+max_traffic_ONR = quantile(cmaq_traffic_rds_na$PM25_TOT_ONR, 1)# 2011, 0.99327; 2012, 0.995; 2014, 1; 2015, 0.999825; 2016, 0.9991; 2017, 0.99999
+min_traffic_ONR = quantile(cmaq_traffic_rds_na$PM25_TOT_ONR, 0.05) # 2011, 0.05; 2014, 0.05
+max_traffic_ONR; min_traffic_ONR
+
+cmaq_traffic_rds_na[PM25_TOT_ONR < min_traffic_ONR | PM25_TOT_ONR > max_traffic_ONR,
+                    PM25_TOT_ONR := NA]
+summary(cmaq_traffic_rds_na)
+
+# ACM
+max_traffic_ACM = quantile(cmaq_traffic_rds_na$PM25_TOT_ACM, 1) # 2011, 0.992825; 2012, 0.993; 2013, 0.895; 2014, 1; 2015, 0.99973; 2016, 0.997; 2017, 0.98475
+min_traffic_ACM = quantile(cmaq_traffic_rds_na$PM25_TOT_ACM, 0.02) # 2011, 0.02; 2013, 0.00005; 2014, 0.02; 2017, 0.00005; 
+max_traffic_ACM; min_traffic_ACM
+
+cmaq_traffic_rds_na[PM25_TOT_ACM < min_traffic_ACM | PM25_TOT_ACM > max_traffic_ACM,
+                    PM25_TOT_ACM := NA]
+summary(cmaq_traffic_rds_na)
+
+# Reorder
+cmaq_traffic_rds_na =
+  cmaq_traffic_rds_na[with(cmaq_traffic_rds_na,
+                           order(Longitude, Latitude, Date)), ]
+
+# Interpolate, geometric mean of 2 values before and after, use "copy" to for data.table assignment!!!!!
+# !!! for data.table, if using "=" with assignment like dt2 = dt1, dt2 point to the same data as dt1.
+# When modifying dt2, dt1 also change because they are the same object!!!
+cmaq_traffic_rds_noExe = copy(cmaq_traffic_rds_na)
+replace_na_with_geom_mean(cmaq_traffic_rds_noExe, "PM25_TOT_NRD")
+replace_na_with_geom_mean(cmaq_traffic_rds_noExe, "PM25_TOT_ONR")
+replace_na_with_geom_mean(cmaq_traffic_rds_noExe, "PM25_TOT_ACM")
 summary(cmaq_traffic_rds_noExe)
 
-# Further deal with PM25_TOT_ACM
-quantile(cmaq_traffic_rds_noExe$PM25_TOT_ACM, 0.99996)
-cmaq_traffic_rds_noExe =
-  subset(cmaq_traffic_rds_noExe,
-         PM25_TOT_ACM <= quantile(cmaq_traffic_rds_noExe$PM25_TOT_ACM, 0.99996) &
-           PM25_TOT_ACM >= quantile(cmaq_traffic_rds_noExe$PM25_TOT_ACM, 0))
+#### still NA in ACM, replace by the median of the whole column
+med_val = median(cmaq_traffic_rds_noExe$PM25_TOT_ACM, na.rm = TRUE)
+cmaq_traffic_rds_noExe[, PM25_TOT_ACM :=
+                         ifelse(is.na(PM25_TOT_ACM),
+                                med_val,
+                                PM25_TOT_ACM)]
 summary(cmaq_traffic_rds_noExe)
 
-traffic_exe_fra = 100-100*nrow(cmaq_traffic_rds_noExe)/nrow(cmaq_traffic_rds)
+# Fraction of extremes
+traffic_exe_fra =
+  100 * sum(is.na(cmaq_traffic_rds_na)) / nrow(cmaq_traffic_rds_noExe) / 3
 print(paste0("Exetrem values fraction (%) in traffic: ", traffic_exe_fra))
+# 2011, 4.70383; 2012, 0.7350; 2013, 3.5%, all in ACM!!!; 2014, 4.000; 2015, 0.0285; 2016, 0.167%; 2017, 0.565%;
 
 write_fst(cmaq_traffic_rds_noExe,
           file.path(paste0("base_raster_grid_sf/CMAQ_Traffic_", cmaq_period, ".fst")))
 
 ########## Biomass
-quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.99998)
-quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.001)
-biom_extreme_all = 
-  subset(cmaq_biom_rds, 
-         PM25_TOT_AFI > quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.99998) |
-           PM25_TOT_AFI < quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.001))
+summary(cmaq_biom_rds)
+quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.99999895) # 2011, 0.99246; 2012, 0.994; 2013, 0.999999; 2014, 0.99999895; 2015, 0.99977; 2016, 0.9985; 2017, 0.99998;
+quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.05) # 2011, 0.05; 2014, 0.05;
+
+biom_extreme_all =
+  subset(cmaq_biom_rds,
+         PM25_TOT_AFI > quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.99999895) |
+           PM25_TOT_AFI < quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.05))
 
 # Check and save distribution of extremes
 biom_extreme_freq20 =
@@ -445,41 +621,47 @@ biom_extreme_freq20 =
       biom_extreme_all$Longitude, biom_extreme_all$Latitude)) %>%
   subset(Freq > 20)
 head(biom_extreme_freq20)
-write_fst(biom_extreme_freq20, 
+write_fst(biom_extreme_freq20,
           file.path(paste0("base_raster_grid_sf/CMAQ_Biomass_Extreme_combine_20more", cmaq_period, ".fst")))
 
 # Exclude extremes from data for modeling
-max_biom_exe = 0.99998
-min_biom_exe = 0.001
-cmaq_biom_rds_noExe =
-  subset(cmaq_biom_rds, 
-         PM25_TOT_AFI <= quantile(cmaq_biom_rds$PM25_TOT_AFI, max_biom_exe) &
-           PM25_TOT_AFI >= quantile(cmaq_biom_rds$PM25_TOT_AFI, min_biom_exe))
-dim(cmaq_biom_rds); dim(cmaq_biom_rds_noExe)
+max_biom_AFI = quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.99999895)
+min_biom_AFI = quantile(cmaq_biom_rds$PM25_TOT_AFI, 0.05)
+
+# Replace extremes by NA step-by-step
+cmaq_biom_rds_na = copy(cmaq_biom_rds)
+cmaq_biom_rds_na[PM25_TOT_AFI < min_biom_AFI | PM25_TOT_AFI > max_biom_AFI,
+                    PM25_TOT_AFI := NA]
+summary(cmaq_biom_rds_na)
+
+# Reorder
+cmaq_biom_rds_na =
+  cmaq_biom_rds_na[with(cmaq_biom_rds_na,
+                           order(Longitude, Latitude, Date)), ]
+
+# Interpolate, geometric mean of 2 values before and after, use "copy" to for data.table assignment!!!!!
+# !!! for data.table, if using "=" with assignment like dt2 = dt1, dt2 point to the same data as dt1.
+# When modifying dt2, dt1 also change because they are the same object!!!
+cmaq_biom_rds_noExe = copy(cmaq_biom_rds_na)
+replace_na_with_geom_mean(cmaq_biom_rds_noExe, "PM25_TOT_AFI")
 summary(cmaq_biom_rds_noExe)
 
-# # Further deal with PM25_TOT_BIOG
-# quantile(cmaq_biom_rds_noExe$PM25_TOT_BIOG, 0.0005)
-# cmaq_biom_rds_noExe =
-#   subset(cmaq_biom_rds_noExe, 
-#          PM25_TOT_BIOG <= quantile(cmaq_biom_rds_noExe$PM25_TOT_BIOG, 1) &
-#            PM25_TOT_BIOG >= quantile(cmaq_biom_rds_noExe$PM25_TOT_BIOG, 0.0005))
-# dim(cmaq_biom_rds_noExe)
-# summary(cmaq_biom_rds_noExe)
-# 
-# biom_exe_fra = 100-100*nrow(cmaq_biom_rds_noExe)/nrow(cmaq_biom_rds)
-# print(paste0("Exetrem values fraction (%) in biomass: ", biom_exe_fra))
+# Fraction of extremes
+biom_exe_fra =
+  100 * sum(is.na(cmaq_biom_rds_na)) / nrow(cmaq_biom_rds_noExe)
+print(paste0("Exetrem values fraction (%) in biomass: ", biom_exe_fra))
+# 2011, 5.75400%; 2012, 0.60%, 2013, 0.0001%; 2014, 5.0001; 2015, ; 2016, 0.15%; 2017, 0.002%;
 
 write_fst(cmaq_biom_rds_noExe,
           file.path(paste0("base_raster_grid_sf/CMAQ_Biomass_", cmaq_period, ".fst")))
 
-###### CMAQ variable plotting ######
+###### CMAQ variable combine into annual ######
 
 # List CMAQ rds files for each sector
-rds_list = 
+rds_list =
   c("cmaq_EGU_rds", "cmaq_OTA_rds",
     "cmaq_ONR_rds", "cmaq_NRD_rds",  "cmaq_ACM_rds",
-    "cmaq_ASEA_rds", "cmaq_ARS_rds", # "cmaq_DUST_rds", 
+    "cmaq_ASEA_rds", "cmaq_ARS_rds", # "cmaq_DUST_rds",
     "cmaq_BIOG_rds", "cmaq_AFI_rds",
     "cmaq_O3_rds", "cmaq_NH3_rds", "cmaq_SO2_rds", "cmaq_NO2_rds")
 
@@ -487,9 +669,9 @@ rds_list =
 variables <- c(
   "EGU", "OTA",
   "ONR", "NRD", "ACM",
-  "ASEA", "ARS", # "DUST", 
-  "BIOG", "AFI", 
-  "O3", "NH3", "SO2", "NO2") 
+  "ASEA", "ARS", # "DUST",
+  "BIOG", "AFI",
+  "O3", "NH3", "SO2", "NO2")
 
 # Evaluate the character names to actual data.tables
 rds_tables <- lapply(rds_list, function(name) get(name))
@@ -513,394 +695,574 @@ write_fst(cmaq_rds_all,
           file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual",
             paste0("CMAQ_all_sectors_", cmaq_period, ".fst")))
 
-# # Generate CMAQ data for each source
-# cmaq_rds_by_source =
-#   cmaq_rds_all %>%
-#   group_by(Longitude, Latitude, cmaq_variable) %>%
-#   dplyr::summarise(cmaq_value_mean = mean(cmaq_value),
-#                    cmaq_value_med = median(cmaq_value))
-# head(cmaq_rds_by_source); dim(cmaq_rds_by_source)
-
-# cmaq_rds_by_source_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_rds_by_source,
-#              aes(x = Longitude, y = Latitude, color = cmaq_value_med),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   facet_wrap(~cmaq_variable, ncol = 3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "Median CMAQ contribution in 2011") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_rds_by_source_plot
-# cmaq_source_name = paste0("CMAQ_source_map_", cmaq_year, ".pdf"); cmaq_source_name
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", cmaq_source_name),
-#   plot = cmaq_rds_by_source_plot, width = 14.5, height = 8.5)
+rm(rds_tables)
+rm(cmaq_rds_all)
+gc()
 
 
-# #### NH3
-# names(cmaq_NH3_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_NH3_rds$NH3, 0.995)
-# 
-# cmaq_NH3_rds_use =
-#   subset(cmaq_NH3_rds,
-#          NH3 < quantile(cmaq_NH3_rds$NH3, 0.995) &
-#            NH3 > quantile(cmaq_NH3_rds$NH3, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(NH3),
-#                    cmaq_median = median(NH3))
-# head(cmaq_NH3_rds_use); dim(cmaq_NH3_rds_use)
-# 
-# cmaq_NH3_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_NH3_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_NH3_rds_plot
-# 
-# NH3_name = paste0("CMAQ_source_map_NH3_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", NH3_name),
-#   plot = cmaq_NH3_rds_plot, width = 14.5, height = 8.5)
-# 
-# #### SO2
-# names(cmaq_SO2_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_SO2_rds$SO2, 0.995) 
-# 
-# cmaq_SO2_rds_use =
-#   subset(cmaq_SO2_rds,
-#          SO2 < quantile(cmaq_SO2_rds$SO2, 0.995) &
-#            SO2 > quantile(cmaq_SO2_rds$SO2, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(SO2),
-#                    cmaq_median = median(SO2))
-# head(cmaq_SO2_rds_use); dim(cmaq_SO2_rds_use)
-# 
-# cmaq_SO2_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_SO2_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_SO2_rds_plot
-# 
-# SO2_name = paste0("CMAQ_source_map_SO2_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", SO2_name),
-#   plot = cmaq_SO2_rds_plot, width = 14.5, height = 8.5)
-# 
-# 
-# #### NO2
-# names(cmaq_NO2_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_NO2_rds$NO2, 0.995)
-# 
-# cmaq_NO2_rds_use =
-#   subset(cmaq_NO2_rds,
-#          NO2 < quantile(cmaq_NO2_rds$NO2, 0.995) &
-#            NO2 > quantile(cmaq_NO2_rds$NO2, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(NO2),
-#                    cmaq_median = median(NO2))
-# head(cmaq_NO2_rds_use); dim(cmaq_NO2_rds_use)
-# 
-# cmaq_NO2_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_NO2_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_NO2_rds_plot
-# 
-# NO2_name = paste0("CMAQ_source_map_NO2_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", NO2_name),
-#   plot = cmaq_NO2_rds_plot, width = 14.5, height = 8.5)
-# 
-# 
-# #### O3
-# names(cmaq_O3_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_O3_rds$O3, 0.995) 
-# 
-# cmaq_O3_rds_use =
-#   subset(cmaq_O3_rds,
-#          O3 < quantile(cmaq_O3_rds$O3, 0.995) &
-#            O3 > quantile(cmaq_O3_rds$O3, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(O3),
-#                    cmaq_median = median(O3))
-# head(cmaq_O3_rds_use); dim(cmaq_O3_rds_use)
-# 
-# cmaq_O3_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_O3_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_O3_rds_plot
-# 
-# O3_name = paste0("CMAQ_source_map_O3_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", O3_name),
-#   plot = cmaq_O3_rds_plot, width = 14.5, height = 8.5)
-# 
-# 
-# #### DUST
-# names(cmaq_DUST_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_DUST_rds$PM25_TOT_DUST, 0.995)
-# 
-# cmaq_DUST_rds_use =
-#   subset(cmaq_DUST_rds,
-#          PM25_TOT_DUST < quantile(cmaq_DUST_rds$PM25_TOT_DUST, 0.995) &
-#            PM25_TOT_DUST > quantile(cmaq_DUST_rds$PM25_TOT_DUST, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(PM25_TOT_DUST),
-#                    cmaq_median = median(PM25_TOT_DUST))
-# head(cmaq_DUST_rds_use); dim(cmaq_DUST_rds_use)
-# 
-# cmaq_DUST_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_DUST_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_DUST_rds_plot
-# 
-# DUST_name = paste0("CMAQ_source_map_DUST_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", DUST_name),
-#   plot = cmaq_DUST_rds_plot, width = 14.5, height = 8.5)
-# 
-# 
-# #### EGU
-# names(cmaq_EGU_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_EGU_rds$PM25_TOT_EGU, 0.995)
-# 
-# cmaq_EGU_rds_use =
-#   subset(cmaq_EGU_rds,
-#          PM25_TOT_EGU < quantile(cmaq_EGU_rds$PM25_TOT_EGU, 0.995) &
-#            PM25_TOT_EGU > quantile(cmaq_EGU_rds$PM25_TOT_EGU, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(PM25_TOT_EGU),
-#                    cmaq_median = median(PM25_TOT_EGU))
-# head(cmaq_EGU_rds_use); dim(cmaq_EGU_rds_use)
-# 
-# cmaq_EGU_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_EGU_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_EGU_rds_plot
-# 
-# EGU_name = paste0("CMAQ_source_map_EGU_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", EGU_name),
-#   plot = cmaq_EGU_rds_plot, width = 14.5, height = 8.5)
-# 
-# 
-# #### NRD
-# names(cmaq_NRD_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_NRD_rds$PM25_TOT_NRD, 0.995)
-# 
-# cmaq_NRD_rds_use =
-#   subset(cmaq_NRD_rds,
-#          PM25_TOT_NRD < quantile(cmaq_NRD_rds$PM25_TOT_NRD, 0.995) &
-#            PM25_TOT_NRD > quantile(cmaq_NRD_rds$PM25_TOT_NRD, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(PM25_TOT_NRD),
-#                    cmaq_median = median(PM25_TOT_NRD))
-# head(cmaq_NRD_rds_use); dim(cmaq_NRD_rds_use)
-# 
-# cmaq_NRD_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_NRD_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_NRD_rds_plot
-# 
-# NRD_name = paste0("CMAQ_source_map_NRD_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", NRD_name),
-#   plot = cmaq_NRD_rds_plot, width = 14.5, height = 8.5)
-# 
-# 
-# #### ONR
-# names(cmaq_ONR_rds)[1:2] = c("Longitude", "Latitude")
-# quantile(cmaq_ONR_rds$PM25_TOT_ONR, 0.995) 
-# 
-# cmaq_ONR_rds_use =
-#   subset(cmaq_ONR_rds,
-#          PM25_TOT_ONR < quantile(cmaq_ONR_rds$PM25_TOT_ONR, 0.995) &
-#            PM25_TOT_ONR > quantile(cmaq_ONR_rds$PM25_TOT_ONR, 0.005)) %>%
-#   group_by(Longitude, Latitude) %>%
-#   dplyr::summarise(cmaq_mean = mean(PM25_TOT_ONR),
-#                    cmaq_median = median(PM25_TOT_ONR))
-# head(cmaq_ONR_rds_use); dim(cmaq_ONR_rds_use)
-# 
-# cmaq_ONR_rds_plot <-
-#   ggplot() +
-#   geom_point(data = cmaq_ONR_rds_use,
-#              aes(x = Longitude, y = Latitude, color = cmaq_median),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = paste0("Median CMAQ contribution in ", cmaq_year)) +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # cmaq_ONR_rds_plot
-# 
-# ONR_name = paste0("CMAQ_source_map_ONR_", cmaq_period, ".pdf")
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", ONR_name),
-#   plot = cmaq_ONR_rds_plot, width = 14.5, height = 8.5)
+###### CMAQ variable plotting ######
+library(USAboundaries)
+us_states = USAboundaries::us_states()
+us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
+
+#### NH3
+quantile(cmaq_NH3_rds$cmaq_value, 0.995)
+
+cmaq_NH3_rds_use =
+  subset(cmaq_NH3_rds,
+         cmaq_value < quantile(cmaq_NH3_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_NH3_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_NH3_rds_use); dim(cmaq_NH3_rds_use)
+
+cmaq_NH3_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_NH3_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_NH3_rds_plot
+
+NH3_name = paste0("CMAQ_source_map_NH3_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", NH3_name),
+  plot = cmaq_NH3_rds_plot, width = 14.5, height = 8.5)
+
+#### SO2
+quantile(cmaq_SO2_rds$cmaq_value, 0.995)
+
+cmaq_SO2_rds_use =
+  subset(cmaq_SO2_rds,
+         cmaq_value < quantile(cmaq_SO2_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_SO2_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_SO2_rds_use); dim(cmaq_SO2_rds_use)
+
+cmaq_SO2_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_SO2_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_SO2_rds_plot
+
+SO2_name = paste0("CMAQ_source_map_SO2_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", SO2_name),
+  plot = cmaq_SO2_rds_plot, width = 14.5, height = 8.5)
+
+
+#### NO2
+quantile(cmaq_NO2_rds$cmaq_value, 0.995)
+
+cmaq_NO2_rds_use =
+  subset(cmaq_NO2_rds,
+         cmaq_value < quantile(cmaq_NO2_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_NO2_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_NO2_rds_use); dim(cmaq_NO2_rds_use)
+
+cmaq_NO2_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_NO2_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_NO2_rds_plot
+
+NO2_name = paste0("CMAQ_source_map_NO2_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", NO2_name),
+  plot = cmaq_NO2_rds_plot, width = 14.5, height = 8.5)
+
+
+#### O3
+quantile(cmaq_O3_rds$cmaq_value, 0.995)
+
+cmaq_O3_rds_use =
+  subset(cmaq_O3_rds,
+         cmaq_value < quantile(cmaq_O3_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_O3_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_O3_rds_use); dim(cmaq_O3_rds_use)
+
+cmaq_O3_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_O3_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_O3_rds_plot
+
+O3_name = paste0("CMAQ_source_map_O3_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", O3_name),
+  plot = cmaq_O3_rds_plot, width = 14.5, height = 8.5)
+
+
+#### DUST, ARS
+quantile(cmaq_ARS_rds$cmaq_value, 0.995)
+
+cmaq_ARS_rds_use =
+  subset(cmaq_ARS_rds,
+         cmaq_value < quantile(cmaq_ARS_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_ARS_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_ARS_rds_use); dim(cmaq_ARS_rds_use)
+
+cmaq_ARS_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_ARS_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_ARS_rds_plot
+
+ARS_name = paste0("CMAQ_source_map_ARS_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", ARS_name),
+  plot = cmaq_ARS_rds_plot, width = 14.5, height = 8.5)
+
+
+#### EGU
+quantile(cmaq_EGU_rds$cmaq_value, 0.995)
+
+cmaq_EGU_rds_use =
+  subset(cmaq_EGU_rds,
+         cmaq_value < quantile(cmaq_EGU_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_EGU_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_EGU_rds_use); dim(cmaq_EGU_rds_use)
+
+cmaq_EGU_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_EGU_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_EGU_rds_plot
+
+EGU_name = paste0("CMAQ_source_map_EGU_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", EGU_name),
+  plot = cmaq_EGU_rds_plot, width = 14.5, height = 8.5)
+
+
+#### NRD
+quantile(cmaq_NRD_rds$cmaq_value, 0.995)
+
+cmaq_NRD_rds_use =
+  subset(cmaq_NRD_rds,
+         cmaq_value < quantile(cmaq_NRD_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_NRD_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_NRD_rds_use); dim(cmaq_NRD_rds_use)
+
+cmaq_NRD_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_NRD_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_NRD_rds_plot
+
+NRD_name = paste0("CMAQ_source_map_NRD_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", NRD_name),
+  plot = cmaq_NRD_rds_plot, width = 14.5, height = 8.5)
+
+
+#### ONR
+quantile(cmaq_ONR_rds$cmaq_value, 0.995)
+
+cmaq_ONR_rds_use =
+  subset(cmaq_ONR_rds,
+         cmaq_value < quantile(cmaq_ONR_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_ONR_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_ONR_rds_use); dim(cmaq_ONR_rds_use)
+
+cmaq_ONR_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_ONR_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_ONR_rds_plot
+
+ONR_name = paste0("CMAQ_source_map_ONR_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", ONR_name),
+  plot = cmaq_ONR_rds_plot, width = 14.5, height = 8.5)
+
+
+#### OTA
+quantile(cmaq_OTA_rds$cmaq_value, 0.995)
+
+cmaq_OTA_rds_use =
+  subset(cmaq_OTA_rds,
+         cmaq_value < quantile(cmaq_OTA_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_OTA_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_OTA_rds_use); dim(cmaq_OTA_rds_use)
+
+cmaq_OTA_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_OTA_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_OTA_rds_plot
+
+OTA_name = paste0("CMAQ_source_map_OTA_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", OTA_name),
+  plot = cmaq_OTA_rds_plot, width = 14.5, height = 8.5)
+
+
+#### ACM
+quantile(cmaq_ACM_rds$cmaq_value, 0.995)
+
+cmaq_ACM_rds_use =
+  subset(cmaq_ACM_rds,
+         cmaq_value < quantile(cmaq_ACM_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_ACM_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_ACM_rds_use); dim(cmaq_ACM_rds_use)
+
+cmaq_ACM_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_ACM_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_ACM_rds_plot
+
+ACM_name = paste0("CMAQ_source_map_ACM_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", ACM_name),
+  plot = cmaq_ACM_rds_plot, width = 14.5, height = 8.5)
+
+
+#### ASEA
+quantile(cmaq_ASEA_rds$cmaq_value, 0.995)
+
+cmaq_ASEA_rds_use =
+  subset(cmaq_ASEA_rds,
+         cmaq_value < quantile(cmaq_ASEA_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_ASEA_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_ASEA_rds_use); dim(cmaq_ASEA_rds_use)
+
+cmaq_ASEA_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_ASEA_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_ASEA_rds_plot
+
+ASEA_name = paste0("CMAQ_source_map_ASEA_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", ASEA_name),
+  plot = cmaq_ASEA_rds_plot, width = 14.5, height = 8.5)
+
+
+#### BIOG
+quantile(cmaq_BIOG_rds$cmaq_value, 0.995)
+
+cmaq_BIOG_rds_use =
+  subset(cmaq_BIOG_rds,
+         cmaq_value < quantile(cmaq_BIOG_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_BIOG_rds$cmaq_value, 0.005)) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_BIOG_rds_use); dim(cmaq_BIOG_rds_use)
+
+cmaq_BIOG_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_BIOG_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_BIOG_rds_plot
+
+BIOG_name = paste0("CMAQ_source_map_BIOG_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", BIOG_name),
+  plot = cmaq_BIOG_rds_plot, width = 14.5, height = 8.5)
+
+
+#### AFI
+quantile(cmaq_AFI_rds$cmaq_value, 0.995)
+
+cmaq_AFI_rds_use =
+  subset(cmaq_AFI_rds,
+         cmaq_value < quantile(cmaq_AFI_rds$cmaq_value, 0.995) &
+           cmaq_value > quantile(cmaq_AFI_rds$cmaq_value, 0.005)) %>%
+  group_by(x, y) %>%
+  dplyr::summarise(cmaq_mean = mean(cmaq_value),
+                   cmaq_median = median(cmaq_value))
+head(cmaq_AFI_rds_use); dim(cmaq_AFI_rds_use)
+
+cmaq_AFI_rds_plot <-
+  ggplot() +
+  geom_point(data = cmaq_AFI_rds_use,
+             aes(x = x, y = y, color = cmaq_median),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(name = "Concentration µg/m^3", option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "x",
+       y = "y",
+       title = paste0("Median CMAQ contribution in ", cmaq_year)) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# cmaq_AFI_rds_plot
+
+AFI_name = paste0("CMAQ_source_map_AFI_", cmaq_period, ".pdf")
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", AFI_name),
+  plot = cmaq_AFI_rds_plot, width = 14.5, height = 8.5)
+
 
 ###### Read CMAQ data for ML inputs ######
 
 # cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
-cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
+# cmaq_period = "2012-01_2012-12"; cmaq_year = 2012
+# cmaq_period = "2013-01_2013-12"; cmaq_year = 2013
+cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
+# cmaq_period = "2015-01_2015-12"; cmaq_year = 2015
+# cmaq_period = "2016-01_2016-12"; cmaq_year = 2016
+# cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
 print(paste0("Study period: ", cmaq_period, " & year ", cmaq_year))
 
 cmaq_sulfate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Sulfate_", cmaq_period, ".fst")))
-cmaq_dust_rds_noExe = read_fst( file.path(paste0("base_raster_grid_sf/CMAQ_DUST_", cmaq_period, ".fst")))
+cmaq_dust_rds_noExe = read_fst( file.path(paste0("base_raster_grid_sf/CMAQ_Dust_", cmaq_period, ".fst")))
 cmaq_traffic_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Traffic_", cmaq_period, ".fst")))
 cmaq_biom_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Biomass_", cmaq_period, ".fst")))
 
@@ -1050,10 +1412,11 @@ ncld_with_centroids_coords_noGeo =
 # ncld_with_centroids_coords =
 #   st_read(file.path(paste0("pmf_ncld_meteo_census/NCLD_", ncld_year, "_in_US_grid_01.fgb")))
 
-## GRIDMET
+#### GRIDMET
 gridmet_us_grid_mean = 
   read_fst(file.path(paste0("pmf_ncld_meteo_census/GRIDMET_commom_", cmaq_year, "_in_US_grid_01.fst")))
 gridmet_us_grid_mean$th[gridmet_us_grid_mean$th < 0] = 0
+head(gridmet_us_grid_mean)
 
 ### round to 2 digits
 ncld_with_centroids_coords_noGeo$Longitude = round(ncld_with_centroids_coords_noGeo$Longitude, 2)
@@ -1061,6 +1424,24 @@ ncld_with_centroids_coords_noGeo$Latitude = round(ncld_with_centroids_coords_noG
 
 gridmet_us_grid_mean$Longitude = round(gridmet_us_grid_mean$Longitude, 2)
 gridmet_us_grid_mean$Latitude = round(gridmet_us_grid_mean$Latitude, 2)
+
+# ###### Replace NA by geometric mean of nearby points, for year 2012 only!!
+# ###### rmin, no data on 2012-06-22; vs, no data on 2012-02-27
+# gridmet_us_grid_mean_tobe_intp = gridmet_us_grid_mean
+# 
+# gridmet_us_grid_mean_tobe_intp = 
+#   fill_na_with_adjacent_days(gridmet_us_grid_mean_tobe_intp, "rmin", "2012-06-22")
+# gridmet_us_grid_mean_tobe_intp = 
+#   fill_na_with_adjacent_days(gridmet_us_grid_mean_tobe_intp, "vs", "2012-02-27")
+# summary(gridmet_us_grid_mean_tobe_intp)
+# dim(gridmet_us_grid_mean_tobe_intp); dim(gridmet_us_grid_mean)
+# head(gridmet_us_grid_mean_tobe_intp); head(gridmet_us_grid_mean)
+# 
+# gridmet_us_grid_mean = gridmet_us_grid_mean_tobe_intp
+# 
+# # Assign back & save
+# write_fst(gridmet_us_grid_mean,
+#           file.path(paste0("pmf_ncld_meteo_census/GRIDMET_commom_", cmaq_year, "_in_US_grid_01.fst")))
 
 sapply(gridmet_us_grid_mean, class)
 sapply(ncld_with_centroids_coords_noGeo, class)
@@ -1106,238 +1487,238 @@ landcover_df <- data.frame(
 )
 rownames(landcover_df) = 1:nrow(landcover_df)
 
-# #### Plotting: GRIDMET & NCLD Mapping
-# met_ncld_us_grid_use = subset(met_ncld_us_grid, !is.na(th))
-# met_ncld_us_grid_use$long = met_ncld_us_grid_use$lat = NULL
-# # summary(met_ncld_us_grid_use)
-# head(met_ncld_us_grid_use)
-# 
-# ## Extract long & points within the continental US
-# library(USAboundaries)
-# library(patchwork)
-# us_states = USAboundaries::us_states()
-# us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
-# 
-# # met_ncld_us_grid_plot = 
-# #   subset(met_ncld_us_grid_use, 
-# #          Date == unique(met_ncld_us_grid_use$Date)[1])
-# 
-# ##### Land cover
-# landcover_df$NLCD.Land.Cover.Class = as.factor(landcover_df$NLCD.Land.Cover.Class)
-# head(landcover_df); dim(landcover_df)
-# 
-# ## NLCD Land Use
-# met_ncld_us_grid_plot =  
-#   merge(met_ncld_us_grid_plot, landcover_df, 
-#         by = "NLCD.Land.Cover.Class", all.x = TRUE)
-# 
-# land_use <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = land_type),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_d(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "land_type") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # land_use
-# 
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", "GridMet_NLCD_2011_Land_Use.pdf"),
-#   plot = land_use, width = 14.5, height = 8.5)
-# 
-# met_ncld_us_grid_plot =
-#   dplyr::select(met_ncld_us_grid_use, -Date) %>%
-#   group_by(Longitude, Latitude) %>%
-#   summarise(
-#     NLCD.Land.Cover.Class = median(NLCD.Land.Cover.Class, na.rm = TRUE),
-#     tmmx = median(tmmx, na.rm = TRUE),
-#     tmmn = median(tmmn, na.rm = TRUE),
-#     rmax = median(rmax, na.rm = TRUE),
-#     rmin = median(rmin, na.rm = TRUE),
-#     vs = median(vs, na.rm = TRUE),
-#     th = median(th, na.rm = TRUE)
-#   )
-# head(met_ncld_us_grid_plot)
-# summary(met_ncld_us_grid_plot)
-# 
-# #### Temp
-# met_tmmx <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = tmmx),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "tmmx") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # met_tmmx
-# 
-# met_tmmn <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = tmmn),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "tmmn") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # met_tmmn
-# met_Temp = met_tmmx + met_tmmn
-# 
-# temp_name = paste0("METEO_map_Temp_", cmaq_year, ".pdf"); temp_name
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", temp_name),
-#   plot = met_Temp, width = 14.5, height = 8.5)
-# 
-# #### RH
-# met_rmax <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = rmax),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "rmax") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # met_rmax
-# 
-# met_rmin <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = rmin),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "rmin") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # met_rmin
-# met_RH = met_rmax + met_rmin
-# 
-# rh_name = paste0("METEO_map_RH_", cmaq_year, ".pdf"); rh_name
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", rh_name),
-#   plot = met_RH, width = 14.5, height = 8.5)
-# 
-# #### Wind
-# met_th <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = th),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "th") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # met_th
-# 
-# met_vs <-
-#   ggplot() +
-#   geom_point(data = met_ncld_us_grid_plot,
-#              aes(x = Longitude, y = Latitude, color = vs),
-#              size = 0.35, alpha = 0.8) +
-#   geom_sf(data = us_states,
-#           fill = NA, color = "grey70", size = 0.3) +
-#   scale_color_viridis_c(option = "plasma") +
-#   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
-#   theme_minimal(base_size = 16) +
-#   labs(x = "Longitude",
-#        y = "Latitude",
-#        title = "vs") +
-#   theme(
-#     legend.position = "bottom",
-#     legend.title = element_text(size = 22),
-#     legend.text = element_text(size = 19),
-#     plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
-#     # plot.subtitle = element_text(size = 22),
-#     axis.title = element_text(size = 22),
-#     axis.text = element_text(size = 19)
-#   )
-# # met_vs
-# met_Wind = met_th + met_vs
-# 
-# wind_name = paste0("METEO_map_Wind_", cmaq_year, ".pdf"); wind_name
-# ggsave(
-#   file.path("machine_learning_source_input/ML_plot", wind_name),
-#   plot = met_Wind, width = 14.5, height = 8.5)
+#### Plotting: GRIDMET & NCLD Mapping
+met_ncld_us_grid_use = subset(met_ncld_us_grid, !is.na(th))
+met_ncld_us_grid_use$long = met_ncld_us_grid_use$lat = NULL
+# summary(met_ncld_us_grid_use)
+head(met_ncld_us_grid_use)
+
+## Extract long & points within the continental US
+library(USAboundaries)
+library(patchwork)
+us_states = USAboundaries::us_states()
+us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
+
+met_ncld_us_grid_plot =
+  subset(met_ncld_us_grid_use,
+         Date == unique(met_ncld_us_grid_use$Date)[1])
+
+##### Land cover
+landcover_df$NLCD.Land.Cover.Class = as.factor(landcover_df$NLCD.Land.Cover.Class)
+head(landcover_df); dim(landcover_df)
+
+## NLCD Land Use
+met_ncld_us_grid_plot =
+  merge(met_ncld_us_grid_plot, landcover_df,
+        by = "NLCD.Land.Cover.Class", all.x = TRUE)
+
+land_use <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = land_type),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_d(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "land_type") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# land_use
+
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", "GridMet_NLCD_2012_Land_Use.pdf"),
+  plot = land_use, width = 14.5, height = 8.5)
+
+met_ncld_us_grid_plot =
+  dplyr::select(met_ncld_us_grid_use, -Date) %>%
+  dplyr::group_by(Longitude, Latitude) %>%
+  dplyr::summarise(
+    NLCD.Land.Cover.Class = median(NLCD.Land.Cover.Class, na.rm = TRUE),
+    tmmx = median(tmmx, na.rm = TRUE),
+    tmmn = median(tmmn, na.rm = TRUE),
+    rmax = median(rmax, na.rm = TRUE),
+    rmin = median(rmin, na.rm = TRUE),
+    vs = median(vs, na.rm = TRUE),
+    th = median(th, na.rm = TRUE)
+  )
+head(met_ncld_us_grid_plot)
+summary(met_ncld_us_grid_plot)
+
+#### Temp
+met_tmmx <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = tmmx),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "tmmx") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# met_tmmx
+
+met_tmmn <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = tmmn),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "tmmn") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# met_tmmn
+met_Temp = met_tmmx + met_tmmn
+
+temp_name = paste0("METEO_map_Temp_", cmaq_year, ".pdf"); temp_name
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", temp_name),
+  plot = met_Temp, width = 14.5, height = 8.5)
+
+#### RH
+met_rmax <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = rmax),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "rmax") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# met_rmax
+
+met_rmin <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = rmin),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "rmin") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# met_rmin
+met_RH = met_rmax + met_rmin
+
+rh_name = paste0("METEO_map_RH_", cmaq_year, ".pdf"); rh_name
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", rh_name),
+  plot = met_RH, width = 14.5, height = 8.5)
+
+#### Wind
+met_th <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = th),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "th") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# met_th
+
+met_vs <-
+  ggplot() +
+  geom_point(data = met_ncld_us_grid_plot,
+             aes(x = Longitude, y = Latitude, color = vs),
+             size = 0.35, alpha = 0.8) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", size = 0.3) +
+  scale_color_viridis_c(option = "plasma") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_size = 16) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "vs") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 19),
+    plot.title = element_text(size = 22, face = "bold", vjust = 1.2),
+    # plot.subtitle = element_text(size = 22),
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 19)
+  )
+# met_vs
+met_Wind = met_th + met_vs
+
+wind_name = paste0("METEO_map_Wind_", cmaq_year, ".pdf"); wind_name
+ggsave(
+  file.path("machine_learning_source_input/ML_plot", wind_name),
+  plot = met_Wind, width = 14.5, height = 8.5)
 
 ###### Sulfate ###### 
 setDT(cmaq_sulfate_rds_noExe)
@@ -1376,6 +1757,9 @@ cmaq_pmf_sulfate_met_ncld =
 
 cmaq_pmf_sulfate_met_ncld$NLCD.Land.Cover.Class = 
   as.factor(cmaq_pmf_sulfate_met_ncld$NLCD.Land.Cover.Class)
+
+# head(cmaq_pmf_sulfate_met_ncld)
+# summary(cmaq_pmf_sulfate_met_ncld)
 
 # Merge with land use type
 sulfate_cmaq_pmf_met_landtype =
@@ -1679,6 +2063,10 @@ biomass_cmaq_pmf_met_landtype_smk =
 # Set NA in smoke_level as 0, NA is due to no record on that day
 biomass_cmaq_pmf_met_landtype_smk[is.na(smoke_level), smoke_level := 0]
 
+# Set smoke_level as factor
+biomass_cmaq_pmf_met_landtype_smk$smoke_level = 
+  as.factor(biomass_cmaq_pmf_met_landtype_smk$smoke_level)
+
 # For caret::train(method = "rf")
 biomass_rf_use = 
   subset(biomass_cmaq_pmf_met_landtype_smk, !is.na(Concentration))
@@ -1694,6 +2082,7 @@ summary(biomass_rf_use)
 # if not delete ALL data from one point from mainland us
 subset(biomass_rf_use, is.na(PM25_TOT_AFI)) # (-108.25, 33.25) on 2017-03-23, no PM25_TOT_AFI
 subset(biomass_cmaq_pmf_met_landtype_smk, is.na(PM25_TOT_AFI)) # (-108.25, 33.25) on 2017-03-23, no PM25_TOT_AFI
+subset(biomass_rf_use, is.na(PM25_TOT_BIOG)) 
 
 biomass_rf_use = subset(biomass_rf_use, !is.na(PM25_TOT_AFI))
 biomass_cmaq_pmf_met_landtype_smk = subset(biomass_cmaq_pmf_met_landtype_smk, !is.na(PM25_TOT_AFI))
