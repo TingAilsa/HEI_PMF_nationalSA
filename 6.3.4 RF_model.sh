@@ -1,9 +1,10 @@
 #!/bin/bash
+
 #SBATCH --partition=normal
 #SBATCH --job-name=RF_model
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
-#SBATCH --mem-per-cpu=32G
+#SBATCH --mem-per-cpu=50G
 
 ## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID
 #SBATCH --output=/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_prediction/err_out/%x_%A_%a.out 
