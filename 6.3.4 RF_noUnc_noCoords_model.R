@@ -17,7 +17,6 @@ library(caret) # trainControl
 library(randomForest)
 library(ggplot2)
 library(patchwork)
-library(randomForest)
 library(doParallel) # parallel backend
 # library(pdp) # partial dependence in RF
 #library(USAboundaries)
@@ -40,8 +39,8 @@ base_dir = getwd()
 
 # Get command line arguments
 args <- commandArgs(trailingOnly = TRUE)
-source.test <- args[1]
-cmaq_period <- args[2]
+source.test <- args[1] # source.test = "Sulfate"
+cmaq_period <- args[2] # cmaq_period = "2012-01_2012-12"
 
 ## Read model input, use a pattern (to avoid day_count in the name)
 # model_input_ini <- read_fst(
