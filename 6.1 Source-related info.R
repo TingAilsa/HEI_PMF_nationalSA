@@ -19,6 +19,7 @@ library(bigmemory)  # handle large files without hitting memory limits
 library(corrplot)
 library(tiff)
 
+
 #### Read the generated census level geometry, after ACScensus step ####
 
 # census_tract_geoid_geo =
@@ -577,6 +578,12 @@ write.csv(tri_metal_use, "EPA_TRI_Metals_2011-20.csv")
 
 ###### TRI 4. mapping the metal trends ######
 
+tri_metal_use = 
+  read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nation_SA_data/EPA_TRI_Metals_2011-20.csv")
+head(tri_metal_use); dim(tri_metal_use)
+# View(tri_metal_use)
+unique(tri_metal_use$chem_metal)
+
 # us_states, mainland
 us_states = USAboundaries::us_states()
 us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
@@ -620,7 +627,6 @@ ggplot() +
         legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
         legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
         legend.spacing.y = unit(1, "cm")) 
-
 
 #### US Census, American Community Survey ####
 
@@ -676,6 +682,10 @@ variable_list <- c(B01001_vars, B02001_vars, B08006_vars, B08303_vars,
                    B25058_vars, B25001_vars, B25068_vars)
 length(variable_list)
 
+#### Additional, 
+B03003_vars <- c('B03003_001', 'B03003_002', 'B03003_003') # 'Total', 'Not Hispanic or Latino', 'Hispanic or Latino'
+variable_list <- B03003_vars
+
 # Initialize empty files to store the data for each period and all periods all states
 all_year_data <- list()
 all_year_state_census = NULL
@@ -721,9 +731,14 @@ for (state_code in mainland_state_fips) {
 dim(all_year_state_census)
 head(all_year_state_census)
 
-# Save the combined data to a CSV file (optional)
+# Save the combined data 
 write.csv(all_year_state_census, 
           "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_2011-2020.csv", 
+          row.names = FALSE)
+
+# For Hispanic or Latino Only
+write.csv(all_year_state_census, 
+          "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_Hispanic_2011-2020.csv", 
           row.names = FALSE)
 
 all_year_state_census = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_2011-2020.csv")
@@ -979,6 +994,158 @@ st_write(census_tract_geoid_geo,
 write.csv(census_tract_geoid_nogeom, 
          file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS", 
                    "ACS_census_tract_geoid_NO_matched_geometry.csv"))
+
+###### Census, EJ variable extract & matching with GEOID ######
+# Generate the list of variables to use
+census_ej <-
+  c(paste0("B01001_", sprintf("%03d", 1:49)), # population by age and sex
+    paste0("B02001_", sprintf("%03d", 1:10)), # population by race
+    c("B12001_002", "B12001_011"), # Marital status
+    "B19001_001", # Household Income
+    # paste0("B19019_", sprintf("%03d", 1:8)), # Median household income by house size (how many people) with inflation adjusted
+    c('B03003_001', 'B03003_002', 'B03003_003') # Hispanic or Latino
+  )
+
+#### Census, related to race, gender, income
+census_api_key <-
+  fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_variables.csv")
+View(census_api_key)
+
+names(census_api_key) = c("Row", "variable", "Census", "Class", "Resolution")
+head(census_api_key)
+
+# Extract API Key to use
+census_key_use = subset(census_api_key, variable %in% census_ej)
+View(census_key_use)
+
+##### Clean up the strings in Census
+census_key_clean = copy(census_key_use)
+census_key_clean[, Census := {
+  # Special age cases and basic formatting
+  cleaned <- gsub("Under 5 years", "0-5", Census)
+  cleaned <- gsub("85 years and over", "85-over", cleaned)
+  cleaned <- gsub(" years", "", cleaned)
+
+  # Patterns with "!!"
+  cleaned <- gsub("Male:!!", "M_", cleaned)
+  cleaned <- gsub("Female:!!", "F_", cleaned)
+
+  # Handle the prefix
+  cleaned <- gsub("Estimate!!Total:!!", "", cleaned)
+
+  # Handle race/ethnicity patterns
+  cleaned <- gsub("White alone", "WA", cleaned)
+  cleaned <- gsub("Black or African American alone", "BA", cleaned)
+  cleaned <- gsub("American Indian and Alaska Native alone", "IA", cleaned)
+  cleaned <- gsub("Asian alone", "AA", cleaned)
+  cleaned <- gsub("Native Hawaiian and Other Pacific Islander alone", "NAH", cleaned)
+  cleaned <- gsub("Some other race alone", "SO", cleaned)
+  cleaned <- gsub("Two or more races:", "TOM", cleaned)
+  cleaned <- gsub("Two or more races:!!Two races including Some other race", "TOM_SOR", cleaned)
+  cleaned <- gsub("Total:!!Two or more races:!!Two races excluding Some other race, and three or more races", "TOM_SOR_ThOM", cleaned)
+  # cleaned <- gsub("Total", "TOT_POP", cleaned)
+  cleaned <- gsub("Not Hispanic or Latino", "NH", cleaned)
+  cleaned <- gsub("Hispanic or Latino", "H", cleaned)
+
+  # Remained pattern
+  cleaned <- gsub(" to ", "-", cleaned)
+  cleaned <- gsub(" and ", "_", cleaned)
+
+  cleaned
+}]
+
+# Some separate replacement for Census
+census_key_clean$Census[census_key_clean$variable == "B01001_002"] = "M_all" # total male
+census_key_clean$Census[census_key_clean$variable == "B01001_026"] = "F_all" # total female
+
+census_key_clean$Census[census_key_clean$variable == "B12001_002"] = "M_married" # total married male above 15
+census_key_clean$Census[census_key_clean$variable == "B12001_011"] = "F_married" # total married female above 15
+
+census_key_clean$Census[census_key_clean$variable == "B02001_009"] = "TOM_SOR"
+census_key_clean$Census[census_key_clean$variable == "B02001_010"] = "TOM_SOR_ThOM"
+census_key_clean$Census[census_key_clean$variable == "B19001_001"] = "Household_Income"
+
+census_key_clean <- census_key_clean[ Census != "Estimate!!Total:", ]
+
+View(census_key_clean)
+
+##### Clean up the strings in Class
+census_key_clean[, Class := {
+  # Special age cases and basic formatting
+  cleaned <- gsub("SEX BY AGE", "Sex_Age", Class)
+  cleaned <- gsub("RACE", "Race", cleaned)
+  cleaned <- gsub("HISPANIC OR LATINO ORIGIN", "Race", cleaned)
+  cleaned <- gsub("SEX BY MARITAL STATUS FOR THE POPULATION 15 YEARS AND OVER", "Marriage_Status", cleaned)
+  cleaned <- gsub("HOUSEHOLD INCOME IN THE PAST 12 MONTHS (IN 2020 INFLATION-ADJUSTED DOLLARS)", "Household_Income_12m", cleaned)
+
+  cleaned
+}]
+census_key_clean$Class[census_key_clean$variable == "B19001_001"] = "Household_Income_12m"
+
+View(census_key_clean)
+unique(census_key_clean$Resolution)
+## All are at block group!!! But this is only for 2020, not for others, check!!!
+
+# write_fst(census_key_clean,
+#           "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_variable_GEOID_match_2011-20.fst")
+# 
+# census_key_clean =
+#   read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_variable_GEOID_match_2011-20.fst")
+
+### Census tract level info - for Race, Gender, etc.
+census_tract_acs =
+  fread(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
+                  "US_Census_ACS_tract_2011-2020.csv"))
+class(census_tract_acs); dim(census_tract_acs)
+head(census_tract_acs)
+
+# The additional Hispanic or Latino
+hispanic_tract_acs =
+  fread(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
+                  "US_Census_ACS_tract_Hispanic_2011-2020.csv"))
+
+# extract ACS Census variables to use for fine-scale modeling
+census_acs_use =
+  subset(census_tract_acs, variable %in% census_ej)
+
+# convert GEOID to 11 digits character, probably starting with 0
+census_acs_use$GEOID <- ifelse(
+  nchar(as.character(census_acs_use$GEOID)) < 11,
+  sprintf("%011s", as.character(census_acs_use$GEOID)),
+  as.character(census_acs_use$GEOID)
+)
+head(census_acs_use); dim(census_acs_use)
+
+hispanic_tract_acs$GEOID <- ifelse(
+  nchar(as.character(hispanic_tract_acs$GEOID)) < 11,
+  sprintf("%011s", as.character(hispanic_tract_acs$GEOID)),
+  as.character(hispanic_tract_acs$GEOID)
+)
+
+# Combine two census info
+census_acs_use = rbind(census_acs_use, hispanic_tract_acs)
+head(census_acs_use)
+
+# Merge with census description
+census_acs =
+  merge(census_acs_use, census_key_clean)
+census_acs$Resolution = census_acs$variable =
+  census_acs$Row = census_acs$Class = NULL
+head(census_acs)
+
+# Expand the census_acs_use with variables as colnames
+census_acs_ej <-
+  census_acs %>%
+  pivot_wider(
+    names_from = "Census",
+    values_from = "estimate"
+  )
+setDT(census_acs_ej)
+head(census_acs_ej); dim(census_acs_ej)
+
+write_fst(census_acs_ej,
+          file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
+                    "US_Census_ACS_tract_EJ_2011-2020.fst"))
 
 #### NLCD, land cover ####
 
@@ -2137,7 +2304,7 @@ gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_
 # names(tmmx_year) 
 
 # Define the date range for each year
-study_years <- 2016 # 2011:2020   2011:2015
+study_years <- 2011 # 2011:2020   2011:2015
 
 # Use rast to read, not raster, so as to directly get date info 
 # Annual data, some variables may miss some days or grids, need to check every time!!!
@@ -2272,7 +2439,7 @@ for (met_year in study_years) { # met_year = 2017
 gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
 gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
 
-met_year = 2016 # 2015
+met_year = 2011 # 2015
 
 # Year 2015, lack one day
 
@@ -2295,19 +2462,68 @@ th_year =
   read_fst(file.path(gridmet_stack_source_path, 
                      paste0("Common_GRIDMET_", "th", "_", met_year, "_stacked.fst")))
 
-summary(tmmx_year$Longitude == tmmn_year$Longitude & 
-          tmmx_year$Latitude == tmmn_year$Latitude & 
-          tmmx_year$Date == tmmn_year$Date)
-# summary(tmmx_year$Longitude == rmax_year$Longitude & 
-#           tmmx_year$Latitude == rmax_year$Latitude & 
-#           tmmx_year$Date == rmax_year$Date)
-# summary(tmmx_year$Longitude == vs_year$Longitude & 
-#           tmmx_year$Latitude == vs_year$Latitude & 
-#           tmmx_year$Date == vs_year$Date)
-# summary(tmmx_year$Longitude == th_year$Longitude & 
-#           tmmx_year$Latitude == th_year$Latitude & 
-#           tmmx_year$Date == th_year$Date)
+# Check which one lack date
+dim(tmmx_year); dim(tmmn_year); dim(rmax_year); dim(rmin_year); dim(vs_year); dim(th_year)
+setDT(tmmx_year); setDT(tmmn_year); setDT(rmax_year); setDT(rmin_year); setDT(vs_year); setDT(th_year)
 
+# Determine the variables with full dates and lack dates
+year_full_record <- tmmn_year
+year_lack <- tmmx_year
+var_lack <- "tmmx"
+# year_lack_2 <- vs_year
+# var_lack_2 <- "vs"
+
+# Get unique Date, Longitude, Latitude combination
+year_coords <- 
+  dplyr::select(year_full_record, Date, Longitude, Latitude)
+
+# Merge with the one lack full date
+year_coords_lack <-
+  merge(year_coords, year_lack, all.x = TRUE)
+# year_coords_lack <-
+#   merge(year_coords_lack, year_lack_2, all.x = TRUE)
+summary(year_coords_lack)
+
+# Check if column sequences are the same
+summary(year_full_record$Date == year_coords_lack$Date &
+          year_full_record$Latitude == year_coords_lack$Latitude &
+          year_full_record$Longitude == year_coords_lack$Longitude)
+
+# Replace NA by geometric mean of nearby points
+year_coords_lack_noNA <-
+  replace_NA_with_geo_mean(year_coords_lack, var_lack, 2)
+# year_coords_lack_noNA <-
+#   replace_NA_with_geo_mean(year_coords_lack_noNA, var_lack_2, 2)
+head(year_coords_lack_noNA)
+
+# Assign back & save
+tmmx_year = year_coords_lack_noNA
+write_fst(rmax_year,
+          file.path(gridmet_stack_source_path, 
+                    paste0("Common_GRIDMET_", "tmmx", "_", met_year, "_stacked.fst")))
+
+
+# For 2012, 2 meteo var lack data
+# rmin_year = dplyr::select(year_coords_lack_noNA, Date, Longitude, Latitude, rmin)
+# write_fst(rmin_year,
+#           file.path(gridmet_stack_source_path,
+#                     paste0("Common_GRIDMET_", "rmin", "_", met_year, "_stacked.fst")))
+# 
+# vs_year = dplyr::select(year_coords_lack_noNA, Date, Longitude, Latitude, vs)
+# write_fst(vs_year,
+#           file.path(gridmet_stack_source_path,
+#                     paste0("Common_GRIDMET_", "vs", "_", met_year, "_stacked.fst")))
+
+
+# Release storage space
+rm(year_coords)
+rm(year_full_record)
+rm(year_lack)
+rm(year_coords_lack)
+rm(year_coords_lack_noNA)
+gc()
+
+# Combine all data
 meteo_year_all = tmmx_year
 meteo_year_all$tmmn = tmmn_year$tmmn
 meteo_year_all$rmax = rmax_year$rmax
@@ -2315,6 +2531,10 @@ meteo_year_all$rmin = rmin_year$rmin
 meteo_year_all$vs = vs_year$vs
 meteo_year_all$th = th_year$th
 head(meteo_year_all); dim(meteo_year_all) # summary(meteo_year_all); 
+sapply(meteo_year_all, class)
+
+# Change date to Date format
+meteo_year_all$Date = as.Date(meteo_year_all$Date)
 
 # Save the merged data for this year
 write_fst(meteo_year_all, 
@@ -2377,7 +2597,7 @@ gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data
 gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
 
 # Define the date range for each year
-study_years <- 2012 # 2011:2020   2011:2015
+study_years <- 2011 # 2011:2020   2011:2015
 
 # Use rast to read, not raster, so as to directly get date info 
 # Annual data, some variables may miss some days or grids, need to check every time!!!
@@ -2503,7 +2723,7 @@ for (met_year in study_years) { # met_year = 2017
 gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
 gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
 
-met_year = 2015 # 2015
+met_year = 2014 # 2015
 
 fm100_year = 
   read_fst(file.path(gridmet_stack_source_path, 
@@ -2516,6 +2736,11 @@ bi_year =
                      paste0("Biomass_GRIDMET_", "bi", "_", met_year, "_stacked.fst")))
 
 dim(fm100_year); dim(fm1000_year); dim(bi_year)
+
+# # Check if column sequences are the same
+# summary(fm100_year$Date == bi_year$Date &
+#           fm100_year$Latitude == bi_year$Latitude &
+#           fm100_year$Longitude == bi_year$Longitude)
 
 ##### Interpolation for the variable that lack days of records
 # File of complete of the year
@@ -2534,21 +2759,81 @@ biomass_full_date = fm100_year
 # 2012
 biomass_full_date = fm100_year 
 
+# 2011
+biomass_full_date = fm100_year 
 
 # Prepare complete date file of the year 
-biomass_date = data.frame(table(biomass_full_date$Date))
-names(biomass_date)[1] = "Date"
-biomass_date$Freq = NULL
-head(biomass_date); dim(biomass_date)
+# biomass_date = data.frame(table(biomass_full_date$Date))
+# names(biomass_date)[1] = "Date"
+# biomass_date$Freq = NULL
+# head(biomass_date); dim(biomass_date)
+# biomass_full_date$Date = as.Date(biomass_full_date$Date)
 
-## 2016
+#### 2016
 bi_year = merge(biomass_date, bi_year, all.x = TRUE)
 dim(biomass_full_date); dim(bi_year)
 
 
+#### 2014, fill fm1000 and bi
+# Determine the variables with full dates and lack dates
+# biomass_lack <- fm1000_year
+# var_lack <- "fm1000"
+biomass_lack <- bi_year
+var_lack <- "bi"
 
-# Combine to get the final output
+# Get unique Date, Longitude, Latitude combination
+biomass_coords <- 
+  dplyr::select(biomass_full_date, Date, Longitude, Latitude)
+
+# Merge with the one lack full date
+biomass_coords_lack <-
+  merge(biomass_coords, biomass_lack, all.x = TRUE)
+head(biomass_coords_lack)
+summary(biomass_coords_lack)
+
+# Check if column sequences are the same
+summary(biomass_full_date$Date == biomass_coords_lack$Date &
+          biomass_full_date$Latitude == biomass_coords_lack$Latitude &
+          biomass_full_date$Longitude == biomass_coords_lack$Longitude)
+
+# Replace NA by geometric mean of nearby points
+setDT(biomass_coords_lack)
+biomass_coords_lack_noNA <-
+  replace_NA_with_geo_mean(biomass_coords_lack, var_lack, 2)
+
+summary(biomass_coords_lack_noNA$bi)
+
+# if the above one not working
+biomass_coords_lack_noNA <- 
+  replace_NA_with_expanding_geo_mean(biomass_coords_lack, "var_lack")
+
+head(biomass_coords_lack_noNA)
+summary(biomass_coords_lack_noNA$bi)
+
+# Assign back & save
+# fm1000_year = biomass_coords_lack_noNA
+# write_fst(fm1000_year,
+#           file.path(gridmet_stack_source_path,
+#                     paste0("Biomass_GRIDMET_", "fm1000", "_", met_year, "_stacked.fst")))
+bi_year = biomass_coords_lack_noNA
+write_fst(bi_year,
+          file.path(gridmet_stack_source_path,
+                    paste0("Biomass_GRIDMET_", "bi", "_", met_year, "_stacked.fst")))
+
+
+# Release storage space
+rm(biomass_coords)
+rm(biomass_full_record)
+rm(biomass_lack)
+rm(biomass_coords_lack)
+rm(biomass_coords_lack_noNA)
+gc()
+
+
+#### Combine to get the final output
 meteo_year_biomass = fm100_year
+# meteo_year_biomass = merge(meteo_year_biomass, fm1000_year)
+# meteo_year_biomass = merge(meteo_year_biomass, bi_year)
 meteo_year_biomass$fm1000 = fm1000_year$fm1000
 meteo_year_biomass$bi = bi_year$bi
 head(meteo_year_biomass); dim(meteo_year_biomass) # ; summary(meteo_year_biomass)
@@ -2573,7 +2858,5 @@ ggplot() +
           fill = NA, color = "grey70", size = 0.3) +
   scale_color_viridis_c(name = "rmax", option = "plasma") +
   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE)
-
-
 
 
