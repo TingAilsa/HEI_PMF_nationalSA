@@ -717,7 +717,285 @@ write_fst(roadiness_us_grid_mean,
 # write_fst(roadiness_us_grid_mean, "Roadiness/Roadiness_in_US_grid_01.fst")
 
 
-#### Census ####
+#### EPA TRI ####
+
+###### TRI, read & prepare data for interpolation ######
+
+tri_metal_use = 
+  read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nation_SA_data/EPA_TRI_Metals_2011-20.csv")
+head(tri_metal_use); dim(tri_metal_use); names(tri_metal_use)
+# View(tri_metal_use)
+unique(tri_metal_use$chem_metal)
+
+# Columns to use
+tri_metal_to_project = 
+  dplyr::select(tri_metal_use, year, longitude, latitude, chem_metal, air_stack_source)
+head(tri_metal_to_project); dim(tri_metal_to_project)
+
+# In case of duplicated
+tri_metal_to_project = 
+  tri_metal_to_project %>%
+  dplyr::group_by(year, longitude, latitude, chem_metal) %>%
+  dplyr::summarise(
+    air_stack_source = mean(air_stack_source, rm.na = TRUE),
+    .groups = "drop"
+  )
+dim(tri_metal_to_project)
+
+# Get the dataset, emission of each metal into air, fill NULL by 0
+tri_metal_to_project_use =
+  tri_metal_to_project %>%
+  pivot_wider(
+    values_from = "air_stack_source", # use the original emission to air directly, ignore the off.site_release
+    names_from = "chem_metal",
+    values_fill = 0 # fill those NULL with 0, not NA
+  ) 
+head(tri_metal_to_project_use); dim(tri_metal_to_project_use)
+
+# Convert to sf
+tri_metal_sf_project <- 
+  st_as_sf(tri_metal_to_project_use, 
+           coords = c("longitude", "latitude"), crs = 4326)
+head(tri_metal_sf_project)
+
+###### TRI, project ######
+
+us_grid_raster_01 = 
+  raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+
+us_grid_raster = us_grid_raster_01
+
+cared_metal_all = 
+  c("Al", "As", "Ba", "Be", "Ca", "Cd", "Co", "Cr", "Cu", "Fe",
+    "Hg", "Mn", "Na", "Ni", "Pb", "Sb", "Se", "Sn", "V", "Zn")
+
+study_years = 2011:2020
+
+# rm(list = ls())
+# Function for projection to US raster and extract date info
+brick_var_date_project <- 
+  function(rast_file_path, grid_raster) { 
+    # Open the rast file, use brick for multi-band file!!
+    rast_file <- brick(rast_file_path)
+    
+    # Extract the layer names and dates
+    layer_names <- names(rast_file)
+    layer_dates <- gsub(".*_(\\d{4})_(\\d{2})_(\\d{2})", "\\1-\\2-\\3", layer_names)
+    # print("First five dates in in layers:")
+    # layer_dates[1:5]
+    
+    # Then project to match the target US grid of 0.1 or 0.01 degree
+    # When using projectRaster, both rast file should be from 
+    projected_var_raster <- projectRaster(rast_file, 
+                                          grid_raster, 
+                                          method = "bilinear")
+    # extent(rast_file); extent(grid_raster); extent(projected_var_raster)
+    
+    # Only use the day information to rename the layers
+    names(projected_var_raster) <- paste0("Date_", layer_dates)
+    # plot( projected_var_raster[[c(1,10,20)]])
+    
+    # Return the raster brick
+    return(projected_var_raster = projected_var_raster)
+  }
+
+# Initialize an empty vector to store the names of files that return NULL
+# some downloaded .tif cannot be read directly via raster() or terra::rast()
+failed_files <- c()
+
+# Merge and output file by EPA TRI variable and by year
+for (tri_metal in cared_metal_all) { # tri_metal = "Cu"
+  for (tri_year in study_years) { # tri_year = 2011
+    
+    # List all .tif files for the specific variable and year
+    tri_yr_metal_sf <- 
+      subset(tri_metal_sf_project, 
+             year == tri_year)
+    
+    if (nrow(tri_yr_metal_sf) > 0) {
+      # Initialize an empty list to store successfully loaded rasters
+      rasters <- list()
+      
+      for (tif_file in tri_yr_metal_sf) {
+        # Extract the name and use it as rast name
+        rast.name = sub("\\.tif$", "", basename(tif_file))
+        
+        
+        # Only add successfully loaded rasters to the list
+        if (!is.null(raster_data)) {
+          rasters <- c(rasters, list(raster_data))
+        }
+      }
+      
+      # Only proceed if there are valid rasters to stack
+      if (length(rasters) > 0) {
+        # Stack the valid rasters into a multi-layer raster (stacked temporally)
+        tri_merged_raster <- rast(rasters)
+        
+        # Define the output filename
+        meter_merged_filename <- 
+          file.path("/EPA_TRI_industry/Projected_element_year",
+                    paste0(tri_metal, "_", tri_year, "_stacked.tif")) 
+        
+        # Save the stacked raster to a new .tif file
+        writeRaster(
+          tri_merged_raster,
+          filename = meter_merged_filename, 
+          overwrite = TRUE)
+        
+        print(paste0("File saved: ", meter_merged_filename))
+      } else {
+        print(paste0("No valid rasters to stack for ", tri_metal, " in ", tri_year))
+      }
+    }
+  }
+}
+
+# Loop through each year and combine the selected variables
+for (met_year in study_years) { # met_year = 2017
+  print(paste("TRImetal year to be used:", met_year))
+  
+  # Initialize an empty list to store rasters for this year
+  rasters_to_merge <- list()
+  
+  # Loop through each selected variable
+  for (tri_var in tri_var_comm) { # tri_var = tri_var_comm[1]
+    print(paste("TRImetal Variable to be used:", tri_var))
+    
+    # Construct the file path for the stacked raster of this variable and year
+    file_path <- 
+      file.path(gridmet_stack_path, 
+                paste0(tri_var, "_", met_year, "_stacked.tif"))
+    
+    # Process the variable to create the raster brick
+    met_var_project <- 
+      brick_var_date_project(
+        file_path, 
+        us_grid_raster)
+    
+    # Extract spatial information and values
+    tri_var_dt = 
+      as.data.table(as.data.frame(met_var_project, xy = TRUE, na.rm = TRUE))
+    # head(tri_var_dt); dim(tri_var_dt)
+    
+    # Reshape data from wide to long format (each variable in a single column)
+    tri_var_long <- 
+      melt(tri_var_dt, 
+           id.vars = c("x", "y"), 
+           variable.name = "Layer", 
+           value.name = tri_var,
+           na.rm = TRUE)
+    
+    # Add Date 
+    tri_var_long[, Date := 
+                     gsub(".*_(\\d{4}).(\\d{2}).(\\d{2})", 
+                          "\\1-\\2-\\3", 
+                          Layer)]
+    tri_var_long[, Layer := NULL]
+    
+    print("Check the file for the applied tri_var")
+    head(tri_var_long); summary(tri_var_long)
+    
+    # Store in list
+    tri_var_list[[tri_var]] <- tri_var_long
+  }
+  
+  # Save the single tri data one by one for this year
+  for (tri_var in tri_var_comm) { # tri_var = tri_var_comm[2]
+    
+    tri_var_year = tri_var_list[[tri_var]]
+    tri_var_year = 
+      tri_var_year[with(tri_var_year, order(Date, x, y)), ]
+    names(tri_var_year)[1:2]
+    names(tri_var_year)[1:2] = c("Longitude", "Latitude")
+    dim(tri_var_year)
+    
+    print(paste("Check the output file for a single tri_var", 
+                head(tri_var_year)
+    ))
+    
+    write_fst(tri_var_year, 
+              file.path(gridmet_stack_source_path, 
+                        paste0("Common_GRIDMET_", tri_var, "_", met_year, "_stacked.fst")))
+  }
+  
+  # Clear memory
+  rm(tri_merged_year, tri_var_list)
+  gc()
+}
+
+
+
+#### Census-1: commute ####
+
+# ###### Census-1, Commute variable extract & matching with GEOID ######
+# ### Census tract level info - for commute
+# census_tract_acs =
+#   fread(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
+#                   "US_Census_ACS_tract_2011-2020.csv"))
+# 
+# # extract ACS Census variables to use for fine-scale modeling
+# census_acs_use =
+#   subset(census_tract_acs,
+#          variable %in%
+#            c(c("B08006_002", "B08006_008", paste0("B08006_", sprintf("%03d", 14:17))), # commute method
+#              paste0("B08303_", sprintf("%03d", 2:13)))) # commute time
+# 
+# # convert GEOID to 11 digits character, probably starting with 0
+# census_acs_use$GEOID <- ifelse(
+#   nchar(as.character(census_acs_use$GEOID)) < 11,
+#   sprintf("%011s", as.character(census_acs_use$GEOID)),
+#   as.character(census_acs_use$GEOID)
+# )
+# head(census_tract_acs)
+# head(census_acs_use)
+# 
+# # expand the census_acs_use with variables as colnames
+# census_acs_wide <-
+#   census_acs_use %>%
+#   pivot_wider(
+#     names_from = "variable",
+#     values_from = "estimate"
+#   )
+# 
+# # re-estimate the commute time based on paste0("B08303_", sprintf("%03d", 2:13)) series columns
+# # c("min_0-4", "min_5-9", "min_10-14", "min_15-19", "min_20-24", "min_25-29", "min_30-34", "min_35-39", "min_40-44", "min_45-59", "min_60-89", "min_90-more")
+# # Define the column names for commute times
+# commute_cols <- paste0("B08303_", sprintf("%03d", 2:13))
+# 
+# # Define the assumed commute times (0, 5, 10, ..., 90 mins)
+# commute_times <- c(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 60, 90)
+# 
+# # Calculate the average commute time
+# census_acs_wide$commute_time <- 
+#   rowSums(sweep(census_acs_wide[, commute_cols], 2, commute_times, FUN = "*")) / 
+#   rowSums(census_acs_wide[, commute_cols])
+# 
+# # remove commute_cols
+# census_acs_wide[, paste0("B08303_", sprintf("%03d", 2:13))] <- NULL
+# 
+# # rename
+# names(census_acs_wide)[3:8]
+# names(census_acs_wide)[3:8] = 
+#   c("car_truck_van", "public_transport", "bike", "walk", "taxi_moto_etc", "work_home")
+# head(census_acs_wide)
+# 
+# # create dataset to list what census variables represent
+# census_variable = data.frame(
+#   variable = 
+#     c(c("B08006_002", "B08006_008", paste0("B08006_", sprintf("%03d", 14:17))), # commute method
+#       paste0("B08303_", sprintf("%03d", 2:13))),
+#   Census_group = 
+#     c(rep("Commute_method", 6), rep("commute_time", 12)),
+#   Census_sub = 
+#     c("car_truck_van", "public_transport", "bike", "walk", "taxi_moto_etc", "work_home",
+#       "min_0-4", "min_5-9", "min_10-14", "min_15-19", "min_20-24", "min_25-29", 
+#       "min_30-34", "min_35-39", "min_40-44", "min_45-59", "min_60-89", "min_90-more"))
+# 
+# write_fst(census_acs_wide, 
+#           file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
+#                     "US_Census_ACS_tract_commute_2011-2020.fst"))
+# 
 # # County tract GEOID & geometry
 # census_tract_geo = st_read("pmf_ncld_meteo_census/ACS_census_tract_geoid_geometry_4326.fgb")
 # st_geometry(census_tract_geo) <- "geometry"
@@ -750,11 +1028,6 @@ class(census_acs_geo_mainland)
 
 census_acs_wide = read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_commute_2011-2020.fst")
 
-# # For nearest point
-# us_grid_centroids_01 = st_read(file.path("/Users/TingZhang/Documents/HEI HAQ PMF/HEI_PMF_nationalSA/us_grid_centroids_01.fgb"))
-# class(us_grid_centroids_01); head(us_grid_centroids_01)
-# us_grid_centroids = us_grid_centroids_01
-
 # For raster extract
 us_grid_sf_01 = st_read(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_sf_01.fgb"))
 us_grid_sf = us_grid_sf_01
@@ -771,62 +1044,7 @@ subset(census_acs_geo_mainland, st_is_empty(geometry)) # check if there is empty
 
 census_out_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS"
 
-
-#### Use parallel method, but the storage is not enough
-# # install.packages("future.apply", dependencies = TRUE)
-# library(future.apply)
-# plan(multisession)  # Use available cores (test with 4-6 workers)
-# 
-# # Get GEOID that are within mainland US
-# census_acs_geo = 
-#   merge(census_acs_wide, 
-#         census_acs_geo_mainland, 
-#         by = "GEOID")
-# print("Dim of census_acs_geo and census_acs_geo_mainland")
-# dim(census_acs_geo); dim(census_acs_geo_mainland)
-# 
-# # Set as sf and remove empty geometries, if any
-# census_acs_geo_sf = 
-#   st_as_sf(census_acs_geo) %>%
-#   filter(!st_is_empty(geometry))
-# print("Head & dim of census_acs_geo_sf")
-# head(census_acs_geo_sf); dim(census_acs_geo_sf)
-# 
-# # Extract unique years from your dataset
-# all_years <- unique(census_acs_geo_sf$year) %>% sort()
-# print("Included years in census_acs_geo_sf")
-# data.frame(table(census_acs_geo_sf$year))
-# 
-# # Extract census variables
-# commute_variables = 
-#   setdiff(names(census_acs_geo_sf), 
-#           c("GEOID", "year", "geometry"))
-# print("Commute variables:"); commute_variables
-# 
-# # Process years in parallel
-# census_acs_rast_list <- 
-#   future_lapply(all_years, function(y) {
-#     
-#   # Year filtering and conversion
-#   census_grid_year_sf <- 
-#     census_acs_geo_sf %>% 
-#     filter(year == y) %>% 
-#     vect()
-#   
-#   # Rasterize with fixed template
-#   rast(lapply(commute_variables, \(var) {
-#     rasterize(census_grid_year_sf, 
-#               raster_census, 
-#               field = var, fun = "mean")
-#   }))
-#   
-# }, future.seed = TRUE)  # Required for reproducibility
-# 
-# # Combine results
-# final_raster <- rast(census_acs_rast_list)
-
-
-#### Census: match via raster extract #### 
+#### Census-1: commute, match via raster extract #### 
 
 # Initialize a list to store all results for 2011-2020
 census_acs_rast_list <- list()
@@ -894,46 +1112,6 @@ for (census_year in 2013:2020){ # census_year = 2011, 2011:2020
   # Store annual results in list
   census_acs_rast_list[[as.character(census_year)]] =
     census_acs_year_var_rast
-  
-  # ####### Tries with exact_extract, which is more often to extract raster values and assign to polygons
-  # # Prepare output raster with the same structure
-  # output_rast_list <- NULL
-  # # names(output_rast_list) <- commute_variables
-  # 
-  # for (commute_var in commute_variables) {
-  #   # Rasterize the current variable (using 'first' to assign polygon values)
-  #   var_raster <- 
-  #     rasterize(census_acs_year_sf, us_grid_raster, 
-  #               field = commute_var, fun = "first")
-  #   
-  #   # Calculate weighted mean using exact_extract (coverage fraction as weights)
-  #   weighted_means <- 
-  #     exact_extract(var_raster, us_grid_sf, 
-  #                   'weighted_mean', 
-  #                   weights = 'area', 
-  #                   append_cols = FALSE)
-  #   
-  #   # Assign results to the output raster layer
-  #   output_rast_list[[commute_var]] <- weighted_means
-  # }
-  # 
-  # # Create template raster from your grid
-  # template <- rast(us_grid_raster)
-  # 
-  # # Convert list to raster stack
-  # output_rast <- rast(
-  #   lapply(commute_variables, function(var) {
-  #     # Convert data.frame column to vector and assign to raster
-  #     values(template) <- output_rast_list[[var]][[1]]  # Extract first (only) column
-  #     return(template)
-  #   })
-  # )
-  # 
-  # # Set proper layer names
-  # names(output_rast) <- commute_variables
-  # summary(output_rast); head(output_rast)
-  # plot(output_rast$car_truck_van)
-  
 
   ###### Match GEOID in census with geometry in US_grids: Raster Extract ###### 
   
@@ -1043,316 +1221,374 @@ for (census_year in 2013:2020){ # census_year = 2011, 2011:2020
   )
 }
 
+
+#### Census-2: Race, Gender, etc. ####
+
+# # Geometry & GEOID
+# census_acs_geo_mainland =
+#   st_read("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/ACS_census_tract_geoid_geometry_4326_USmainland.fgb")
 # 
-# # Get centroids
-# grid_census_commute_centroid = st_centroid(grid_census_commute_all)
+# census_acs_ej =
+#   read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_Census_ACS_tract_EJ_2011-2020.fst")
 # 
-# #
-# grid_census_commute_all_fst
-# # Prepare the .csv file, drop geometry
+# census_out_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS"
+
+
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/")
+getw()
+
+census_acs_geo_mainland = 
+  st_read("pmf_ncld_meteo_census/ACS_census_tract_geoid_geometry_4326_USmainland.fgb")
+census_acs_ej = 
+  read_fst("pmf_ncld_meteo_census/US_Census_ACS_tract_EJ_2011-2020.fst")
+
+length(unique(census_acs_geo_mainland$GEOID))
+class(census_acs_geo_mainland)
+head(census_acs_geo_mainland)
+
+
+# # For raster extract
+# us_grid_sf_01 =
+#   st_read(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_sf_01.fgb"))
+# us_grid_raster_01 =
+#   raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+
+# For raster extract
+us_grid_sf_01 = 
+  st_read(file.path("base_raster_grid_sf/us_grid_sf_01.fgb"))
+us_grid_raster_01 = 
+  raster(file.path("base_raster_grid_sf/us_grid_raster_01.tif"))
+
+us_grid_sf = us_grid_sf_01
+us_grid_raster = us_grid_raster_01
+grid_centroids <- st_centroid(us_grid_sf)
+
+
+#### Census-2: GEOID match with Longitude Latitude #### 
+
+# Match all GEOID with the geometry
+census_acs_geoid_geo = 
+  merge(census_acs_geoid, census_acs_geo_mainland)
+st_geometry(census_acs_geoid_geo) <- "geometry"
+
+head(census_acs_geoid_geo)
+subset(census_acs_geoid_geo, st_is_empty(geometry)) # check if there is empty geometry
+
+# #### Beyong memory
+# # Find nearest GEOID for EVERY grid cell
+# grid_nearest_idx <- st_nearest_feature(grid_centroids, census_acs_geoid_geo)
 # 
-# grid_census_commute_all_fst = st_drop_geometry(grid_census_commute_all)
+# # Assign GEOIDs to grid cells 
+# us_grid_sf_geoid = us_grid_sf
+# us_grid_sf_geoid$assigned_geoid <- 
+#   census_acs_geoid_geo$GEOID[grid_nearest_idx]
 # 
+# # Verify coverage
+# # Check that no grid cells are unassigned
+# stopifnot("Some grid cells have no GEOID assigned" = !any(is.na(us_grid_sf$assigned_geoid)))
 # 
+# # Optional: Check distribution of assignments
+# geoid_assignment_counts <- table(us_grid_sf$assigned_geoid)
+# print(summary(as.numeric(geoid_assignment_counts)))
 # 
-# # Output files
-# st_write(grid_census_commute_all, 
-#          file.path(census_out_path, "US_census_tract_grid_01_Commute_rasterExtract_2011-20.fgb"))
-# 
-# 
-# 
-# 
-# ###### Census: match via nearest point ###### 
-# 
-# # file to save GEOID-geometry-year match for 2011-2020
-# grid_cTract_final_all = NULL
-# grid_cTract_census_all = NULL
-# 
-# 
-# for (census_year in 2011:2020){ # census_year = 2011
-#   
-#   ###### Prepare basic data ###### 
-#   
-#   # Prepare census commute data for each year, and get geometry
-#   census_acs_wide_year = subset(census_acs_wide, year == census_year)
-#   census_acs_geo_year = 
-#     merge(census_acs_wide_year, census_acs_geo_mainland, all.x = TRUE) %>%
-#     dplyr::select(GEOID, geometry)
-#   
-#   # Set as sf
-#   census_acs_geo_year = st_as_sf(census_acs_geo_year)
-#   head(census_acs_geo_year); summary(census_acs_geo_year); dim(census_acs_geo_year)
-#   
-#   # Check if there is empty geometry
-#   census_acs_geo_year_emptyGeo = subset(census_acs_geo_year, st_is_empty(geometry))
-#   nrow(census_acs_geo_year_emptyGeo); head(census_acs_geo_year_emptyGeo)
-#   
-#   # Remove GEOID with empty geomety (GEOID without a geometry to match, probably outside of the mainland US)
-#   census_acs_geo_year <- 
-#     census_acs_geo_year %>%
-#     filter(!st_is_empty(geometry))
-#   
-#   census_acs_use_year <- 
-#     subset(census_acs_wide_year, 
-#            GEOID %in% unique(census_acs_geo_year$GEOID))
-#   
-#   # # Checking the boundaries
-#   # st_bbox(us_grid_centroids)
-#   # st_bbox(census_acs_geo_year)
-# 
-#   ###### Match GEOID in census with geometry in US_grids: Nearest Point  ###### 
-#   
-#   ### Keep all GEOID and all grids (try the best)
-#   # Track counts for validation
-#   n_orig_tracts <- length(unique(census_acs_geo_year$GEOID))
-#   n_orig_grids <- length(unique(us_grid_centroids$geometry))
-#   # n_orig_tracts; n_orig_grids
-#   
-#   # Get base grid-tract matches from spatial join
-#   base_matches <- 
-#     st_join(us_grid_centroids, census_acs_geo_year, join = st_within) 
-#   # head(base_matches); dim(base_matches)
-#   # length(unique(base_matches$GEOID)); length(unique(base_matches$geometry))
-#   
-#   # Get unmatched grids and assign nearest tract
-#   unmatched_grids <- 
-#     base_matches %>%
-#     filter(is.na(GEOID)) %>%
-#     mutate(
-#       GEOID = census_acs_geo_year$GEOID[st_nearest_feature(geometry, census_acs_geo_year)]
-#     )
-#   # head(unmatched_grids); dim(unmatched_grids)
-#   # length(unique(unmatched_grids$GEOID)); length(unique(unmatched_grids$geometry))
-#   
-#   # Get unmatched tracts and assign nearest grid
-#   unmatched_tracts <- 
-#     census_acs_geo_year %>%
-#     filter(!GEOID %in% base_matches$GEOID) %>%
-#     mutate(
-#       near_grid = st_nearest_feature(st_centroid(geometry), us_grid_centroids)
-#     ) %>%
-#     st_drop_geometry() %>%
-#     mutate(
-#       geometry = us_grid_centroids$geometry[near_grid]
-#     ) %>%
-#     dplyr::select(-near_grid)
-#   # head(unmatched_tracts); dim(unmatched_tracts)
-#   # length(unique(unmatched_tracts$GEOID)); length(unique(unmatched_tracts$geometry))
-#   
-#   # Combine all
-#   grid_with_censusTract <- bind_rows(
-#     base_matches %>% filter(!is.na(GEOID)),
-#     unmatched_grids,
-#     unmatched_tracts
-#   )
-#   
-#   # head(grid_with_censusTract)
-#   # # summary(grid_with_censusTract)
-#   # length(unique(grid_with_censusTract$GEOID))
-#   # length(unique(census_acs_geo_year$GEOID))
-#   # length(unique(grid_with_censusTract$geometry))
-#   # length(unique(us_grid_centroids$geometry))
-#   # nrow(census_acs_geo_year); nrow(us_grid_centroids); nrow(grid_with_censusTract) 
-#   # 
-#   # nrow(subset(grid_with_censusTract, is.na(GEOID)))
-#   # nrow(subset(grid_with_censusTract, is.na(geometry)))
-#   # subset(grid_with_censusTract, !(geometry %in% us_grid_centroids$geometry))
-#   
-#   # Check if there is still GEOID with empty geometry (there should be NO!!!)
-#   geoid_empty_geo = 
-#     unique(
-#       subset(grid_with_censusTract, 
-#              !(geometry %in% us_grid_centroids$geometry))$GEOID)
-#   head(geoid_empty_geo); length(geoid_empty_geo)
-#   
-#   # geoid_with_geo =
-#   #   unique(
-#   #     subset(grid_with_censusTract, 
-#   #            geometry %in% us_grid_centroids$geometry)$GEOID)
-#   # head(geoid_with_geo); length(geoid_with_geo)
-#   
-#   # # Check if there any GEOID with empty geometry included in that with some other grids assigned
-#   # # If TRUE, then not, only need to find grid geometry for geoid_empty_geo
-#   # length(geoid_with_geo) + length(geoid_empty_geo) == length(unique(census_acs_geo_year$GEOID))
-#   # geoid_empty_geo = geoid_empty_geo[!(geoid_empty_geo %in% geoid_with_geo)]
-#   # census_acs_year_emptyGeo = subset(census_acs_geo_year, GEOID %in% geoid_empty_geo)
-#   
-#   #### Handle the cases that multiple grids assigned to one GEOID; again need to keep all GEOID and grids
-#   # Estimate the appearance frequency of each GEOID and geometry
-#   grid_with_censusTract <- 
-#     grid_with_censusTract %>%
-#     group_by(GEOID) %>%
-#     mutate(geoid_freq = n()) %>%
-#     ungroup() %>%
-#     group_by(geometry) %>%
-#     mutate(geom_freq = n()) %>%
-#     ungroup()
-#   length(unique(grid_with_censusTract$GEOID)) # 70,208
-#   length(unique(census_acs_geo_year$GEOID)) # 70,208
-#   length(unique(grid_with_censusTract$geometry)) # 153,400
-#   length(unique(us_grid_centroids$geometry)) # 153,400
-#   
-#   # # Get long lat
-#   # grid_with_censusTract$Longitude = round(st_coordinates(grid_with_censusTract)[, 1], 2)
-#   # grid_with_censusTract$Latitude = round(st_coordinates(grid_with_censusTract)[, 2], 2)
-#   # grid_with_censusTract$coords = paste(grid_with_censusTract$Longitude, grid_with_censusTract$Latitude)
-#   
-#   # Identify the GEOID that only have one match, file for final use directly
-#   grid_cTract_oneGEOID <-
-#     subset(grid_with_censusTract, 
-#            geoid_freq == 1)
-#   nrow(grid_cTract_oneGEOID); length(unique(grid_cTract_oneGEOID$geometry))
-#   # 59,551,  11,821
-#   
-#   # Identify the geometry that only have one match, but multiple GEIOD, need to handle GEOID
-#   grid_cTract_oneGrid <-
-#     subset(grid_with_censusTract, 
-#            geoid_freq > 1 & geom_freq == 1)
-#   nrow(grid_cTract_oneGrid); length(unique(grid_cTract_oneGrid$GEOID))
-#   # 141,439,  10,306
-#   
-#   # Combine above two files
-#   grid_cTract_1to1 =
-#     rbind(grid_cTract_oneGEOID, grid_cTract_oneGrid)
-#   length(unique(grid_cTract_1to1$geometry)); length(unique(grid_cTract_1to1$GEOID))
-#   # 153,260,  69,857
-#   summary(grid_cTract_1to1$geoid_freq == 1 | grid_cTract_1to1$geom_freq == 1)
-#   nrow(grid_cTract_1to1) # 200,990
-#   
-#  # Identify the GEOID or geometry with >1 matches for both
-#   grid_cTract_nMatch <-
-#     subset(grid_with_censusTract,
-#            geoid_freq > 1 & geom_freq > 1) 
-#   nrow(grid_cTract_nMatch)
-#   length(unique(grid_cTract_nMatch$geometry)); length(unique(grid_cTract_nMatch$GEOID))
-#   summary(grid_cTract_nMatch)
-#   
-#   ### Handle those multi matches
-#   ## Situation 1, both geoID & gEOmetry appear in 1to1, not to use
-#   grid_cTract_nMatch_gIDgEO_in_1to1 <-
-#     subset(grid_cTract_nMatch, 
-#            GEOID %in% grid_cTract_1to1$GEOID & geometry %in% grid_cTract_1to1$geometry)
-#   nrow(grid_cTract_nMatch_gIDgEO_in_1to1)
-#   
-#   ## Situation 2, geoid not but gEOmetry appear in 1to1, detect any geometry for each GEOID
-#   grid_cTract_nMatch_gEO_in_1to1 <-
-#     subset(grid_cTract_nMatch, 
-#            !(GEOID %in% grid_cTract_1to1$GEOID) & geometry %in% grid_cTract_1to1$geometry)
-#   nrow(grid_cTract_nMatch_gEO_in_1to1)
-#   
-#   grid_cTract_nMatch_gEO_in_1to1_single <-
-#     grid_cTract_nMatch_gEO_in_1to1 %>%
-#     group_by(GEOID) %>%
-#     slice(1)
-#   nrow(grid_cTract_nMatch_gEO_in_1to1_single)
-#   
-#   ## Situation 3, geometry not but geoID appear in 1to1, detect any GEOID for each geometry
-#   grid_cTract_nMatch_gID_in_1to1 <-
-#     subset(grid_cTract_nMatch, 
-#            GEOID %in% grid_cTract_1to1$GEOID & !(geometry %in% grid_cTract_1to1$geometry))
-#   nrow(grid_cTract_nMatch_gID_in_1to1)
-#   
-#   grid_cTract_nMatch_gID_in_1to1_single <-
-#     grid_cTract_nMatch_gID_in_1to1 %>%
-#     group_by(geometry) %>%
-#     slice(1)
-#   nrow(grid_cTract_nMatch_gID_in_1to1_single)
-#   
-#   ## Situation 4, neither geometry nor geoid appear in 1to1,  detect one geometry for each GEOID
-#   grid_cTract_nMatch_neither_in_1to1 <-
-#     subset(grid_cTract_nMatch, 
-#            !(GEOID %in% grid_cTract_1to1$GEOID) &
-#              !(geometry %in% grid_cTract_1to1$geometry))
-#   nrow(grid_cTract_nMatch_neither_in_1to1)
-#   
-#   grid_cTract_nMatch_neither_in_1to1 <-
-#     grid_cTract_nMatch_neither_in_1to1 %>%
-#     subset(!(GEOID %in% grid_cTract_nMatch_gEO_in_1to1_single$GEOID) &
-#              !(GEOID %in% grid_cTract_nMatch_gID_in_1to1_single$GEOID))
-#   nrow(grid_cTract_nMatch_neither_in_1to1)
-#   
-#   # Get all geometry that are not used for GEOID matching 
-#   rest_geometry = 
-#     unique(
-#       subset(grid_with_censusTract, 
-#              !(geometry %in% grid_cTract_1to1$geometry | 
-#                geometry %in% grid_cTract_nMatch_gID_in_1to1$geometry))$geometry)
-#   length(rest_geometry)
-#   
-#   # For each GEOID, detect one geometry
-#   # Choose the geometry that is not in rest_geometry, if possible
-#   grid_cTract_nMatch_neither_in_1to1_single <-
-#     grid_cTract_nMatch_neither_in_1to1 %>%
-#     group_by(GEOID) %>%
-#     mutate(
-#       # Checks if geometry already exists in grid_cTract_oneGEOID_oneGrid
-#       in_oneMatch = geometry %in% rest_geometry,
-#       # Prioritize the geometry not in in_oneMatch
-#       priority = if(any(!in_oneMatch)) !in_oneMatch else TRUE
-#     ) %>%
-#     filter(priority) %>%
-#     slice(1) %>%
-#     ungroup() %>%
-#     dplyr::select(-in_oneMatch, -priority)
-#   nrow(grid_cTract_nMatch_neither_in_1to1_single)
-#   
-#   ## Combine all matches
-#   grid_cTract_final =
-#     rbind(grid_cTract_1to1,
-#           grid_cTract_nMatch_gEO_in_1to1_single,
-#           grid_cTract_nMatch_gID_in_1to1_single,
-#           grid_cTract_nMatch_neither_in_1to1_single)
-# 
-#   length(unique(grid_cTract_final$GEOID))
-#   length(unique(census_acs_geo_year$GEOID))
-#   length(unique(grid_cTract_final$geometry))
-#   length(unique(us_grid_centroids$geometry))
-#   head(grid_cTract_final); dim(grid_cTract_final)
-#   summary(is.na(grid_cTract_final$GEOID))
-#   summary(st_is_empty(grid_cTract_final$geometry))
-#   
-# 
-#   # Add long & lat, and round to 2 digits
-#   grid_cTract_final$Longitude = round(st_coordinates(grid_cTract_final)[,1], 2)
-#   grid_cTract_final$Latitude = round(st_coordinates(grid_cTract_final)[,2], 2)
-#   
-#   # Exclude and add columns
-#   grid_cTract_final$geoid_freq = grid_cTract_final$geom_freq = NULL
-#   grid_cTract_final$year = census_year
-#   grid_cTract_final = st_drop_geometry(grid_cTract_final)
-#   
-#   # Combine into final file for all years and output it
-#   grid_cTract_final_all = rbind(grid_cTract_final_all, grid_cTract_final)
-#   write_fst(grid_cTract_final_all, 
-#             ## "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_census_tract_grid_01_4326_2011.fst"
-#             "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_census_tract_grid_01_4326_2011-20.fst"
-#             )
-# 
-#   ###### Match census commute info with coordinates from US grid ###### 
-#   census_acs_use_year_coords =
-#     merge(census_acs_use_year, grid_cTract_final, by = c("GEOID", "year"))
-#   dim(census_acs_use_year_coords); dim(census_acs_use_year)
-#   head(census_acs_use_year_coords)
-#   
-#   # Calculate median for all columns
-#   census_acs_year_coords_avg =
-#     dplyr::select(census_acs_use_year_coords, -GEOID) %>%
-#     group_by(Longitude, Latitude) %>%
-#     summarize(across(everything(), \(x) median(x)),
-#               .groups = "drop") 
-#   head(census_acs_year_coords_avg); dim(census_acs_year_coords_avg)
-#   summary(census_acs_year_coords_avg)
-#   # unique combination counts of long, lat
-#   census_acs_year_coords_avg %>%
-#     summarize(unique_combinations = n_distinct(paste(Longitude, Latitude)))
-#   
-#   # Combine into final file for all years and output it
-#   grid_cTract_census_all = rbind(grid_cTract_census_all, census_acs_year_coords_avg)
-#   write_fst(grid_cTract_census_all, 
-#             ## "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_census_tract_grid_01_Commute_2011.fst"
-#             "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS/US_census_tract_grid_01_Commute_2011-20.fst"
-#             )
-# }
+# st_write(census_acs_geoid_geo, "US_01_grid_GEOID.geojson")
+
+
+# Check a small sample to confirm structure
+sample_check <- 
+  function(grid_points, census_polygons, n_sample = 10) {
+  # Sample some points
+  sample_idx <- sample(1:nrow(grid_points), min(n_sample, nrow(grid_points)))
+  sample_points <- grid_points[sample_idx, ]
+  
+  # Find nearest
+  nearest_idx <- st_nearest_feature(sample_points, census_polygons)
+  
+  # Create results
+  results <- data.table(
+    grid_id = sample_idx,
+    grid_x = st_coordinates(sample_points)[,1],
+    grid_y = st_coordinates(sample_points)[,2],
+    geoid = census_polygons$GEOID[nearest_idx],
+    year = census_polygons$year[nearest_idx]
+  )
+  
+  return(results)
+}
+
+sample_check(
+  grid_centroids, 
+  census_acs_geo_mainland
+)
+
+# Optimized function with more fields and progress tracking
+process_nearest_in_chunks <- 
+  function(grid_points, 
+           census_polygons, 
+           chunk_size, 
+           output_file,
+           resume_from) {
+    
+  # Total number of points to process
+  total_points <- nrow(grid_points)
+  total_chunks <- ceiling((total_points - resume_from + 1) / chunk_size)
+  
+  # Create empty list for batch results
+  result_batches <- list()
+  current_batch <- 1
+  
+  # Track timing for progress estimates
+  start_time <- Sys.time()
+  last_time <- start_time
+  
+  # Process each chunk
+  for (chunk in 1:total_chunks) {
+    # Calculate chunk indices
+    start_idx <- resume_from + (chunk - 1) * chunk_size
+    end_idx <- min(resume_from + chunk * chunk_size - 1, total_points)
+    
+    # Extract current points chunk
+    points_chunk <- grid_points[start_idx:end_idx, ]
+    
+    # Find nearest feature for this chunk
+    nearest_idx <- st_nearest_feature(points_chunk, census_polygons)
+    
+    # Get coordinates
+    coords <- st_coordinates(points_chunk)
+    
+    # Create results
+    results <- data.table(
+      grid_id = start_idx:end_idx,
+      Longi = coords[,1],  # Add X coordinate
+      grid_y = coords[,2],  # Add Y coordinate
+      GEIOD = census_polygons$GEOID[nearest_idx]
+     )
+    
+    # Store in result batch
+    result_batches[[length(result_batches) + 1]] <- results
+    
+    # Save to disk every 5 chunks or on the last chunk
+    if (chunk %% 5 == 0 || chunk == total_chunks) {
+      # Combine batches
+      batch_results <- rbindlist(result_batches)
+      
+      # Write part file, .fst
+      part_file <- paste0(output_file, "_part", current_batch, ".fst")
+      write_fst(batch_results, part_file)
+      cat("Saved batch to:", part_file, "\n")
+      
+      # Clear batch data and increment batch counter
+      result_batches <- list()
+      current_batch <- current_batch + 1
+      
+      # Force garbage collection
+      gc(full = TRUE)
+    }
+    
+    # Clean up to free memory
+    rm(points_chunk, nearest_idx, results, coords)
+    gc(full = TRUE)
+    
+    # Calculate and report progress with time estimates
+    current_time <- Sys.time()
+    elapsed <- as.numeric(difftime(current_time, start_time, units = "secs"))
+    chunk_time <- as.numeric(difftime(current_time, last_time, units = "secs"))
+    last_time <- current_time
+    
+    pct_complete <- 100 * chunk / total_chunks
+    est_remaining <- elapsed / pct_complete * (100 - pct_complete)
+    
+    cat(sprintf("Chunk %d/%d (%.1f%%) - This chunk: %.1f sec - Est. remaining: %.1f min\n", 
+                chunk, total_chunks, pct_complete,
+                chunk_time, est_remaining/60))
+  }
+  
+  # Reminder about combining files
+  cat("\nProcessing complete! To combine all part files, run:\n")
+  cat("part_files <- list.files(pattern = \"", basename(output_file), "_part.*\\.fst$\", full.names=TRUE)\n", sep="")
+  cat("all_results <- rbindlist(lapply(part_files, read_fst))\n")
+  cat("write_fst(all_results, \"", output_file, "\")\n", sep="")
+}
+
+
+# Process with very small chunks to manage memory
+process_nearest_in_chunks(
+  grid_centroids, 
+  census_acs_geo_mainland, 
+  chunk_size = 500,
+  output_file = "GEOID_US_Grid_01",
+  resume_from = 1)
+
+
+
+
+
+census_acs_geoid =
+  dplyr::select(census_acs_ej, GEOID, year)
+head(census_acs_geoid); summary(census_acs_geoid)
+census_acs_geoid = 
+  subset(census_acs_geoid, GEOID %in% census_acs_geo_mainland$GEOID)
+summary(unique(census_acs_geoid$GEOID) %in% census_acs_geo_mainland$GEOID)
+
+census_acs_geoid_unique = 
+  data.table(table(census_acs_geoid$GEOID, census_acs_geoid$geometry))
+nrow(census_acs_geoid_unique)
+
+
+
+
+
+
+
+
+
+
+#### Census-2: Race, Gender, etc. commute, match via raster extract only #### 
+
+
+# Initialize a list to store all results for 2011-2020
+geoid_rast_list <- list()
+geoid_extract_year_list <-  list()
+
+for (geoid_year in 2011:2020){ # geoid_year = 2017, 2011:2020
+  print(paste("Processing year:", geoid_year))
+  
+  ###### Prepare basic data ###### 
+  
+  # Prepare census commute data for each year, and get GEOID that are within mainland US
+  geoid_geo_year = 
+    merge(subset(census_acs_ej, year == geoid_year), 
+          census_acs_geo_mainland, 
+          by = "GEOID")
+  print(paste("Rows after matching census_acs_geo_mainland in geoid_geo_year:", 
+              nrow(geoid_geo_year)))
+  
+  # Set as sf and remove empty geometries, if any
+  geoid_year_sf = 
+    st_as_sf(geoid_geo_year) %>%
+    filter(!st_is_empty(geometry))
+  # head(geoid_geo_year); summary(geoid_geo_year); dim(geoid_geo_year)
+  print(paste("Rows after removing empty geometry in geoid_year_sf, if any:", 
+              nrow(geoid_year_sf)))
+  # ggplot(geoid_year_sf) +
+  #   geom_sf(aes(fill = car_truck_van), color = NA) +
+  #   scale_fill_viridis_c(
+  #     option = "plasma", 
+  #     name = "Car/Truck/Van\nCommute %",
+  #     labels = scales::percent_format()
+  #   )
+  
+  # Extract census variables
+  geoid_variables = 
+    setdiff(names(geoid_year_sf), 
+            c("GEOID", "year", "geometry"))
+  print("EJ variables:"); geoid_variables
+  
+  #### Use rasterize using area-weighted mean
+  # Convert sf to vect for terra compatibility
+  geoid_year_vect <- vect(geoid_year_sf)
+  # print("Check the vect file for a single year:")
+  # head(geoid_year_vect); class(geoid_year_vect); dim(geoid_year_vect)
+  
+  # Get the empty raster, need SpatRaster format here
+  raster_census <- rast(us_grid_raster)
+  
+  # Rasterize each variable using area-weighted mean
+  geoid_year_var_rast <- 
+    rast(lapply(geoid_variables, function(var) {
+      rasterize(geoid_year_vect, raster_census, 
+                field = var, fun = "mean")
+    }))
+  
+  # Copy variable names
+  names(geoid_year_var_rast) <- geoid_variables
+  print("Summary the geoid_year_var_rast:")
+  summary(geoid_year_var_rast); geoid_year_var_rast
+  # plot(geoid_year_var_rast$car_truck_van)
+  
+  geoid_year_var_rast_all = rast(geoid_year_var_rast)
+  
+  # Store annual results in list
+  geoid_rast_list[[as.character(geoid_year)]] =
+    geoid_year_var_rast
+  
+  ###### Match GEOID in census with geometry in US_grids: Raster Extract ###### 
+  
+  for (geoid_var in geoid_variables){ 
+    print(paste("Processing variable:", geoid_var))
+    
+    # Convert to SpatRaster and create new raster from template
+    srast_census <- rast(us_grid_raster)
+    print(paste("Class of srast_census:", class(srast_census)))
+    
+    # Extract values with exact=TRUE to get area fractions
+    geoid_values_var <- 
+      terra::extract(srast_census, geoid_year_sf, 
+                     exact=TRUE, cells=TRUE, small=TRUE)  # Include small overlaps
+    
+    print(paste("Number of unique cells:", length(unique(geoid_values_var$cell))))
+    
+    # Calculate weighted values using the commute variable
+    geoid_values_var$weighted_value <- 
+      geoid_year_sf[[geoid_var]][geoid_values_var$ID] * 
+      geoid_values_var$fraction
+    
+    # Aggregate by cell to get weighted mean for each grid cell
+    agg_values <- aggregate(
+      geoid_values_var[!is.na(geoid_values_var$weighted_value), 
+                                c("weighted_value", "fraction")], 
+      by=list(cell=geoid_values_var$cell[!is.na(geoid_values_var$weighted_value)]), 
+      FUN=sum)
+    
+    # Calculate final weighted mean with threshold for small fractions
+    agg_values$final_value <- ifelse(agg_values$fraction > 0.001,
+                                     agg_values$weighted_value / agg_values$fraction,
+                                     NA)
+    
+    # Initialize raster with NA and assign values
+    values(srast_census)[agg_values$cell] <- agg_values$final_value
+    # plot(srast_census, main=paste("Census Variable:", geoid_var))
+    
+    # Store in list
+    geoid_extract_year_list[[geoid_var]] <- srast_census
+  }
+  
+  # Assign year and combine
+  geoid_extract_year_list$year = geoid_year
+  census_extract_year_raster_all = rast(geoid_extract_year_list)
+  
+  ###### Get centroids and save fst files & Save raster files - Extract process ######
+  
+  census_extract_year_raster_df <- 
+    data.frame(
+      cell = 1:ncell(census_extract_year_raster_all),
+      xyFromCell(census_extract_year_raster_all, 1:ncell(census_extract_year_raster_all)),
+      values(census_extract_year_raster_all)
+    )
+  names(census_extract_year_raster_df)[2:3]
+  names(census_extract_year_raster_df)[2:3] = c("Longitude", "Latitude")
+  
+  # round to 2 digits
+  census_extract_year_raster_df$Longitude = round(census_extract_year_raster_df$Longitude, 2)
+  census_extract_year_raster_df$Latitude = round(census_extract_year_raster_df$Latitude, 2)
+  
+  print("Check the output fst file using Extract:")
+  head(census_extract_year_raster_df); summary(census_extract_year_raster_df); dim(census_extract_year_raster_df)
+  
+  write_fst(
+    census_extract_year_raster_df,
+    file.path(census_out_path, 
+              paste0("Census_EJ_geoid_Extract_", geoid_year, ".fst")))
+  
+  writeRaster(
+    census_extract_year_raster_all,
+    file.path(census_out_path, 
+              paste0("Census_EJ_geoid_Extract_", geoid_year, ".tif")),
+    overwrite = TRUE,
+    gdal = "COMPRESS=LZW"  # To minimize file size
+  )
+}
+
 
 ####  HMS SMOKE ####
 setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/HMS_SMOKE/")
