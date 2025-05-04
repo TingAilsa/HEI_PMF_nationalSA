@@ -29,11 +29,11 @@ csn_daily_bef = fread("CSN_Component_with_missing_Before_2015_2023.02.csv")
 csn_daily_aft = fread("CSN_Component_with_missing_After_2015_2023.02.csv")
 # csn_daily$Accept.PM2.5 = NULL # after 2015
 
-csn_daily_bef$X = NULL
+csn_daily_bef$V1 = NULL
 csn_daily_bef$Date = as.Date(csn_daily_bef$Date)
 sapply(csn_daily_bef, class)
 
-csn_daily_aft$X = NULL
+csn_daily_aft$V1 = NULL
 csn_daily_aft$Date = as.Date(csn_daily_aft$Date)
 sapply(csn_daily_aft, class)
 
@@ -90,8 +90,8 @@ daily_common_cols <- intersect(names(csn_daily_bef_noAllNA),
                                names(csn_daily_aft_noAllNA))
 
 # Subset data frames using common rownames and column names
-daily_commonRowCol_bef <- csn_daily_bef_noAllNA[, daily_common_cols]
-daily_commonRowCol_aft <- csn_daily_aft_noAllNA[, daily_common_cols]
+daily_commonRowCol_bef <- csn_daily_bef_noAllNA[, ..daily_common_cols]
+daily_commonRowCol_aft <- csn_daily_aft_noAllNA[, ..daily_common_cols]
 
 # change variable column to rownames
 daily_commonRowCol_bef$Variables = row.names(daily_commonRowCol_bef)
@@ -102,7 +102,8 @@ csn_daily_comb = rbind(daily_commonRowCol_bef, daily_commonRowCol_aft)
 
 # estimate the overall NA rate
 sum(is.na(csn_daily_comb)) *100 /
-  (ncol(csn_daily_comb) * nrow(csn_daily_comb))
+  ((ncol(csn_daily_comb)-4) * nrow(csn_daily_comb))
+# 2.841667%
 
 # NA rate of each row
 csn_daily_comb$NA.rate = 
@@ -1245,6 +1246,9 @@ dim(imp_miss) #383448, 44
 
 View(subset(imp_miss_noAllNA, SiteCode == "ATLA1"))
 
+na_count <- sum(is.na(imp_miss_noAllNA))
+na_count
+na_count / (col.component * nrow(imp_miss_noAllNA)) * 100 # 1.814266
 
 # reorder columns 
 imp_miss_noAllNA = species_col_reorder(imp_miss_noAllNA)
