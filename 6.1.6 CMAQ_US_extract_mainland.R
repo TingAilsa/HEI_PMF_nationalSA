@@ -13,9 +13,6 @@ base_dir = getwd()
 
 #### 1. Basic info ####
 
-# cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
-cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
-
 # All date related predictors 
 date_use = 
   read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Date_DOW_Holiday_2011-20.fst")
@@ -27,9 +24,17 @@ us_point_coord =
 source_all_names = 
   c("Traffic", "Dust", "Sulfate", "Biomass") # 
 
+# cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
+# cmaq_period = "2012-01_2012-12"; cmaq_year = 2012
+# cmaq_period = "2013-01_2013-12"; cmaq_year = 2013
+cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
+# cmaq_period = "2015-01_2015-12"; cmaq_year = 2015
+# cmaq_period = "2016-01_2016-12"; cmaq_year = 2016
+# cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
+
 #### 2. Extract data and match new date info ####
 
-for(source_name in source_all_names){ # source_name = "Sulfate"
+for(source_name in source_all_names){ # source_name = "Biomass"; source_name = "Traffic"
   
   # Read CMAQ data 
   model_input_all_grid = 
@@ -40,9 +45,25 @@ for(source_name in source_all_names){ # source_name = "Sulfate"
   model_input_ini = 
     read_fst(
       paste0(source_name, "_only_PMF_points_input_", cmaq_period, ".fst"))
+  head(model_input_ini)
+  
+  # Check if there are duplicates
+  model_input_all_grid_dup = 
+    dplyr::select(model_input_all_grid, 
+                  Date, Longitude, Latitude, SiteCode, Concentration)
+  model_input_all_grid_dup$dup = duplicated(model_input_all_grid_dup)
+  summary(model_input_all_grid_dup$dup)
+  
+  model_input_ini_dup = 
+    dplyr::select(model_input_ini, 
+                  Date, Longitude, Latitude, SiteCode, Concentration)
+  model_input_ini_dup$dup = duplicated(model_input_ini_dup)
+  summary(model_input_ini_dup$dup)
+  
+  subset(model_input_ini_dup, Longitude == -102.15 & Latitude == 36.85)
+  subset(model_input_all_grid_dup, Longitude == -102.15 & Latitude == 36.85)
   
   ###### Within mainland US CMAQ variable Extraction ######
-  head(model_input_all_grid)
   
   # Filter points within mainland US
   model_cmaq_allVar_all_grid_us <- 
@@ -138,12 +159,12 @@ for(source_name in source_all_names){ # source_name = "Sulfate"
     # Input should be factor or numeric in missForest
     model_input_all_commute_NA = 
       model_input_all_commute_NA %>%
-      group_by(Longitude, Latitude) %>%
-      summarise(
+      dplyr::group_by(Longitude, Latitude) %>%
+      dplyr::summarise(
         land_type = first(land_type),
-        across(where(is.numeric), mean, na.rm = TRUE)
-      ) %>%
-      ungroup()
+        dplyr::across(where(is.numeric), mean, na.rm = TRUE),
+        .group = "drop"
+      )
     print("Check if all inputs are factor or numeric")
     sapply(model_input_all_commute_NA, class)
     
@@ -183,10 +204,11 @@ for(source_name in source_all_names){ # source_name = "Sulfate"
     
     model_allVar_grid_us_date_imputed <- 
       model_allVar_grid_us_date %>%
-      left_join(model_input_commute_mice, 
+      dplyr::left_join(model_input_commute_mice, 
                 by = c("Longitude", "Latitude"), 
                 suffix = c("", "_imputed")) %>%
-      mutate(across(all_of(common_cols), 
+      dplyr::mutate(
+        dplyr::across(all_of(common_cols), 
                     ~ ifelse(is.na(.x), 
                              get(paste0(cur_column(), "_imputed")), 
                              .x))) %>%
@@ -213,6 +235,70 @@ for(source_name in source_all_names){ # source_name = "Sulfate"
             paste0(source_name, "_ML_input_mainlandUS_", day_count, "_days_", cmaq_period, ".fst"))
   write_fst(model_input_ini, 
             paste0(source_name, "_ML_input_only_PMF_sites_", day_count, "_days_", cmaq_period, ".fst"))
+}
+
+
+#### Extract files for CMAQ & PMF comparison, Sumaiya ####
+
+source_all_names = 
+  c("Traffic", "Dust", "Sulfate", "Biomass") # 
+
+cmaq_period_all = 
+  c("2014-01_2014-12") # , "2014-01_2014-12"
+
+
+for(cmaq_period in cmaq_period_all){ # cmaq_period = "2012-01_2012-12"
+  
+  # Define the name pattern
+  all_grid_pattern <- 
+    paste0("_ML_input_only_PMF_sites_.*_days_", cmaq_period, "\\.fst$")
+  all_grid_path <- 
+    list.files(path = ".", pattern = all_grid_pattern, full.names = TRUE)
+  print(paste("CMAQ_period", cmaq_period))
+  print("All files under this period")
+  all_grid_path
+  
+  # Read files of all grids by source
+  Biomass_all_grid = read_fst(all_grid_path[1])
+  Dust_all_grid =  read_fst(all_grid_path[2])
+  Sulfate_all_grid = read_fst(all_grid_path[3])
+  Traffic_all_grid = read_fst(all_grid_path[4])
+  
+  # Select CMAQ & PMF variables
+  head(Biomass_all_grid)
+  Biomass_all_grid_cmaq = 
+    dplyr::select(Biomass_all_grid, 
+                  Date, Longitude, Latitude, CMAQ_conc, PM25_TOT_BIOG, PMF_conc)
+  
+  head(Dust_all_grid)
+  Dust_all_grid_cmaq = 
+    dplyr::select(Dust_all_grid, 
+                  Date, Longitude, Latitude, CMAQ_conc, PMF_conc)
+
+  head(Sulfate_all_grid)
+  Sulfate_all_grid_cmaq = 
+    dplyr::select(Sulfate_all_grid, 
+                  Date, Longitude, Latitude, CMAQ_conc, PM25_TOT_OTA, NH3, SO2, O3, PMF_conc)
+
+  head(Traffic_all_grid)
+  Traffic_all_grid_cmaq = 
+    dplyr::select(Traffic_all_grid, 
+                  Date, Longitude, Latitude, CMAQ_conc, PMF_conc)
+  
+  # Write file
+  write_fst(Biomass_all_grid,
+            file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual",
+                      paste0("Biomass_CMAQ_PMF_", cmaq_period, ".fst")))
+  write_fst(Dust_all_grid,
+            file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual",
+                      paste0("Dust_CMAQ_PMF_", cmaq_period, ".fst")))
+  write_fst(Sulfate_all_grid,
+            file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual",
+                      paste0("Sulfate_CMAQ_PMF_", cmaq_period, ".fst")))
+  write_fst(Traffic_all_grid,
+            file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual",
+                      paste0("Traffic_CMAQ_PMF_", cmaq_period, ".fst")))
+  
 }
 
 
