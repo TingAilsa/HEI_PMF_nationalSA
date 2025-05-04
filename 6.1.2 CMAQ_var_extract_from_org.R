@@ -73,6 +73,13 @@ get_nc_grid_create_crs <- function(nc_file) {
   return(list(lon = lon, lat = lat, p4s = p4s))
 }
 
+# nc_file = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_SA_v54_gcc_CMAQ_ISAM_201102.nc"
+nc_file = nc_cmaq_month_path
+grid_info <- get_nc_grid_create_crs(nc_file)
+lon = grid_info$lon; lat = grid_info$lat; p4s = grid_info$p4s
+# cmaq_var = "PM25_TOT_NRD"
+cmaq_var = "NO2"
+
 ###### Daily, extract selected variable from .nc file, add crs and date and return the corresponding raster brick ###### 
 daily_cmaq_var_add_date <- 
   function(nc_file, us_grid_raster, cmaq_var, lon, lat, p4s) {
@@ -152,7 +159,7 @@ us_grid_raster_001 =
   raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_001.tif"))
 
 # Choose the US grid resolution to project
-us_grid_raster = us_grid_raster_01
+us_grid_raster = us_grid_raster_001
 
 included_years = c(2011, 2017)
 
@@ -183,43 +190,26 @@ for (study_year in included_years){ # study_year = 2017
     month_nc_files <- list.files(month_folder, pattern = "\\.nc$", full.names = TRUE)
     month_nc_files <- month_nc_files[str_detect(basename(month_nc_files),  "^hr2day_v54_")]
     
-    # # Find the file that starts with "hr2day_SA_v54_" and "hr2day_v54_"
-    # source_nc <- 
-    #   month_nc_files[str_detect(basename(month_nc_files), 
-    #                             "^hr2day_SA_v54_")]
-    # 
-    # airpollunc <- 
-    #   month_nc_files[str_detect(basename(month_nc_files), 
-    #                             "^hr2day_v54_")]
-    
     for (nc_cmaq_month_path in month_nc_files) { # nc_cmaq_month_path = month_nc_files[1]
       print("Path of the .nc to be processed:")
       nc_cmaq_month_path
       
       # Get variable info
-      # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/CCTM_WETDEP1_v54_ISAM_gcc_12US1_2011_Apr_20110421.nc"
+      # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_v54_gcc_CMAQ_ISAM_201701.nc"
+      # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_v54_gcc_CMAQ_ISAM_201102.nc"
+      # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/COMBINE_ACONC_v54_gcc_CMAQ_ISAM_2017_Jan_201701.nc"
       nc_cmaq_month = nc_open(nc_cmaq_month_path)
       cmaq_var_names <- names(nc_cmaq_month$var) 
       
       print("All available CMAQ-ISAM variables:")
       print(cmaq_var_names)
       
-      # # Check if the current file is source_nc or airpollunc and assign the cmaq_var_use_list accordingly
-      # if (grepl("hr2day_SA_v54_", nc_cmaq_month_path)) {
-      #   cmaq_var_use_list = cmaq_var_names[c(2:4, 9:10)] # PM source variables # 2, 4, 5, 11
-      #   
-      # } else if (grepl("hr2day_v54_", nc_cmaq_month_path)) {
-      #   # cmaq_var_use_list = cmaq_var_names[c(2:5, 9:10, 33:36)] # air pollutant variables 
-      #   cmaq_var_use_list = c("PM25_TOT_EGU", "PM25_TOT_ONR", "PM25_TOT_NRD", 
-      #                         "PM25_TOT_ASEA", "PM25_TOT_DUST", 
-      #                         "O3", "NH3", "SO2", "NO2")
-      # }
-      
       # Get the variable list
       cmaq_var_use_list_full = c("PM25_TOT_EGU", "PM25_TOT_OTA",
                                  "PM25_TOT_ONR", "PM25_TOT_NRD",  "PM25_TOT_ACM",
                                  "PM25_TOT_ASEA", "PM25_TOT_DUST", "PM25_TOT_ARS",
                                  "PM25_TOT_BIOG", "PM25_TOT_AFI",
+                                 "PM25_TOT_BCO", "PM25_TOT_ICO", "PM25_TOT_LTNG",
                                  "O3", "NH3", "SO2", "NO2")
       # cmaq_var_use_list_full = c("PM25_TOT_OTA", 
       #                            "PM25_TOT_ACM",
