@@ -217,6 +217,21 @@ color_source = c(
 )
 
 
+color_source_noF = c(
+  "Traffic" = "#C71000FF",         # red 
+  "Traffic-Diesel" = "#FF95A8FF",         # red 
+  "Traffic-Gasoline" = "#FF410DFF",         # red 
+  "Traffic-ResOil" = "#FB6467FF",         # red 
+  "Secondary Nitrate" = "#0073C2FF", # blue
+  "Secondary Sulfate" = "#16A085FF", # green 16A085FF 00A087FF
+  "Non-tailpipe" = "#F7C530FF",     # yellow FAFD7CFF F7C530FF
+  "Industry" = "#E89242FF",         # orange
+  "Salt" = "#00B5E2FF",             # cyan 6EE2FFFF  84D7E1FF  00B5E2FF
+  "Biomass" = "#8A4198FF",          # purple #8A4198FF violetred
+  "Soil/Dust" = "grey40",         # Gray, brown
+  "OP-rich" = "#5A9599FF"         # , brown
+)
+
 #### arrange the position of multiple plots ####
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   library(grid)
@@ -285,6 +300,13 @@ col_comp = function(df, start.comp, end.comp) {
 #### Get the percentile summary for each column  ####
 quantile_col <- function(col_range, dataset) {
   quantile( x = unlist( dataset[,  col_range] ), 
+            c(0.05, .1, 0.25, .5, .75, .8, 0.95),
+            na.rm = T )
+}
+
+# for data.table
+quantile_col_dt <- function(col_range, dataset) {
+  quantile( x = unlist( dataset[,  ..col_range] ), 
             c(0.05, .1, 0.25, .5, .75, .8, 0.95),
             na.rm = T )
 }
@@ -1235,6 +1257,43 @@ source_time_periods <- function(df, time_col) {
 ############ 4. DATA MANAGEMENT ############ 
 ##########################################################################################
 
+#### Calculate geometric mean #### 
+geometric_mean <- function(x) {
+  exp(mean(log(x[x > 0]), na.rm = TRUE))
+}
+
+#### Replace NAs with geometric mean of surrounding values in data.table #### 
+replace_NA_with_geo_mean <- function(dt, column_name, n) {
+  # Create a copy of the column to work with
+  values <- dt[[column_name]]
+  
+  # Find NA positions
+  na_positions <- which(is.na(values))
+  
+  # Replace each NA value
+  for (pos in na_positions) {
+    # Get indices for values above
+    above_indices <- (pos - n):(pos - 1)
+    above_indices <- above_indices[above_indices > 0 & above_indices <= length(values)]
+    above_values <- values[above_indices]
+    
+    # Get indices for values below
+    below_indices <- (pos + 1):(pos + n)
+    below_indices <- below_indices[below_indices > 0 & below_indices <= length(values)]
+    below_values <- values[below_indices]
+    
+    # Combine values and calculate geometric mean
+    surrounding_values <- c(above_values, below_values)
+    surrounding_values <- surrounding_values[!is.na(surrounding_values)]
+    
+    if (length(surrounding_values) > 0) {
+      dt[pos, (column_name) := geometric_mean(surrounding_values)]
+    }
+  }
+  
+  return(dt)
+}
+
 #### rmse  ####
 
 rmse <- function(actual, predicted) {
@@ -1655,3 +1714,51 @@ hourly_daily_cmaq_var_add_date <-
     return(pollu_var_daily_brick)
   }
 
+#### Function to read csv files and extract serial.No & Factor.No from basename ####
+
+# Function to read CSV and extract information from filename
+read_and_extract_info <- function(file_path) {
+  # Extract the filename from the path
+  data <- fread(file_path)
+  data$V1 = NULL
+  filename <- basename(file_path)
+  
+  # Extract serial number (after S_) and factor number (after F_)
+  serial_no <- sub(".*S_(\\d+)_F_.*", "\\1", filename)
+  factor_no <- sub(".*F_(\\d+)_species.*", "\\1", filename)
+  
+  # Add these as columns to the data
+  data$serial.No <- serial_no
+  data$Factor.No <- factor_no
+  
+  return(data)
+}
+
+#### Function to read all csv files with different colnames in a list and combine, need to use together with read_and_extract_info function  ####
+
+# Process all files and merge them with the pre-prepared data.table (with colnames)
+# the applied species are different between-site
+process_and_merge <- function(file_list, col_names) {
+  # Create a list to store all data frames
+  all_data <- list()
+  
+  # Read all files and store in list
+  for (i in seq_along(file_list)) {
+    all_data[[i]] <- read_and_extract_info(file_list[i])
+  }
+  
+  # Ensure all data frames have all columns, filling with NA where needed
+  for (i in seq_along(all_data)) {
+    missing_cols <- setdiff(col_names, names(all_data[[i]]))
+    if (length(missing_cols) > 0) {
+      for (col in missing_cols) {
+        all_data[[i]][[col]] <- NA
+      }
+    }
+  }
+  
+  # Combine all data frames
+  combined_data <- rbindlist(all_data, fill = TRUE, use.names = TRUE)
+  
+  return(combined_data)
+}
