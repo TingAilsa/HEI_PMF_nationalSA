@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --partition=normal
-#SBATCH --job-name=Sul_pred
+#SBATCH --job-name=Sul_CVpred
 
 #SBATCH --nodes=1  # number of nodes
 #SBATCH --tasks-per-node=1  # tasks per node # up to 128;
@@ -16,7 +16,7 @@
 
 #SBATCH --time=05-00:00 
 
-#SBATCH --array=1-117 # Change based on the day count in file
+#SBATCH --array=1-125 # Change based on the day count in file
 
 
 #load modules
@@ -26,19 +26,19 @@ module load netcdf-c netcdf-fortran
 # Source and period to process (set these when submitting the job)
 SOURCE_TEST="Sulfate" # "Sulfate", "Traffic", "Dust", "Biomass", "Industry", "Nitrate"
 CMAQ_PERIOD="2017-01_2017-12" # 1-10， 2011-2020, "2017-01_2017-12"
-No_of_days="117" 
+# No_of_days="117" 
 
-# cmaq_period = c("2011-01_2011-12", 117,
-#                 "2012-01_2012-12", 117,
-#                 "2013-01_2013-12", 117, 
-#                 "2014-01_2014-12", 117,
-#                 "2015-01_2015-12", 117, 
-#                 "2016-01_2016-12", 117,
-#                 "2017-01_2017-12", 117,
-#                 "2018-01_2018-12", 117, 
-#                 "2019-01_2019-12", 117,
-#                 "2020-01_2020-12", 117)
+# cmaq_period = c("2011-01_2011-12", 
+#                 "2012-01_2012-12", 
+#                 "2013-01_2013-12",  
+#                 "2014-01_2014-12", 
+#                 "2015-01_2015-12",  
+#                 "2016-01_2016-12", 
+#                 "2017-01_2017-12", 
+#                 "2018-01_2018-12",  
+#                 "2019-01_2019-12", 
+#                 "2020-01_2020-12")
 
 # Run R script for this date
-Rscript predict_single_day.R "${SLURM_ARRAY_TASK_ID}" "$SOURCE_TEST" "$CMAQ_PERIOD" "$No_of_days"
+Rscript ML_predictions_daily.R "${SLURM_ARRAY_TASK_ID}" "$SOURCE_TEST" "$CMAQ_PERIOD" #"$No_of_days"
 
