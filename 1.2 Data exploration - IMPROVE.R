@@ -251,8 +251,9 @@ for(site_imp in unique(imp_plot$SiteCode)) {
 ####### 2. Applied Method ####### 
 ##########################################################################################
 #### read data ####
-imp_data = fread("IMPROVE component only 10092022.csv")
+imp_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/IMPROVE component only 10092022.csv")
 imp_data$V1 = NULL
+head(imp_data)
 imp_data$Date = as.Date(imp_data$Date)
 
 method_comp = read.csv("IMPROVE reogranized method.csv")
