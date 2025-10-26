@@ -1294,6 +1294,24 @@ replace_NA_with_geo_mean <- function(dt, column_name, n) {
   return(dt)
 }
 
+#### Replace NAs with overall geometric mean of the whole data.table #### 
+replace_NA_comprehensive <- function(dt, column_name, n = 2) {
+  dt_copy <- copy(dt)
+  
+  # First pass: local geometric mean
+  dt_copy <- replace_NA_with_geo_mean(dt_copy, column_name, n)
+  
+  # Second pass: use overall geometric mean for remaining NAs
+  remaining_nas <- sum(is.na(dt_copy[[column_name]]))
+  if (remaining_nas > 0) {
+    overall_geo_mean <- geometric_mean(dt_copy[[column_name]])
+    dt_copy[is.na(get(column_name)), (column_name) := overall_geo_mean]
+    cat("Replaced", remaining_nas, "remaining NAs with overall geometric mean:", overall_geo_mean, "\n")
+  }
+  
+  return(dt_copy)
+}
+
 #### rmse  ####
 
 rmse <- function(actual, predicted) {
@@ -1407,6 +1425,28 @@ get_slope_ts <- function(df, x, y) {
   model_ts <- theilsen(formula, data = df)
   slope_ts <- coef(model_ts)[x]
   return(slope_ts)
+}
+
+# Fixed version with error handling and NA removal
+get_slope_ts <- function(df, x, y) {
+  # Remove rows where either x or y is NA
+  clean_df <- df[complete.cases(df[[x]], df[[y]]), ]
+  
+  # Check if we have enough data points (need at least 2 for a slope)
+  if (nrow(clean_df) < 2) {
+    return(NA)
+  }
+  
+  # Try to fit the model with error handling
+  tryCatch({
+    formula <- as.formula(paste(y, "~", x))
+    model_ts <- theilsen(formula, data = clean_df)
+    slope_ts <- coef(model_ts)[x]
+    return(slope_ts)
+  }, error = function(e) {
+    # Return NA if model fails
+    return(NA)
+  })
 }
 
 #### Reorder columns for datasets with PM2.5 and species  ####
@@ -1762,3 +1802,63 @@ process_and_merge <- function(file_list, col_names) {
   
   return(combined_data)
 }
+
+
+#### Function to calculate performance metrics #### 
+modeling_perform_metrics <- function(observed, predicted) {
+  # Correlation coefficient
+  r <- cor(observed, predicted)
+  
+  # Coefficient of determination (R squared)
+  SS_tot <- sum((observed - mean(observed))^2)
+  SS_res <- sum((observed - predicted)^2)
+  R2 <- 1 - (SS_res/SS_tot)
+  
+  # Error metrics
+  RMSE <- sqrt(mean((observed - predicted)^2))
+  MAE <- mean(abs(observed - predicted))
+  MB <- mean(predicted - observed)
+  NMB <- mean(predicted - observed) / mean(observed) * 100
+  
+  return(list(
+    r = r,
+    R2 = R2,
+    RMSE = RMSE,
+    MAE = MAE,
+    MB = MB,
+    NMB = NMB
+  ))
+}
+
+
+#### Function to change full spells for state names into abbreviations #### 
+# Create a mapping from full names to abbreviations
+state_mapping <- setNames(state.abb, state.name)
+
+# Add DC manually since it's not in the built-in vectors
+state_mapping["District of Columbia"] <- "DC"
+
+# Function to convert to abbreviations
+state_convert_to_abbrev <- 
+  function(x) {
+  # First check if it's already an abbreviation (2 characters and in state.abb)
+  if (nchar(x) == 2 && x %in% state.abb) {
+    return(x)
+  }
+  # Otherwise look up the full name
+  abbrev <- state_mapping[x]
+  # Return the abbreviation if found, otherwise return original
+  ifelse(is.na(abbrev), x, abbrev)
+}
+
+
+#### Function to extract source name from filename for source-specific train test files####
+extract_source_name <- function(filepath, file_usage, time_year) {
+  filename <- basename(filepath)
+  file_pattern = paste0("(?<=", file_usage, "_)[^_]+(?=_", time_year, "\\.fst)")
+  # Extract everything between "train_test_" and "_2011-2020.fst"
+  source_name <- str_extract(filename, "(?<=train_test_)[^_]+(?=_2011-2020\\.fst)")
+  return(source_name)
+}
+
+
