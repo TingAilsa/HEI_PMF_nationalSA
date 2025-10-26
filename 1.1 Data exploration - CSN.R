@@ -6,9 +6,9 @@
 # getwd()
 # data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original CSN"
 
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN")
+setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN")
 getwd()
-data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN"
+data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN"
 
 ##packages in need
 library(tidyr) 
@@ -27,18 +27,18 @@ library(data.table)
 #############################################################################################################
 
 #### read and save original datasets ####
-csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/CSN sites.txt",
+csn_meta_sites = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/CSN sites.txt",
                           sep = ",", dec = ".")
-csn_meta_flags = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/CSN flags.txt",
+csn_meta_flags = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/CSN flags.txt",
                           sep = ",", dec = ".")
-csn_meta_para = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/CSN parameter.txt",
+csn_meta_para = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/CSN parameter.txt",
                          sep = ",", dec = ".")
 
 write.csv(csn_meta_sites, "CSN metadata 157 sample sites info 2010-20.csv")
 write.csv(csn_meta_flags, "CSN metadata 18 flags 2010-20.csv")
 write.csv(csn_meta_para, "CSN metadata 118 parameters 2010-20.csv")
 
-csn_data = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20220816_221221_OJ1LO CSN.txt", sep = ",", dec = ".")
+csn_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20220816_221221_OJ1LO CSN.txt", sep = ",", dec = ".")
 csn_data$Date = as.Date(csn_data$Date, format = "%m/%d/%Y")
 csn_data$year = year(csn_data$Date)
 csn_data$month = month(csn_data$Date)
@@ -191,8 +191,10 @@ write.csv(csn_data,"CSN data for analysis 10232022.csv")
 #############################################################################################################
 
 csn_data = fread("CSN data for analysis 10232022.csv") ## with extracted collection, analysis methods
+csn_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/CSN data for analysis 10232022.csv")
 csn_data$Date = as.Date(csn_data$Date)
 csn_data$X = csn_data$X.1 = csn_data$V1 = NULL
+dim(csn_data)
 
 #### combine csn qualifier with EPA codes, calculated appearance frequency separately ####
 Qualifier1_freq = as.data.frame(table(csn_data$Qualifier1))
@@ -212,7 +214,7 @@ Qualifier_freq = join(Qualifier_freq, Qualifier3_freq)
 colnames(Qualifier_freq)[1] = "Qualifier.Code"
 
 # EPA AQS Reference Table: https://aqs.epa.gov/aqsweb/documents/codetables/qualifiers.html
-EPA_qualifier = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/EPA qualifiers.csv")
+EPA_qualifier = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/EPA qualifiers.csv")
 head(EPA_qualifier)
 Qualifier_freq_EPA = join(Qualifier_freq, EPA_qualifier)
 head(Qualifier_freq_EPA)
