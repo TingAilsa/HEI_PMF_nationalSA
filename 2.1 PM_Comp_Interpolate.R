@@ -162,6 +162,13 @@ csn_daily = fread("CSN_Component_with_missing_Before_2015_2023.02.csv")
 csn_daily = fread("CSN_Component_with_missing_After_2015_2023.02.csv")
 # csn_daily$Accept.PM2.5 = NULL # after 2015
 
+# Count rows that contain at least one NA
+sum(!complete.cases(select(csn_daily, Ag:Zr))) # 23200 for before; 51244 for after
+nrow(csn_daily) # 69337 for before; 51244 for after
+(23200+69337)
+(51244+51244)
+(23200+69337)/(51244+51244) # 90.3%
+
 csn_daily$V1 = NULL
 csn_daily$Date = as.Date(csn_daily$Date)
 sapply(csn_daily, class)
@@ -392,6 +399,7 @@ for (i in 1:n.site){
   sgl_intp_rdNA_mice <- mice(site_single_rdm_NA[, cols.comp.use], 
                              maxit=0, m = 50,
                              remove.collinear = F)
+  # sgl_intp_rdNA_mice$method, to check the applied regression method, 2025.05
   # sgl_intp_rdNA_mice$loggedEvents
   # collinear exists in the dataset, mice will automatically remove NO3 & SO4 as a result
   # https://stefvanbuuren.name/fimd/sec-toomany.html
@@ -1243,6 +1251,8 @@ imp_miss_noAllNA = subset(imp_miss,
 n.site = length(unique(imp_miss_noAllNA$SiteCode))
 dim(imp_miss_noAllNA) # 171563, 44
 dim(imp_miss) #383448, 44
+
+# 383448/(383448+171563)
 
 View(subset(imp_miss_noAllNA, SiteCode == "ATLA1"))
 
