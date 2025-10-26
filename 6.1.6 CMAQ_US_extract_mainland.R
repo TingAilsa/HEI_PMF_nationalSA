@@ -22,12 +22,12 @@ us_point_coord =
 # head(date_use)
 
 source_all_names = 
-  c("Traffic", "Dust", "Sulfate", "Biomass") # 
+  c("Dust", "Sulfate", "Biomass", "Traffic", "Nitrate", "PM25") # "Traffic", 
 
 # cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
 # cmaq_period = "2012-01_2012-12"; cmaq_year = 2012
 # cmaq_period = "2013-01_2013-12"; cmaq_year = 2013
-cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
+# cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
 # cmaq_period = "2015-01_2015-12"; cmaq_year = 2015
 # cmaq_period = "2016-01_2016-12"; cmaq_year = 2016
 # cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
@@ -37,14 +37,24 @@ cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
 for(source_name in source_all_names){ # source_name = "Biomass"; source_name = "Traffic"
   
   # Read CMAQ data 
+  # model_input_all_grid = 
+  #   read_fst(
+  #     paste0(source_name, "_all_CMAQ_points_input_", cmaq_period, ".fst"))
+  # head(model_input_all_grid)
+  # 
+  # model_input_ini = 
+  #   read_fst(
+  #     paste0(source_name, "_only_PMF_points_input_", cmaq_period, ".fst"))
+  # head(model_input_ini)
+  
   model_input_all_grid = 
     read_fst(
-      paste0(source_name, "_all_CMAQ_points_input_", cmaq_period, ".fst"))
+      paste0(source_name, "_all_CMAQ_points_Daily_", cmaq_period, ".fst"))
   head(model_input_all_grid)
   
   model_input_ini = 
     read_fst(
-      paste0(source_name, "_only_PMF_points_input_", cmaq_period, ".fst"))
+      paste0(source_name, "_only_PMF_points_Daily_", cmaq_period, ".fst"))
   head(model_input_ini)
   
   # Check if there are duplicates
@@ -88,21 +98,33 @@ for(source_name in source_all_names){ # source_name = "Biomass"; source_name = "
   model_input_ini <-
     plyr::rename(model_input_ini,
                  c("Concentration" = "PMF_conc"))
-  model_input_ini <- 
-    model_input_ini %>%
-    rename_with(~ "CMAQ_conc", 
-                .cols = intersect(names(model_input_ini),
-                                  c("PM25_TOT_EGU", "PM25_TOT_NRD", 
-                                    "PM25_TOT_AFI", "PM25_TOT_ARS")))  
   model_allVar_grid_us_date <-
     plyr::rename(model_allVar_grid_us_date,
                  c("Concentration" = "PMF_conc"))
-  model_allVar_grid_us_date <- 
-    model_allVar_grid_us_date %>%
-    rename_with(~ "CMAQ_conc", 
-                .cols = intersect(names(model_allVar_grid_us_date),
-                                  c("PM25_TOT_EGU", "PM25_TOT_NRD", 
-                                    "PM25_TOT_AFI", "PM25_TOT_ARS")))  
+  
+  if(source_name == "Nitrate"){
+    model_input_ini <-
+      plyr::rename(model_input_ini,
+                   c("PM25_TOT_NRD" = "CMAQ_conc"))
+    model_allVar_grid_us_date <-
+      plyr::rename(model_allVar_grid_us_date,
+                   c("PM25_TOT_NRD" = "CMAQ_conc"))
+  } else{
+    model_input_ini <- 
+      model_input_ini %>%
+      rename_with(~ "CMAQ_conc", 
+                  .cols = intersect(names(model_input_ini),
+                                    c("PM25_TOT_EGU", "PM25_TOT_NRD", 
+                                      "PM25_TOT_AFI", "PM25_TOT_ARS")))  
+    
+    model_allVar_grid_us_date <- 
+      model_allVar_grid_us_date %>%
+      rename_with(~ "CMAQ_conc", 
+                  .cols = intersect(names(model_allVar_grid_us_date),
+                                    c("PM25_TOT_EGU", "PM25_TOT_NRD", 
+                                      "PM25_TOT_AFI", "PM25_TOT_ARS")))
+  }
+  
   # Get grid_ID
   model_input_ini$grid_ID = 
     paste0("grid_", model_input_ini$Longitude, "_", model_input_ini$Latitude)
@@ -241,7 +263,7 @@ for(source_name in source_all_names){ # source_name = "Biomass"; source_name = "
 #### Extract files for CMAQ & PMF comparison, Sumaiya ####
 
 source_all_names = 
-  c("Traffic", "Dust", "Sulfate", "Biomass") # 
+  c("Traffic", "Dust", "Sulfate", "Biomass", "Nitrate") # 
 
 cmaq_period_all = 
   c("2014-01_2014-12") # , "2014-01_2014-12"
