@@ -2304,7 +2304,7 @@ gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_
 # names(tmmx_year) 
 
 # Define the date range for each year
-study_years <- 2011 # 2011:2020   2011:2015
+study_years <- 2018 # 2011:2020   2011:2015
 
 # Use rast to read, not raster, so as to directly get date info 
 # Annual data, some variables may miss some days or grids, need to check every time!!!
@@ -2319,10 +2319,10 @@ rmax_year = rast(file.path(gridmet_stack_path, paste0("rmax_", study_years, "_st
 rmax_year # 2013, rmax 364
 
 rmin_year = rast(file.path(gridmet_stack_path, paste0("rmin_", study_years, "_stacked.tif")))
-rmin_year # 2012, rmin 365; 
+rmin_year # 2012, rmin 365; 2018, 364; 
 
 vs_year = rast(file.path(gridmet_stack_path, paste0("vs_", study_years, "_stacked.tif")))
-vs_year # 2012, vs 365; 
+vs_year # 2012, vs 365; 2018, 364
 
 th_year = rast(file.path(gridmet_stack_path, paste0("th_", study_years, "_stacked.tif")))
 th_year
@@ -2340,7 +2340,7 @@ meteo_var_list <- list()
 # study_years = 2016
 
 # Loop through each year and combine the selected variables
-for (met_year in study_years) { # met_year = 2017
+for (met_year in study_years) { # met_year = 2018
   print(paste("GRIDMET year to be used:", met_year))
   
   # Initialize an empty list to store rasters for this year
@@ -2439,7 +2439,7 @@ for (met_year in study_years) { # met_year = 2017
 gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
 gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
 
-met_year = 2011 # 2015
+met_year = 2018 # 2015
 
 # Year 2015, lack one day
 
@@ -2467,9 +2467,9 @@ dim(tmmx_year); dim(tmmn_year); dim(rmax_year); dim(rmin_year); dim(vs_year); di
 setDT(tmmx_year); setDT(tmmn_year); setDT(rmax_year); setDT(rmin_year); setDT(vs_year); setDT(th_year)
 
 # Determine the variables with full dates and lack dates
-year_full_record <- tmmn_year
-year_lack <- tmmx_year
-var_lack <- "tmmx"
+year_full_record <- tmmx_year
+year_lack <- rmin_year
+var_lack <- "rmin"
 # year_lack_2 <- vs_year
 # var_lack_2 <- "vs"
 
@@ -2496,23 +2496,23 @@ year_coords_lack_noNA <-
 #   replace_NA_with_geo_mean(year_coords_lack_noNA, var_lack_2, 2)
 head(year_coords_lack_noNA)
 
-# Assign back & save
-tmmx_year = year_coords_lack_noNA
-write_fst(rmax_year,
-          file.path(gridmet_stack_source_path, 
-                    paste0("Common_GRIDMET_", "tmmx", "_", met_year, "_stacked.fst")))
+#### Assign back & save
+# # If only one meteo variable lack data
+# tmmx_year = year_coords_lack_noNA
+# write_fst(rmax_year,
+#           file.path(gridmet_stack_source_path, 
+#                     paste0("Common_GRIDMET_", "tmmx", "_", met_year, "_stacked.fst")))
 
+# If 2 meteo var lack data
+rmin_year = dplyr::select(year_coords_lack_noNA, Date, Longitude, Latitude, rmin)
+write_fst(rmin_year,
+          file.path(gridmet_stack_source_path,
+                    paste0("Common_GRIDMET_", "rmin", "_", met_year, "_stacked.fst")))
 
-# For 2012, 2 meteo var lack data
-# rmin_year = dplyr::select(year_coords_lack_noNA, Date, Longitude, Latitude, rmin)
-# write_fst(rmin_year,
-#           file.path(gridmet_stack_source_path,
-#                     paste0("Common_GRIDMET_", "rmin", "_", met_year, "_stacked.fst")))
-# 
-# vs_year = dplyr::select(year_coords_lack_noNA, Date, Longitude, Latitude, vs)
-# write_fst(vs_year,
-#           file.path(gridmet_stack_source_path,
-#                     paste0("Common_GRIDMET_", "vs", "_", met_year, "_stacked.fst")))
+vs_year = dplyr::select(year_coords_lack_noNA, Date, Longitude, Latitude, vs)
+write_fst(vs_year,
+          file.path(gridmet_stack_source_path,
+                    paste0("Common_GRIDMET_", "vs", "_", met_year, "_stacked.fst")))
 
 
 # Release storage space
@@ -2534,12 +2534,22 @@ head(meteo_year_all); dim(meteo_year_all) # summary(meteo_year_all);
 sapply(meteo_year_all, class)
 
 # Change date to Date format
+rm(tmmx_year)
+rm(tmmn_year)
+rm(rmax_year)
+rm(rmin_year)
+rm(vs_year)
+rm(th_year)
+gc()
 meteo_year_all$Date = as.Date(meteo_year_all$Date)
 
 # Save the merged data for this year
 write_fst(meteo_year_all, 
           file.path(gridmet_stack_source_path, 
                     paste0("GRIDMET_commom_", met_year, "_in_US_grid_01.fst")))
+head(meteo_year_all)
+# rm(meteo_year_all)
+# gc()
 
 
 library(USAboundaries)
@@ -2597,7 +2607,7 @@ gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data
 gridmet_stack_source_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_source_stacked"
 
 # Define the date range for each year
-study_years <- 2011 # 2011:2020   2011:2015
+study_years <- 2014 # 2011:2020   2011:2015
 
 # Use rast to read, not raster, so as to directly get date info 
 # Annual data, some variables may miss some days or grids, need to check every time!!!
@@ -2776,10 +2786,10 @@ dim(biomass_full_date); dim(bi_year)
 
 #### 2014, fill fm1000 and bi
 # Determine the variables with full dates and lack dates
-# biomass_lack <- fm1000_year
-# var_lack <- "fm1000"
-biomass_lack <- bi_year
-var_lack <- "bi"
+biomass_lack <- fm1000_year
+var_lack <- "fm1000"
+# biomass_lack_2 <- bi_year
+# var_lack_2 <- "bi"
 
 # Get unique Date, Longitude, Latitude combination
 biomass_coords <- 
@@ -2788,6 +2798,8 @@ biomass_coords <-
 # Merge with the one lack full date
 biomass_coords_lack <-
   merge(biomass_coords, biomass_lack, all.x = TRUE)
+# biomass_coords_lack <-
+#   merge(biomass_coords_lack, biomass_lack_2, all.x = TRUE)
 head(biomass_coords_lack)
 summary(biomass_coords_lack)
 
@@ -2800,22 +2812,24 @@ summary(biomass_full_date$Date == biomass_coords_lack$Date &
 setDT(biomass_coords_lack)
 biomass_coords_lack_noNA <-
   replace_NA_with_geo_mean(biomass_coords_lack, var_lack, 2)
+# biomass_coords_lack_noNA <-
+#   replace_NA_with_geo_mean(biomass_coords_lack_noNA, var_lack_2, 2)
 
-summary(biomass_coords_lack_noNA$bi)
-
-# if the above one not working
-biomass_coords_lack_noNA <- 
-  replace_NA_with_expanding_geo_mean(biomass_coords_lack, "var_lack")
+# # If the surrounding value method not work, use the overall geometric mean
+# biomass_coords_lack_noNA <-
+#   replace_NA_comprehensive(biomass_coords_lack, var_lack, 2)
+# biomass_coords_lack_noNA <-
+#   replace_NA_comprehensive(biomass_coords_lack_noNA, var_lack_2, 2)
 
 head(biomass_coords_lack_noNA)
-summary(biomass_coords_lack_noNA$bi)
+summary(biomass_coords_lack_noNA)
 
 # Assign back & save
-# fm1000_year = biomass_coords_lack_noNA
-# write_fst(fm1000_year,
-#           file.path(gridmet_stack_source_path,
-#                     paste0("Biomass_GRIDMET_", "fm1000", "_", met_year, "_stacked.fst")))
-bi_year = biomass_coords_lack_noNA
+fm1000_year = dplyr::select(biomass_coords_lack_noNA, Date, Longitude, Latitude, fm1000)
+write_fst(fm1000_year,
+          file.path(gridmet_stack_source_path,
+                    paste0("Biomass_GRIDMET_", "fm1000", "_", met_year, "_stacked.fst")))
+bi_year = dplyr::select(biomass_coords_lack_noNA, Date, Longitude, Latitude, bi)
 write_fst(bi_year,
           file.path(gridmet_stack_source_path,
                     paste0("Biomass_GRIDMET_", "bi", "_", met_year, "_stacked.fst")))
@@ -2836,13 +2850,22 @@ meteo_year_biomass = fm100_year
 # meteo_year_biomass = merge(meteo_year_biomass, bi_year)
 meteo_year_biomass$fm1000 = fm1000_year$fm1000
 meteo_year_biomass$bi = bi_year$bi
+
+rm(fm100_year)
+rm(fm1000_year)
+rm(bi_year)
+gc()
+
 head(meteo_year_biomass); dim(meteo_year_biomass) # ; summary(meteo_year_biomass)
+meteo_year_biomass$Date = as.Date(meteo_year_biomass$Date)
 sapply(meteo_year_biomass, class)
 
 # Save the merged data for this year
 write_fst(meteo_year_biomass, 
           file.path(gridmet_stack_source_path, 
                     paste0("GRIDMET_Biomass_", met_year, "_in_US_grid_01.fst")))
+rm(meteo_year_biomass)
+gc()
 
 
 library(USAboundaries)
