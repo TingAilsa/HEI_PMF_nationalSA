@@ -123,7 +123,7 @@ us_bbox <- c(xmin = -125, xmax = -66, ymin = 24, ymax = 50)
 crs_proj <- "+proj=longlat +datum=WGS84 +no_defs"
 
 us_grid_raster_01 = raster(file.path("base_raster_grid_sf/us_grid_raster_01.tif"))
-us_grid_raster_001 = raster(file.path("base_raster_grid_sf/us_grid_raster_001.tif"))
+# us_grid_raster_001 = raster(file.path("base_raster_grid_sf/us_grid_raster_001.tif"))
 
 # us_grid_sf_01 = st_read(file.path("base_raster_grid_sf/us_grid_sf_01.fgb"))
 # us_grid_sf_001 = st_read(file.path("base_raster_grid_sf/us_grid_sf_001.fgb"))
@@ -135,107 +135,108 @@ us_grid_raster_001 = raster(file.path("base_raster_grid_sf/us_grid_raster_001.ti
 
 ###### Extract and manage source specific data from PMF ######
 
-# # read files
-# csn_imp_site_with_nearest =
-#   st_read( file.path("base_raster_grid_sf/PMF_sites_in_US_grid_01.fgb"))
-# 
+# read files
+csn_imp_site_with_nearest =
+  st_read( file.path("base_raster_grid_sf/PMF_sites_in_US_grid_01.fgb"))
+
 # pmf_source = fread("pmf_ncld_meteo_census/CSN_IMPROVE_source_daily_contribution.csv")
-# date_use = read.fst("pmf_ncld_meteo_census/Date_DOW_Holiday_2011-20.fst")
-# sapply(date_use, class)
-# 
-# # Merge date info with source info
-# pmf_source$Date = as.Date(pmf_source$Date)
-# pmf_source = base::merge(pmf_source, date_use, all.x = TRUE)
-# 
-# # Raster does not include date, convert date to integer and change back later
-# # pmf_source$Date <- as.integer(format(pmf_source$Date, "%Y%m%d"))
-# 
-# # change the characters to factor
-# pmf_source$day_of_week = as.factor(pmf_source$day_of_week)
-# pmf_source$is_holiday = as.factor(pmf_source$is_holiday)
-# sapply(pmf_source, class)
-# 
-# # change colnames
-# names(pmf_source)[3:4]
-# names(pmf_source)[3:4] = c("org_long", "org_lat")
-# 
-# csn_imp_site_with_nearest$org_long = csn_imp_site_with_nearest$org_lat = NULL
-# 
-# # Assign new long and lat from US grid
-# pmf_source_US = merge(pmf_source, csn_imp_site_with_nearest,
-#                       by = "SiteCode", all.x = TRUE)
-# unique(pmf_source_US$Source_aftermanual)
-# 
-# # Change different traffic/sea salt from CSN & IMPROVE to one traffic/sea salt
-# pmf_source_US <-
-#   pmf_source_US %>%
-#   mutate(Source_aftermanual =
-#            ifelse(grepl("Traffic", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
-#                   "F1-Traffic",
-#                   Source_aftermanual))
-# 
-# pmf_source_US <-
-#   pmf_source_US %>%
-#   mutate(Source_aftermanual =
-#            ifelse(grepl("Sea Salt", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
-#                   "F6-Salt",
-#                   Source_aftermanual))
-# 
-# pmf_source_US <-
-#   pmf_source_US %>%
-#   mutate(Source_aftermanual =
-#            ifelse(grepl("Non-tailpipe", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
-#                   "F7-Non-tailpipe",
-#                   Source_aftermanual))
-# 
-# pmf_source_US <-
-#   pmf_source_US %>%
-#   mutate(Source_aftermanual =
-#            ifelse(grepl("Industry", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
-#                   "F5-Industry",
-#                   Source_aftermanual))
-# 
-# pmf_source_US <-
-#   pmf_source_US %>%
-#   mutate(Source_aftermanual =
-#            ifelse(grepl("Biomass", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
-#                   "F8-Biomass",
-#                   Source_aftermanual))
-# 
-# unique(pmf_source_US$Source_aftermanual)
-# 
-# # change to factor for modeling
-# pmf_source_US$Source_aftermanual = as.factor(pmf_source_US$Source_aftermanual)
-# 
-# # Get the tOTAl contribution of new groups
-# pmf_source_US_sumContri <-
-#   pmf_source_US %>%
-#   group_by(SiteCode, Date, Source_aftermanual, Latitude, Longitude, 
-#            year, month, day_of_week, is_holiday, Dataset) %>%
-#   dplyr::summarise(Concentration = sum(Concentration),
-#                    .groups = "drop")
-# unique(pmf_source_US_sumContri$Source_aftermanual)
-# 
-# # PMF data for each sources
-# pmf_traffic = subset(pmf_source_US_sumContri, Source_aftermanual == "F1-Traffic")
-# pmf_nitrate = subset(pmf_source_US_sumContri, Source_aftermanual == "F2-Secondary Nitrate")
-# pmf_sulfate = subset(pmf_source_US_sumContri, Source_aftermanual == "F3-Secondary Sulfate")
-# pmf_industry = subset(pmf_source_US_sumContri, Source_aftermanual == "F5-Industry")
-# pmf_salt = subset(pmf_source_US_sumContri, Source_aftermanual == "F6-Salt")
-# pmf_biomass = subset(pmf_source_US_sumContri, Source_aftermanual == "F8-Biomass")
-# pmf_DUST = subset(pmf_source_US_sumContri, Source_aftermanual == "F9-Soil/DUST")
-# pmf_nontailpipe = subset(pmf_source_US_sumContri, Source_aftermanual == "F7-Non-tailpipe")
-# pmf_oprich = subset(pmf_source_US_sumContri, Source_aftermanual == "F10-OP-rich")
-# 
-# write_fst(pmf_traffic, "pmf_ncld_meteo_census/PMF_F1-Traffic.fst")
-# write_fst(pmf_nitrate, "pmf_ncld_meteo_census/PMF_F2-Secondary_Nitrate.fst")
-# write_fst(pmf_sulfate, "pmf_ncld_meteo_census/PMF_F3-Secondary_Sulfate.fst")
-# write_fst(pmf_industry, "pmf_ncld_meteo_census/PMF_F5-Industry.fst")
-# write_fst(pmf_salt, "pmf_ncld_meteo_census/PMF_F6-Salt.fst")
-# write_fst(pmf_biomass, "pmf_ncld_meteo_census/PMF_F8-Biomass.fst")
-# write_fst(pmf_DUST, "pmf_ncld_meteo_census/PMF_F9-Soil_DUST.fst")
-# write_fst(pmf_nontailpipe, "pmf_ncld_meteo_census/PMF_F7-Non-tailpipe.fst")
-# write_fst(pmf_oprich, "pmf_ncld_meteo_census/PMF_F10-OP-rich.fst")
+pmf_source = read.fst("pmf_ncld_meteo_census/CSN_IMPROVE_Daily_Source_Impacts_region_2011-20.fst")
+date_use = read.fst("pmf_ncld_meteo_census/Date_DOW_Holiday_2011-20.fst")
+sapply(date_use, class)
+
+# Merge date info with source info
+pmf_source$Date = as.Date(pmf_source$Date)
+pmf_source = base::merge(pmf_source, date_use, all.x = TRUE)
+
+# Raster does not include date, convert date to integer and change back later
+# pmf_source$Date <- as.integer(format(pmf_source$Date, "%Y%m%d"))
+
+# change the characters to factor
+pmf_source$day_of_week = as.factor(pmf_source$day_of_week)
+pmf_source$is_holiday = as.factor(pmf_source$is_holiday)
+sapply(pmf_source, class)
+
+# change colnames
+names(pmf_source)[3:4]
+names(pmf_source)[3:4] = c("org_long", "org_lat")
+
+csn_imp_site_with_nearest$org_long = csn_imp_site_with_nearest$org_lat = NULL
+
+# Assign new long and lat from US grid
+pmf_source_US = merge(pmf_source, csn_imp_site_with_nearest,
+                      by = "SiteCode", all.x = TRUE)
+unique(pmf_source_US$Source_aftermanual)
+
+# Change different traffic/sea salt from CSN & IMPROVE to one traffic/sea salt
+pmf_source_US <-
+  pmf_source_US %>%
+  mutate(Source_aftermanual =
+           ifelse(grepl("Traffic", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
+                  "F1-Traffic",
+                  Source_aftermanual))
+
+pmf_source_US <-
+  pmf_source_US %>%
+  mutate(Source_aftermanual =
+           ifelse(grepl("Sea Salt", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
+                  "F6-Salt",
+                  Source_aftermanual))
+
+pmf_source_US <-
+  pmf_source_US %>%
+  mutate(Source_aftermanual =
+           ifelse(grepl("Non-tailpipe", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
+                  "F7-Non-tailpipe",
+                  Source_aftermanual))
+
+pmf_source_US <-
+  pmf_source_US %>%
+  mutate(Source_aftermanual =
+           ifelse(grepl("Industry", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
+                  "F5-Industry",
+                  Source_aftermanual))
+
+pmf_source_US <-
+  pmf_source_US %>%
+  mutate(Source_aftermanual =
+           ifelse(grepl("Biomass", Source_aftermanual, fixed = TRUE), # only apply to character, not factor
+                  "F8-Biomass",
+                  Source_aftermanual))
+
+unique(pmf_source_US$Source_aftermanual)
+
+# change to factor for modeling
+pmf_source_US$Source_aftermanual = as.factor(pmf_source_US$Source_aftermanual)
+
+# Get the tOTAl contribution of new groups
+pmf_source_US_sumContri <-
+  pmf_source_US %>%
+  group_by(SiteCode, Date, Source_aftermanual, Latitude, Longitude,
+           year, month, day_of_week, is_holiday, Dataset) %>%
+  dplyr::summarise(Concentration = sum(Concentration),
+                   .groups = "drop")
+unique(pmf_source_US_sumContri$Source_aftermanual)
+
+# PMF data for each sources
+pmf_traffic = subset(pmf_source_US_sumContri, Source_aftermanual == "F1-Traffic")
+pmf_nitrate = subset(pmf_source_US_sumContri, Source_aftermanual == "F2-Secondary Nitrate")
+pmf_sulfate = subset(pmf_source_US_sumContri, Source_aftermanual == "F3-Secondary Sulfate")
+pmf_industry = subset(pmf_source_US_sumContri, Source_aftermanual == "F5-Industry")
+pmf_salt = subset(pmf_source_US_sumContri, Source_aftermanual == "F6-Salt")
+pmf_biomass = subset(pmf_source_US_sumContri, Source_aftermanual == "F8-Biomass")
+pmf_DUST = subset(pmf_source_US_sumContri, Source_aftermanual == "F9-Soil/DUST")
+pmf_nontailpipe = subset(pmf_source_US_sumContri, Source_aftermanual == "F7-Non-tailpipe")
+pmf_oprich = subset(pmf_source_US_sumContri, Source_aftermanual == "F10-OP-rich")
+
+write_fst(pmf_traffic, "pmf_ncld_meteo_census/PMF_F1-Traffic.fst")
+write_fst(pmf_nitrate, "pmf_ncld_meteo_census/PMF_F2-Secondary_Nitrate.fst")
+write_fst(pmf_sulfate, "pmf_ncld_meteo_census/PMF_F3-Secondary_Sulfate.fst")
+write_fst(pmf_industry, "pmf_ncld_meteo_census/PMF_F5-Industry.fst")
+write_fst(pmf_salt, "pmf_ncld_meteo_census/PMF_F6-Salt.fst")
+write_fst(pmf_biomass, "pmf_ncld_meteo_census/PMF_F8-Biomass.fst")
+write_fst(pmf_DUST, "pmf_ncld_meteo_census/PMF_F9-Soil_DUST.fst")
+write_fst(pmf_nontailpipe, "pmf_ncld_meteo_census/PMF_F7-Non-tailpipe.fst")
+write_fst(pmf_oprich, "pmf_ncld_meteo_census/PMF_F10-OP-rich.fst")
 
 ###### Read PMF source data for ML inputs ######
 
