@@ -40,9 +40,9 @@ getwd()
 # data_use = "CSN_Site_15t1mdl0unc_DN"
 # data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
 
-# # 0 uncertainty, dispersion normalization, Csub, Ni V
-# data_use = "CSN_Site_15t1mdlVNi_DN"
-# data.pre = "CSN_Csub_15t1mdlVNi_DN_"
+# 0 uncertainty, dispersion normalization, Csub, Ni V
+data_use = "CSN_Site_15t1mdlVNi_DN"
+data.pre = "CSN_Csub_15t1mdlVNi_DN_"
 
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
 # data_use = "IMPROVE_Site_15t1mdlVNi_DN"
@@ -53,6 +53,7 @@ getwd()
 # data.pre = "IMPROVE_Csub_15tAmmIonVNi_DN_"
 
 dir_path <- paste0("PMF_NonGUI/", data_use, "/base_DISPres1")
+dir_path
 
 time = Sys.Date()
 
@@ -63,7 +64,8 @@ time = Sys.Date()
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-04.csv")
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-05.csv")
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-05-30.csv")
-# source_org = read.csv("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv")
+# source_org = read.csv("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv") # Final use for total OC/EC
+source_org = read.csv("CSN_Site_15t1mdlVNi_DN_PMF_decision_2025-08-05.csv") # Final use for total C-Subgroups
 
 
 ##### IMPROVE
@@ -93,7 +95,6 @@ nrow(subset(source_org_long, Source == "F1-Traffic-Gasoline"))
 nrow(subset(source_org_long, Source == "F1-Traffic-Diesel"))
 nrow(subset(source_org_long, Source == "F1-Traffic-ResOil"))
 
-
 # remove the mixed for now
 source_org_long = subset(source_org_long, !(is.na(Fraction)))
 dim(source_org_long)
@@ -107,10 +108,16 @@ source_org_long =
 
 source_org_long$Source[grepl("OP", source_org_long$Source, fixed = T)] = "F10-OP-rich"
 source_org_long$Source[source_org_long$Source == ""] = "F7-Industry"
+source_org_long$Source[source_org_long$Source == "Agriculture"] = "F7-Industry"
+source_org_long$Source[source_org_long$Source == "Constraction"] = "F7-Industry"
+unique(source_org_long$Source)
 
 source_org_long = plyr::rename(source_org_long, 
                                c("Factor" = "Factor_source",
                                  "Source" = "Source_aftermanual"))
+source_org_long$Source_aftermanual[source_org_long$Source_aftermanual == "F1-Traffic ResOil"] = "F1-Traffic-ResOil"
+source_org_long$Source_aftermanual[source_org_long$Source_aftermanual == "F8-Biomass Burning"] = "F8-Biomass"
+
 unique(source_org_long$Source_aftermanual)
 unique(source_org_long$Factor_source)
 
@@ -123,6 +130,7 @@ nrow(subset(source_org_long, Source_aftermanual == "F1-Traffic-ResOil"))
 # get fraction numeric
 source_org_long$Fraction_nm = as.numeric(sub("%", "", source_org_long$Fraction))
 source_org_long$Fraction = NULL
+source_org_long = subset(source_org_long, SiteCode != 300490004)
 summary(source_org_long$Fraction_nm)
 
 # remove those with NA fraction
@@ -135,12 +143,13 @@ data.frame(table(source_org_long$Source_aftermanual))
 # check the number of sites with a given source, which might be two source to one factor
 length(unique(subset(source_org_long, Source_aftermanual == "F1-Traffic")$SiteCode))
 length(unique(subset(source_org_long, Source_aftermanual == "F5-Industry")$SiteCode))
+length(unique(subset(source_org_long, Source_aftermanual == "F7-Industry")$SiteCode))
 length(unique(subset(source_org_long, Source_aftermanual == "F2-Secondary Nitrate")$SiteCode))
 length(unique(subset(source_org_long, Source_aftermanual == "F3-Secondary Sulfate")$SiteCode))
 
 
 #### GPS coordinates
-manual_site_info = read_excel("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_168_site_osm_geocode.xlsx")
+# manual_site_info = read_excel("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_168_site_osm_geocode.xlsx")
 manual_site_info = select(manual_site_info, SiteCode, Latitude, Longitude)
 
 source_org_long = join(source_org_long, manual_site_info)
@@ -152,12 +161,14 @@ source_org_unique = select(source_org_long,
                            State, Latitude, Longitude, geoid, Species,
                            Factor_source, Source_aftermanual, Fraction_nm)
 names(source_org_unique)[8] = "Main_Species"
+head(source_org_unique)
 
 ###### source profile
 # csv_source_profile = fread("CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv")
 # csv_source_profile = fread("CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv") # not updated to DN version!!!
+csv_source_profile = fread("CSN_Site_Csub_15t1mdlVNi_DN_source_profile_2024-07-26.csv") # not updated to DN version!!!
 
-csv_source_profile = fread("IMPROVE_Site_15t1mdlVNi_DN_source_profile_2024-07-12.csv") # not updated to DN version!!!
+# csv_source_profile = fread("IMPROVE_Site_15t1mdlVNi_DN_source_profile_2024-07-12.csv") # not updated to DN version!!!
 
 csv_source_profile = select(csv_source_profile,
                             site.serial, Factor.No, Factor_source, Species, 
@@ -168,14 +179,16 @@ names(csv_source_profile)[1] = "serial.No"
 # daily contribution
 # csv_daily = fread("CSN_Site_15t1mdl0unc_daily.csv")
 # csv_daily = fread("CSN_Site_15t1mdl0unc_DN_covertBack_daily.csv")
+csv_daily = fread("CSN_Site_Csub_15t1mdlVNi_DN_covertBack_daily.csv")
 
-csv_daily = fread("IMPROVE_Site_15t1mdlVNi_DN_covertBack_daily.csv")
+# csv_daily = fread("IMPROVE_Site_15t1mdlVNi_DN_covertBack_daily.csv")
 
 csv_daily$V1 = NULL
 csv_daily_use = select(csv_daily,
                        site.serial, Factor.No, Date,
                        Factor_source, Main_Species, Concentration, Percent)
 names(csv_daily_use)[1] = "serial.No"
+head(csv_daily_use)
 
 # use site.serial & factor.NO combinations to match
 source_profile_use = 
@@ -190,6 +203,8 @@ daily_contri_use =
         select(source_org_unique, -Fraction_nm))
 dim(csv_daily_use); dim(source_org_unique); dim(daily_contri_use)
 summary(daily_contri_use)
+head(daily_contri_use)
+unique(daily_contri_use$Source_aftermanual)
 
 # check if the merge is correct
 # source_profile_use1= select(source_profile_use, serial.No, Factor.No, 
@@ -207,6 +222,49 @@ write.csv(source_profile_use, paste0(data_use, "_source_profile.csv"))
 
 write.csv(daily_contri_use, paste0(data_use, "_source_daily_contribution.csv"))
 # write.csv(non_tailpipe_daily, paste0(data_use, "_non-tailpipe_daily_contribution.csv"))
+
+daily_contri_use = fread("CSN_Site_15t1mdlVNi_DN_source_daily_contribution.csv")
+
+daily_contri_use_positive =
+  subset(daily_contri_use, Percent < 100 & Percent > 0 & Concentration > 0)
+summary(daily_contri_use_positive)
+
+ddply(daily_contri_use_positive, 
+      .(Source_aftermanual), 
+      function(df) {
+        data.frame(
+          Concentration = mean(df$Concentration),
+          Concentration_sd = sd(df$Concentration),
+          Percent = mean(df$Percent),
+          Percent_sd = sd(df$Percent)
+        )
+      })
+
+
+daily_contri_use_positive_traffic = daily_contri_use_positive
+daily_contri_use_positive_traffic$Source_aftermanual[grepl("Traffic", daily_contri_use_positive_traffic$Source_aftermanual, fixed = T)] = "F1-Traffic"
+daily_contri_use_positive_traffic =
+  daily_contri_use_positive_traffic %>%
+  dplyr::group_by(serial.No, Factor.No, SiteCode, State, Latitude, Longitude, geoid, 
+                  Date, Factor_source, Main_Species, Source_aftermanual) %>%
+  dplyr::summarise(
+    Concentration = sum(Concentration),
+    Percent = sum(Percent),
+    .groups = "drop"
+  )
+dim(daily_contri_use_positive_traffic)
+
+ddply(daily_contri_use_positive_traffic, 
+      .(Source_aftermanual), 
+      function(df) {
+        data.frame(
+          Concentration = mean(df$Concentration),
+          Concentration_sd = sd(df$Concentration),
+          Percent = mean(df$Percent),
+          Percent_sd = sd(df$Percent)
+        )
+      })
+
 
 ########### generate into to check the source-site match
 source_site_match = 
@@ -244,21 +302,100 @@ source_org_site_source =
 
 write.csv(source_org_site_source, paste0(data_use, "_source_assign_check.csv"))
 
+#### 2.0 daily data for trend ####
+daily_contri_use = fread("CSN_Site_15t1mdlVNi_DN_source_daily_contribution.csv")
+daily_contri_use$V1 = NULL
+head(daily_contri_use)
+
+daily_contri_use$Source_aftermanual[grepl("OP", daily_contri_use$Source_aftermanual, fixed = T)] = "F9-OP-rich"
+daily_contri_use$Source_aftermanual[grepl("Salt", daily_contri_use$Source_aftermanual, fixed = T)] = "F6-Salt"
+daily_contri_use$Source_aftermanual[daily_contri_use$Source_aftermanual == ""] = "F7-Industry"
+daily_contri_use$Source_aftermanual[daily_contri_use$Source_aftermanual == "Agriculture"] = "F7-Industry"
+daily_contri_use$Source_aftermanual[daily_contri_use$Source_aftermanual == "Constraction"] = "F7-Industry"
+daily_contri_use$Source_aftermanual[daily_contri_use$Source_aftermanual == "F1-Traffic ResOil"] = "F1-Traffic-ResOil"
+daily_contri_use$Source_aftermanual[daily_contri_use$Source_aftermanual == "F8-Biomass Burning"] = "F8-Biomass"
+daily_contri_use$Source_aftermanual[grepl("Traffic", daily_contri_use$Source_aftermanual, fixed = T)] = "F1-Traffic"
+daily_contri_use$Source_aftermanual[grepl("Industry", daily_contri_use$Source_aftermanual, fixed = T)] = "F5-Industry"
+daily_contri_use$Source_aftermanual[grepl("Biomass", daily_contri_use$Source_aftermanual, fixed = T)] = "F7-Biomass"
+daily_contri_use$Source_aftermanual[grepl("Soil", daily_contri_use$Source_aftermanual, fixed = T)] = "F8-Soil/Dust"
+daily_contri_use$Source_aftermanual[grepl("ailpipe", daily_contri_use$Source_aftermanual, fixed = T)] = "F4-Non-tailpipe"
+unique(daily_contri_use$Source_aftermanual)
+names(daily_contri_use)
+
+# New daily contribution
+daily_contri_use_upd =
+  dplyr::select(daily_contri_use, -Factor_source) %>%
+  dplyr::group_by(serial.No, Factor.No, Main_Species, Date, SiteCode, State, 
+                  Source_aftermanual, Latitude, Longitude, geoid) %>%
+  dplyr::summarise(
+    Concentration = sum(Concentration),
+    Percent = sum(Percent),
+    .groups = "drop"
+  )
+head(daily_contri_use_upd)
+
+# Overall source-specific contribution
+over_contri_dailyBase =
+  daily_contri_use_upd %>%
+  dplyr::group_by(Source_aftermanual) %>%
+  dplyr::summarise(
+    conc_mean = round(mean(Concentration), 2),
+    conc_sd = round(sd(Concentration), 2),
+    perc_mean = round(mean(Percent), 2),
+    perc_sd = round(sd(Percent), 2),
+    .groups = "drop"
+  )
+over_contri_dailyBase
+
+daily_contri_use_upd$Year = year(as.Date(daily_contri_use_upd$Date))
+
+annual_source_nation_fromDaily <-
+  daily_contri_use_upd %>%
+  st_drop_geometry() %>%
+  group_by(Source_aftermanual, Year) %>%
+  dplyr::summarise(
+    Concentration = median(Concentration),
+    Percent = median(Percent),
+    Conc_mean = mean(Concentration),
+    Perc_mean = mean(Percent),
+    conc_999 = quantile(Concentration, 0.999),
+    conc_001 = quantile(Concentration, 0.001),
+    perc_999 = quantile(Percent, 0.999),
+    perc_001 = quantile(Percent, 0.001),
+    .groups = "drop")
+
+nation_slope_diff_ts <- 
+  annual_source_nation_fromDaily %>%
+  group_by(Source_aftermanual) %>% # Dataset.x, 
+  dplyr::summarize(
+    diff_slope_conc = 
+      round(get_slope_ts(pick(everything()), "Year", "Concentration"), 3),
+    diff_slope_perc = 
+      round(get_slope_ts(pick(everything()), "Year", "Percent"), 2),
+    .groups = "drop"
+  ) %>%
+  ungroup()
+View(nation_slope_diff_ts)
+
+
 #### 2.1 match with monthly contribution ####
 
 # combine with monthly concentration contribution
 # month_source = fread("CSN_Site_15t1mdl0unc_month.csv")
 # month_source = fread("CSN_Site_15t1mdl0unc_DN_covertBack_month.csv")
+month_source = fread("CSN_Site_Csub_15t1mdlVNi_DN_covertBack_month.csv")
 
-month_source = fread("IMPROVE_Site_15t1mdlVNi_DN_covertBack_month.csv")
+# month_source = fread("IMPROVE_Site_15t1mdlVNi_DN_covertBack_month.csv")
 
 month_source$V1 = NULL
 names(month_source)[2] = "serial.No"
-month_source$Dataset = "IMPROVE"
+# month_source$Dataset = "IMPROVE"
+month_source$Dataset = "CSN"
 head(month_source)
 unique(month_source$Factor_source)
 
 # should be character(0) here
+unique(source_org_long$Source_aftermanual)
 unique(source_org_long$Factor_source)[!(unique(source_org_long$Factor_source) %in% unique(month_source$Factor_source))]
 # probably "Factor10" "Factor11" here
 unique(month_source$Factor_source)[!(unique(month_source$Factor_source) %in% unique(source_org_long$Factor_source))]
@@ -273,8 +410,8 @@ summary(unique(source_org_long$site_factor) %in% unique(month_source$site_factor
 unique(source_org_long$site_factor)[!(unique(source_org_long$site_factor) %in% unique(month_source$site_factor))]
 
 # manual check if the Factor_source match
-select(subset(source_org_long, serial.No == "330"), site_factor, Factor_source, Species, Source_aftermanual)
-b = select(subset(month_source, serial.No == "330" & Factor.No == 7), site_factor, Factor_source, Main_Species)
+select(subset(source_org_long, serial.No == "115"), site_factor, Factor_source, Species, Source_aftermanual)
+b = select(subset(month_source, serial.No == "115" & Factor.No == 7), site_factor, Factor_source, Main_Species)
 b[!duplicated(b), ]
 
 month_source_cleaning = 
@@ -327,6 +464,7 @@ replacement_sourcename <-
     "F4-Aged Sea Salt" = "F6-Salt",
     "F7-Industry" = "F5-Industry",
     "F8-Biomass Burning" = "F7-Biomass",
+    "F8-Biomass" = "F7-Biomass",
     "F9-Soil/Dust" = "F8-Soil/Dust", 
     "F10-OP-rich" = "F9-OP-rich")
 
@@ -338,6 +476,7 @@ month_source_cleaning_matchSpecies <-
                   Source_use))
 
 unique(month_source_cleaning_matchSpecies$Source_use)
+table(month_source_cleaning_matchSpecies$Source_use)
 
 # in manual assign, for cases of >1 factors assigned to the same source
 # Get the sum
@@ -361,8 +500,11 @@ month_source_assign_keyinfo =
 month_source_assign_vehicle = subset(month_source_assign_keyinfo, Source_use == "F1-Traffic")
 length(unique(month_source_assign_vehicle$SiteCode))
 
-write.csv(month_source_cleaning_matchSpecies, paste0(data_use, "_montly_source_assigned_with_2factor_to_one_2024-07.csv"))
-write.csv(month_source_assign, paste0(data_use, "_montly_source_assigned_2024-07.csv"))
+# write.csv(month_source_cleaning_matchSpecies, paste0(data_use, "_montly_source_assigned_with_2factor_to_one_2024-07.csv"))
+# write.csv(month_source_assign, paste0(data_use, "_montly_source_assigned_2024-07.csv"))
+
+write.csv(month_source_cleaning_matchSpecies, paste0(data_use, "_montly_source_assigned_with_2factor_to_one_2025-08.csv"))
+write.csv(month_source_assign, paste0(data_use, "_montly_source_assigned_2025-08.csv"))
 
 #### 4. plotting - data preparation ####
 
@@ -383,8 +525,9 @@ library(gganimate)
 # month_source_assign = read.csv("CSN_Site_15t1mdl0unc_montly_source_assigned.csv")
 # month_source_assign = read.csv("CSN_Site_15t1mdl0unc_montly_source_assigned_2024-05.csv")
 # month_source_assign = read.csv("CSN_Site_15t1mdl0unc_DN_montly_source_assigned_2024-06.csv")
+month_source_assign = read.csv("CSN_Site_15t1mdlVNi_DN_montly_source_assigned_2025-08.csv")
 
-month_source_assign = read.csv("IMPROVE_Site_15t1mdlVNi_DN_montly_source_assigned_2024-07.csv")
+# month_source_assign = read.csv("IMPROVE_Site_15t1mdlVNi_DN_montly_source_assigned_2024-07.csv")
 
 month_source_assign$X = NULL
 
@@ -435,6 +578,14 @@ Year_aggregated <- ddply(month_source_gps,
                          perc_up = median(perc_up),
                          perc_down = median(perc_down))
 
+annual_total_conc =
+  ddply(Year_aggregated, .(SiteCode, Year), summarise, 
+        Concentration = sum(Concentration))
+summary(annual_total_conc)
+ddply(annual_total_conc, .(Year), summarise, 
+      Concentration = mean(Concentration))
+
+
 year_month_aggregated <- ddply(month_source_gps, 
                                .(Dataset.x, SiteCode, Year, Month, Source_use), 
                                summarise,
@@ -473,9 +624,13 @@ month_aggregated <- ddply(month_source_gps, .(Dataset.x, SiteCode, Month, Source
 # write.csv(year_month_aggregated, paste0(data_use, "_Year-month_source_2024.06.csv")) # "CSN_Site_15t1mdl0unc_DN_Year-month_source_2024.06.csv"
 # write.csv(month_aggregated, paste0(data_use, "_Month_source_2024.06.csv")) # "CSN_Site_15t1mdl0unc_DN_Month_source_2024.06.csv"
 
-write.csv(Year_aggregated, paste0(data_use, "_Annual_source_2024.07.csv")) # "IMPROVE_Site_15t1mdlVNi_DN_Annual_source_2024.07.csv"
-write.csv(year_month_aggregated, paste0(data_use, "_Year-month_source_2024.07.csv")) # "IMPROVE_Site_15t1mdlVNi_DN_Year-month_source_2024.07.csv"
-write.csv(month_aggregated, paste0(data_use, "_Month_source_2024.07.csv")) # "IMPROVE_Site_15t1mdlVNi_DN_Month_source_2024.07.csv"
+write.csv(Year_aggregated, paste0(data_use, "_Annual_source_2025.08.csv")) # "CSN_Site_15t1mdlVNi_DN_Annual_source_2025.08.csv"
+write.csv(year_month_aggregated, paste0(data_use, "_Year-month_source_2025.08.csv")) # "CSN_Site_15t1mdlVNi_DN_Year-month_source_2025.08.csv"
+write.csv(month_aggregated, paste0(data_use, "_Month_source_2025.08.csv")) # "CSN_Site_15t1mdlVNi_DN_Month_source_2025.08.csv"
+
+# write.csv(Year_aggregated, paste0(data_use, "_Annual_source_2024.07.csv")) # "IMPROVE_Site_15t1mdlVNi_DN_Annual_source_2024.07.csv"
+# write.csv(year_month_aggregated, paste0(data_use, "_Year-month_source_2024.07.csv")) # "IMPROVE_Site_15t1mdlVNi_DN_Year-month_source_2024.07.csv"
+# write.csv(month_aggregated, paste0(data_use, "_Month_source_2024.07.csv")) # "IMPROVE_Site_15t1mdlVNi_DN_Month_source_2024.07.csv"
 
 #### 4.2 mapping - annual & map ####
 
@@ -499,9 +654,13 @@ color_npg = pal_npg("nrc")(10)
 # month_aggregated = read.csv("CSN_Site_15t1mdl0unc_DN_Month_source_2024.06.csv")
 # year_month_aggregated = read.csv("CSN_Site_15t1mdl0unc_DN_Year-month_source_2024.06.csv")
 
-Year_aggregated = read.csv("IMPROVE_Site_15t1mdlVNi_DN_Annual_source_2024.07.csv")
-month_aggregated = read.csv("IMPROVE_Site_15t1mdlVNi_DN_Month_source_2024.07.csv")
-year_month_aggregated = read.csv("IMPROVE_Site_15t1mdlVNi_DN_Year-month_source_2024.07.csv")
+Year_aggregated = read.csv("CSN_Site_15t1mdlVNi_DN_Annual_source_2025.08.csv")
+month_aggregated = read.csv("CSN_Site_15t1mdlVNi_DN_Month_source_2025.08.csv")
+year_month_aggregated = read.csv("CSN_Site_15t1mdlVNi_DN_Year-month_source_2025.08.csv")
+
+# Year_aggregated = read.csv("IMPROVE_Site_15t1mdlVNi_DN_Annual_source_2024.07.csv")
+# month_aggregated = read.csv("IMPROVE_Site_15t1mdlVNi_DN_Month_source_2024.07.csv")
+# year_month_aggregated = read.csv("IMPROVE_Site_15t1mdlVNi_DN_Year-month_source_2024.07.csv")
 
 Year_aggregated$X = month_aggregated$X = year_month_aggregated$X = NULL
 
@@ -522,6 +681,17 @@ Year_aggregated$X = month_aggregated$X = year_month_aggregated$X = NULL
 #                               !(Source_use %in% c("F10-Industries_2", "Vehic_Biom")))
 Year_aggregated_use = Year_aggregated
 Month_aggregated_use = month_aggregated
+
+Month_aggregated_sum =
+  ddply(Month_aggregated_use, .(SiteCode, Month, Source_use), summarise,
+        Percent_mean = mean(Percent),
+        Percent_sum = sum(Percent))
+ddply(Month_aggregated_use, .(Source_use), summarise,
+      Concentration = mean(Concentration), Concentration_sd = sd(Concentration),
+      Percent = mean(Percent), Percent_sd = sd(Percent))
+ddply(Month_aggregated_sum, .(Source_use), summarise,
+      Percent_sum = mean(Percent_sum), Percent_sum_sd = sd(Percent_sum))
+
 
 # site_no_source <- 
 #   Year_aggregated_use %>%
@@ -1732,7 +1902,7 @@ slope_range_conc <- c(-0.2, 0.2)
 
 ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
-  geom_point(data = subset(slope_diff, Source_use != "F4-Non-tailpipe"), 
+  geom_point(data = subset(slope_diff, !(Source_use %in% c("F4-Non-Tailpipe", "F4-Non-tailpipe"))),  # "F4-Non-tailpipe"
              aes(x = Longitude, y = Latitude, 
                  fill = diff_slope),
              size = 2.5, alpha = 0.8, 
@@ -1809,7 +1979,7 @@ slope_range_perc <- c(-0.4, 0.4)
 
 ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
-  geom_point(data = subset(slope_diff_perc, Source_use != "F4-Non-tailpipe"), 
+  geom_point(data = subset(slope_diff_perc,!(Source_use %in% c("F4-Non-Tailpipe", "F4-Non-tailpipe"))), 
              aes(x = Longitude, y = Latitude, 
                  fill = diff_slope),
              size = 2.5, alpha = 0.8, 
@@ -2556,12 +2726,14 @@ cor_overall_obs_pmf =
     "median_obs_PM2.5", "median_PMF_PM2.5")
 cor_overall_obs_pmf
 
+site_perform = subset(site_perform, Dataset %in% c("IMPROVE", "CSN"))
+
 #### summary figure
 
 pmf_obs <- 
   ggplot(site_perform, 
          aes(x = median_obs_PM2.5, y = median_PMF_PM2.5, 
-             shape = Dataset, color = Dataset)) +
+             color = Dataset)) +
   geom_point(alpha = 0.65, size = 2) +
   scale_color_manual(values = c("royalblue3", "#ff7f0e")) + # "#1f77b4"
   geom_abline(intercept = 0, slope = 1, color = "red") +
@@ -2570,7 +2742,8 @@ pmf_obs <-
   # geom_text(size = 0,  aes(x = 2, y = 9, label = "R = 0.97; p = 0.00")) + 
   labs(x = format_variable("Observation  µg/m3"),
        y = format_variable("DN-PMF prediction  µg/m3")) +
-  theme_bw(base_size = 24)
+  theme_bw(base_size = 20)+
+  theme(legend.position = "none")
 pmf_obs
 
 # other validation parameter distribution
@@ -2592,21 +2765,23 @@ head(site_perform_estimated)
 r2_r2 <- 
   ggplot(subset(site_perform_estimated,
                 Validation_method != "RMSE_PM2.5"), 
-         aes(x = Validation_method, y = Performance, shape = Dataset)) +
+         aes(x = Validation_method, y = Performance, color = Dataset)) +
   geom_jitter(width = 0.2, alpha = 0.25, size = 2)+
+  scale_color_manual(values = c("royalblue3", "#ff7f0e")) +
   geom_boxplot(outlier.shape = NA, fill = NA,
                linewidth = 0.6, width = 0.5) +
   scale_x_discrete(labels = c("Correlation \ncoefficient", 
                               "Coefficient of \ndetermination")) +
   labs(x = "Validation method") +
-  theme_bw(base_size = 20)
+  theme_bw(base_size = 20)+
+  theme(legend.position = "none")
 r2_r2
 
 rmse_pm <- 
   ggplot(subset(site_perform_estimated,
                 Validation_method == "RMSE_PM2.5"), 
          aes(x = Performance, fill = Dataset)) +  # moved fill into aes()
-  geom_histogram(alpha = 0.8, position = "stack") +  # added position = "stack"
+  geom_histogram(position = "stack", alpha = 0.65) +  # added position = "stack"
   scale_fill_manual(values = c("royalblue3", "#ff7f0e")) +
   labs(x = format_variable("RMSE  µg/m3"), y = "Count") +
   theme_bw(base_size = 20)
