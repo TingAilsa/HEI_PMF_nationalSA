@@ -16,6 +16,7 @@ library(insight)
 library(data.table)
 library(patchwork)
 library(ggpubr)
+library(lubridate)
 
 
 setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/")
@@ -41,12 +42,12 @@ getwd()
 # data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
 
 # 0 uncertainty, dispersion normalization, Csub, Ni V
-data_use = "CSN_Site_Csub_15t1mdlVNi_DN"
-data.pre = "CSN_Csub_15t1mdlVNi_DN_"
+# data_use = "CSN_Site_Csub_15t1mdlVNi_DN"
+# data.pre = "CSN_Csub_15t1mdlVNi_DN_"
 
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
-# data_use = "IMPROVE_Site_15t1mdlVNi_DN"
-# data.pre = "IMPROVE_Csub_15t1mdlVNi_DN_"
+data_use = "IMPROVE_Site_15t1mdlVNi_DN"
+data.pre = "IMPROVE_Csub_15t1mdlVNi_DN_"
 
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
 # data_use = "IMPROVE_Site_15tAmmIonVNi_DN"
@@ -324,20 +325,21 @@ write.csv(csv_daily_site, paste0(data_use, "_covertBack_PM2.5_daily", ".csv"))
 dropbox_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/"
 
 # site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15TimesMean_site/CSN_noCsub_15timesMean_PMF_SWB_site.csv"))
-# site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_NoCsub_15t1mdl0unc_site/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv"))
-site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_Csub_15t1mdlVNi_Site/CSN_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
+# site_info_all = read.csv("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/PMF_NonGUI/CSN_Site_15t1mdl0unc_DN/CSN_noCsub_15t1mdl0unc_PMF_SWB_site.csv")
+# site_info_all = read.csv(paste0(dropbox_path, "CSN_NoGUI_Csub_15t1mdlVNi_Site/CSN_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
 
-# site_info_all = read.csv(paste0(dropbox_path, "IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
+site_info_all = read.csv(paste0(dropbox_path, "IMPROVE_NoGUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_PMF_SWB_site.csv"))
 
-site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
+# site_geo = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/CSN_site_info.csv"))
+site_geo = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/CSN_site_info.csv")
 site_geo$SiteCode = as.character(site_geo$SiteCode)
 
-site_geoid = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv"))
-
+# site_geoid = read.csv(paste0(dropbox_path, "CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv"))
+site_geoid = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_cluster_traffic = read.csv("results_R_data/County_cluster_traffic_info.csv")
 
 # site serial
-site_code_serial = read.csv("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
+site_code_serial = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/CSN_IMPROVE_site.serial.csv")
 site_code_serial$X = NULL
 site_serial_info = subset(site_code_serial, serial.No %in% site_info_all$serial.No)
 dim(site_serial_info)
@@ -345,6 +347,7 @@ dim(site_serial_info)
 # PMF performance direct summary
 PMF_base_summary = read.csv(
   paste0(dir_path, "/", data.pre, "base_DISP_summary.csv")
+  # paste0(dir_path, data.pre, "base_DISP_summary.csv")
 )
 
 tans_sourceAssigned = read.csv(paste0(data_use, "_Source_assigned_reorder.csv"))
@@ -373,14 +376,14 @@ site_cluster_traffic = select(cty_cluster_traffic, -col_remove_cty)
 # make sure all listed files are data.frame or all are data.table, otherwise, error in Reduce
 
 ### CSN
-list_site_census_source_assign =
-  list(site_serial, site_geo, site_geoid, site_cluster_traffic,
-       PMF_base_summary, tans_toAssign, tans_sourceAssigned)
+# list_site_census_source_assign =
+#   list(site_serial, site_geo, site_geoid, site_cluster_traffic,
+#        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
 
 # ### IMPROVE
-# list_site_census_source_assign = 
-#   list(site_serial, site_geoid, site_cluster_traffic,
-#        PMF_base_summary, tans_toAssign, tans_sourceAssigned)
+list_site_census_source_assign =
+  list(site_serial, site_geoid, site_cluster_traffic,
+       PMF_base_summary, tans_toAssign, tans_sourceAssigned)
 
 site_census_source_assign =
   Reduce(function(x, y) 
@@ -424,7 +427,7 @@ site_census_source_assign =
 library(readxl)
 
 #### IMPROVE
-manual_site_info = read_excel("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_168_site_osm_geocode.xlsx")
+manual_site_info = read_excel("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nation_SA_data/IMPROVE_168_site_osm_geocode.xlsx")
 head(manual_site_info); dim(manual_site_info)
 names(manual_site_info)
 
@@ -464,7 +467,7 @@ write.csv(site_census_source_assign,
 ## for unnormalized results
 csv_daily_site = fread(paste0(data_use, "_covertBack_PM2.5_daily", ".csv"))
 csv_daily_site$V1 = NULL
-
+head(csv_daily_site)
 names(csv_daily_site)[2] = "serial.No"
 
 ## only results from determined number of factors
@@ -481,33 +484,40 @@ names(csv_daily_site_use)[(ncol(csv_daily_site_use)-2):ncol(csv_daily_site_use)]
 # reorder
 csv_daily_site_use = 
   csv_daily_site_use[with(csv_daily_site_use, 
-                    order(serial.No, Date)), ]
+                     order(serial.No, Date)), ]
+head(csv_daily_site_use)
+summary(csv_daily_site_use)
 
 ## merge to get all observations
 
 #### daily contribution, non-DN data
-path.conc.org = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_GUI_NoCsub_15t1mdl0unc_Site"
-
-csv_daily_org_list <- 
-  list.files(path.conc.org, pattern = ".*conc\\.csv$", full.names = TRUE)
+# path.conc.org = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_GUI_NoCsub_15t1mdl0unc_Site"
+path.conc.org = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_GUI_Csub_15t1mdlVNi_Site"
 
 # site serial info to be extracted from titles
 extract_pattern <- "(?<=_S_)[0-9]+"
 
+csv_daily_org_list <- 
+  list.files(path.conc.org, pattern = ".*conc\\.csv$", full.names = TRUE)
+
 ## combine all csv files
 # there are different columns in csv files, thus, use rbindlist instead of rbind
 
-species_daily_org <- rbindlist(
+species_daily_org <- 
+  rbindlist(
   lapply(csv_daily_org_list, 
          function(file) title_info_column(file, extract_pattern)), 
   fill = TRUE
 )
+head(species_daily_org); dim(species_daily_org)
 
 species_daily_org = 
   plyr::rename(species_daily_org,
               c("PM25" = "PM2.5_obs",
                 "title_col" = "serial.No"))
+head(species_daily_org)
 # write.csv(species_daily_org, "CSN_NoCsub_15t1mdl0unc_daily_species_for_PMF.csv")
+# write.csv(species_daily_org, "IMPROVE_Csub_15t1mdlVNi_daily_species_for_PMF_lack_227&229.csv")
 
 ## here, combine original PM2.5 only
 species_daily_org$serial.No = as.integer(species_daily_org$serial.No)
@@ -515,9 +525,50 @@ species_daily_org$serial.No = as.integer(species_daily_org$serial.No)
 ## combine data
 csv_daily_site_allPM = 
   join(csv_daily_site_use,
-        select(species_daily_org, serial.No, Date, PM2.5_obs))
+        dplyr::select(species_daily_org, serial.No, Date, PM2.5_obs))
 dim(csv_daily_site_use); dim(species_daily_org); dim(csv_daily_site_allPM)
 head(csv_daily_site_use); head(csv_daily_site_allPM)
+
+summary(select(csv_daily_site_allPM, VC_coef, Percent, PM2.5_obs, PM2.5_pred_org))
+
+### Two IMPROVE Sites
+subset(csv_daily_site_allPM, is.na(PM2.5_obs))
+
+imp_site_227 = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_GUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_S_227_conc.csv")
+imp_site_229 = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/IMPROVE_GUI_Csub_15t1mdlVNi_Site/IMPROVE_Csub_15t1mdlVNi_S_229_conc.csv")
+imp_site_227$serial.No = 227
+imp_site_229$serial.No = 229
+
+# combine 227 & 229
+imp_site_227_229 = 
+  rbind(imp_site_227, imp_site_229) %>%
+  select(serial.No, Date, PM25) %>%
+  plyr::rename(c("PM25" = "PM2.5"))
+imp_site_227_229$Date =  
+  as.Date(imp_site_227_229$Date, format = "%m/%d/%y")
+head(imp_site_227_229)
+
+# merge with csv_daily_site_allPM
+csv_daily_site_allPM_1 = merge(csv_daily_site_allPM, imp_site_227_229, all.x = TRUE)
+rows_need_pm = csv_daily_site_allPM_1$serial.No %in% c(227, 229)
+csv_daily_site_allPM_1$PM2.5_obs[rows_need_pm] = csv_daily_site_allPM_1$PM2.5[rows_need_pm]
+summary(csv_daily_site_allPM_1)
+
+csv_daily_site_allPM = csv_daily_site_allPM_1
+csv_daily_site_allPM$PM2.5 = NULL
+
+write.csv(csv_daily_site_allPM, paste0(data_use, "_PM_DN_obs_PMF_PM.csv")) # CSN 
+# write.csv(csv_daily_site_allPM, paste0(data_use, "_PM_DN_obs_PMF_PM_lack_227&229.csv")) # IMPROVE, Csub_15t1mdlVNi_daily
+
+csv_daily_site_allPM_2 = csv_daily_site_allPM
+csv_daily_site_allPM_2$Year = year(csv_daily_site_allPM_2$Date)
+csv_daily_allPM_year = 
+  ddply(csv_daily_site_allPM_2, .(Year), summarise,
+        PM2.5_obs_mean = mean(PM2.5_obs), 
+        PM2.5_obs_median = median(PM2.5_obs), 
+        PM2.5_pred_org_mean = mean(PM2.5_pred_org), 
+        PM2.5_pred_org_median = median(PM2.5_pred_org))
+csv_daily_allPM_year
 
 #### estimate the RMSE, coefficient of determination, and correlation coefficient for each site
 # for original data
@@ -695,13 +746,20 @@ pm_perform
 
 source_org = read.csv("IMPROVE_Site_15t1mdlVNi_DN_PMF_2024-07-23.csv")
 
+site_gps = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+head(site_gps)
+site_gps = select(site_gps, SiteCode, Longitude, Latitude)
+head(site_gps)
+
 source_org$X = NULL
 names(source_org)
 dim(source_org)
+source_org = join(source_org, site_gps)
+head(source_org)
 
 # select determined site-factor combinations
 source_site_decide = 
-  select(source_org, SiteCode, serial.No, Factor.No)
+  select(source_org, SiteCode, serial.No, Factor.No, Longitude, Latitude)
 
 # remove the "assigned_" and re-organize the dataframe
 source_org_long = 
@@ -776,36 +834,67 @@ names(source_org_unique)[8] = "Main_Species"
 
 ###### source profile
 # csv_source_profile = fread("CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv")
-csv_source_profile = fread("CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv") # not updated to DN version!!!
+# csv_source_profile = fread("CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv") # not updated to DN version!!!
+# csv_source_profile = fread("CSN_Site_15t1mdl0unc_DN_source_profile.csv")
+csv_source_profile = fread("IMPROVE_Site_15t1mdlVNi_DN_source_profile_2024-07-12.csv") # not updated to DN version!!!
 
 csv_source_profile = select(csv_source_profile,
                             site.serial, Factor.No, Factor_source, Species, 
                             Concentration, Percent, 
                             disp_conc_down, disp_conc_mean, disp_conc_up, Main_Species)
+# csv_source_profile = select(csv_source_profile,
+#                             serial.No, Factor.No, Factor_source, Species, 
+#                             Concentration, Percent, 
+#                             disp_conc_down, disp_conc_mean, disp_conc_up, Main_Species)
 names(csv_source_profile)[1] = "serial.No"
 
 # daily contribution
 # csv_daily = fread("CSN_Site_15t1mdl0unc_daily.csv")
-csv_daily = fread("CSN_Site_15t1mdl0unc_DN_covertBack_daily.csv")
+# csv_daily = fread("CSN_Site_15t1mdl0unc_DN_covertBack_daily.csv")
+csv_daily = fread("IMPROVE_Site_15t1mdlVNi_DN_covertBack_daily.csv")
+
 csv_daily$V1 = NULL
 csv_daily_use = select(csv_daily,
                        site.serial, Factor.No, Date,
                        Factor_source, Main_Species, Concentration, Percent)
+head(csv_daily); head(csv_daily_use)
 names(csv_daily_use)[1] = "serial.No"
 
 # use site.serial & factor.NO combinations to match
+source_org_unique = plyr::rename(source_org_unique, c("Species" = "Main_Species"))
+head(source_org_unique)
+
 source_profile_use = 
-  merge(csv_source_profile, source_org_unique, all.x = TRUE)
+  join(csv_source_profile, source_org_unique)
+head(source_profile_use)
 source_profile_use = na.omit(source_profile_use)
 summary(source_profile_use)
+head(source_profile_use)
 dim(source_profile_use); dim(source_org_unique); dim(csv_source_profile)
 names(source_profile_use)[ncol(source_profile_use)] = "Fraction_source"
+source_profile_use$Species = NULL
 
 daily_contri_use =
-  merge(csv_daily_use, 
-        select(source_org_unique, -Fraction_nm))
+  join(csv_daily_use, 
+        select(source_org_unique, -Fraction_nm)) %>%
+  na.omit()
 dim(csv_daily_use); dim(source_org_unique); dim(daily_contri_use)
 summary(daily_contri_use)
+head(daily_contri_use)
+
+# CSN Site Check
+subset(csv_daily_use, serial.No == 1 & Factor_source == "F3-Secondary Sulfate" & Factor.No == 9)[1:4, ]
+subset(source_org_unique, serial.No == 1 & Factor_source == "F3-Secondary Sulfate" & Factor.No == 9)
+subset(daily_contri_use, serial.No == 1 & Factor_source == "F3-Secondary Sulfate")[1:6, ]
+
+subset(csv_daily_use, serial.No == 32 & Source_aftermanual == "F5-Industry" & Factor.No == 8)[1:4, ]
+subset(source_org_unique, serial.No == 32 & Source_aftermanual == "F5-Industry" & Factor.No == 8)
+subset(daily_contri_use, serial.No == 32 & Source_aftermanual == "F5-Industry")[1:6, ]
+
+# IMPROVE Site Check
+subset(csv_daily_use, serial.No == 157 & Factor.No == 7 & Date == as.Date("2011-01-03"))
+subset(source_org_unique, serial.No == 157 & Source_aftermanual == "F1-Traffic" & Factor.No == 7)
+subset(daily_contri_use, serial.No == 157 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-03"))
 
 # check if the merge is correct
 # source_profile_use1= select(source_profile_use, serial.No, Factor.No, 
@@ -818,10 +907,15 @@ non_tailpipe_profile =
 non_tailpipe_daily = 
   subset(daily_contri_use, Source_aftermanual == "F7-Non-tailpipe")
 
-write.csv(source_profile_use, paste0(data_use, "_source_profile.csv"))
-write.csv(non_tailpipe_profile, paste0(data_use, "_non-tailpipe_source_profile.csv"))
+## there could be status of TWO Factors assigned to One Source !!!!!!
 
-write.csv(daily_contri_use, paste0(data_use, "_source_daily_contribution.csv"))
+write.csv(source_profile_use, paste0(data_use, "_source_profile.csv")) # there could be status of TWO Factors assigned to One Source !!!
+write.csv(daily_contri_use, paste0(data_use, "_source_daily_contribution.csv")) # there could be status of TWO Factors assigned to One Source
+
+# daily_contri_use_1 = fread(paste0(data_use, "_source_daily_contribution.csv"))
+# subset(daily_contri_use_1, serial.No == 157 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-03"))
+
+write.csv(non_tailpipe_profile, paste0(data_use, "_non-tailpipe_source_profile.csv"))
 write.csv(non_tailpipe_daily, paste0(data_use, "_non-tailpipe_daily_contribution.csv"))
 
 ########### generate into to check the source-site match
@@ -3195,3 +3289,230 @@ ddply(threh_K, .(Method), summarise,
       mean_k = mean(Above_thresholds_K),
       median_k = median(Above_thresholds_K))
 
+##### CSN & IMPROVE source daily contribution #####
+# csn_daily_contri = fread("CSN_Site_15t1mdl0unc_DN_source_daily_contribution.csv") # contribution with dispersion normalization
+# imp_daily_contri = fread("IMPROVE_Site_15t1mdlVNi_DN_source_daily_contribution.csv") # contribution with dispersion normalization
+csn_daily_contri = fread("CSN_Site_15t1mdl0unc_DN_covertBack_daily.csv") # un-normalized
+imp_daily_contri = fread("IMPROVE_Site_15t1mdlVNi_DN_covertBack_daily.csv") # un-normalized
+csn_daily_contri$Dataset = "CSN"
+imp_daily_contri$Dataset = "IMPROVE"
+
+csn_daily_contri = 
+  plyr::rename(
+    csn_daily_contri,
+    c("site.serial" = "serial.No")
+  )
+head(csn_daily_contri)
+head(imp_daily_contri)
+subset(csn_daily_contri, serial.No == 1 & Factor_source == "F3-Secondary Sulfate")
+
+csn_daily_pm = fread("CSN_Site_15t1mdl0unc_DN_PM_DN_obs_PMF_PM.csv")
+csn_daily_pm$Dataset = "CSN"
+head(csn_daily_pm); summary(csn_daily_pm)
+imp_daily_pm = fread("IMPROVE_Site_15t1mdlVNi_DN_PM_DN_obs_PMF_PM.csv")
+imp_daily_pm$Dataset = "IMPROVE"
+imp_daily_pm = 
+  imp_daily_pm %>%
+  relocate(Date, .after = SiteCode) %>%
+  select(-Longitude, -Latitude)
+head(imp_daily_pm); summary(imp_daily_pm)
+
+# Check model performance
+modeling_perform_metrics(csn_daily_pm$PM2.5_pred_org, csn_daily_pm$PM2.5_obs)
+modeling_perform_metrics(imp_daily_pm$PM2.5_pred_org, imp_daily_pm$PM2.5_obs)
+
+csn_pm_site_metric = 
+  csn_daily_pm %>%
+  dplyr::group_by(SiteCode) %>%
+  dplyr::summarise(
+    r = cor(PM2.5_pred_org, PM2.5_obs),
+    R2 = 1 - sum((PM2.5_obs - PM2.5_pred_org)^2) / sum((PM2.5_obs - mean(PM2.5_obs))^2),
+    RMSE = sqrt(mean((PM2.5_obs - PM2.5_pred_org)^2)),
+    MAE = mean(abs(PM2.5_obs - PM2.5_pred_org)),
+    MB = mean(PM2.5_pred_org - PM2.5_obs),
+    NMB = mean(PM2.5_pred_org - PM2.5_obs) / mean(PM2.5_obs) * 100,
+    .groups = "drop"
+  )
+summary(csn_pm_site_metric)
+
+imp_pm_site_metric = 
+  imp_daily_pm %>%
+  dplyr::group_by(SiteCode) %>%
+  dplyr::summarise(
+    r = cor(PM2.5_pred_org, PM2.5_obs),
+    R2 = 1 - sum((PM2.5_obs - PM2.5_pred_org)^2) / sum((PM2.5_obs - mean(PM2.5_obs))^2),
+    RMSE = sqrt(mean((PM2.5_obs - PM2.5_pred_org)^2)),
+    MAE = mean(abs(PM2.5_obs - PM2.5_pred_org)),
+    MB = mean(PM2.5_pred_org - PM2.5_obs),
+    NMB = mean(PM2.5_pred_org - PM2.5_obs) / mean(PM2.5_obs) * 100,
+    .groups = "drop"
+  )
+summary(imp_pm_site_metric)
+
+# combine dataset and arrange columns
+daily_contri_both = rbind(csn_daily_contri, imp_daily_contri)
+daily_contri_both$V1 = NULL
+daily_contri_both = relocate(daily_contri_both, Dataset, .before = serial.No)
+daily_contri_both = relocate(daily_contri_both, SiteCode, .before = serial.No)
+summary(daily_contri_both)
+head(daily_contri_both)
+
+table(daily_contri_both$Source_aftermanual)
+
+daily_pm_both = rbind(csn_daily_pm, imp_daily_pm)
+daily_pm_both$V1 = NULL
+daily_pm_both = relocate(daily_pm_both, Dataset, .before = serial.No)
+daily_pm_both = relocate(daily_pm_both, SiteCode, .before = serial.No)
+summary(daily_pm_both)
+head(daily_pm_both)
+
+# Change cell info to be consistent
+daily_contri_both$Source_aftermanual[daily_contri_both$Source_aftermanual == "F8-Biomass Burning"] = "F8-Biomass"
+unique(daily_contri_both$Source_aftermanual)
+
+# Sum the contribution if two factors are assigned to one
+subset(daily_contri_both, serial.No == 1 & Source_aftermanual == "F3-Secondary Sulfate" & Date == as.Date("2011-01-03"))
+subset(daily_contri_both, serial.No == 157 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-03"))
+subset(daily_contri_both, serial.No == 114 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-09"))
+
+subset(daily_pm_both, serial.No == 114 & Date == as.Date("2011-01-09"))
+subset(daily_pm_both, serial.No == 157 & Date == as.Date("2011-01-09"))
+
+daily_contri_both = 
+  dplyr::select(daily_contri_both, -Factor_source, -Main_Species) %>%
+  dplyr::group_by(Dataset, SiteCode, serial.No, Factor.No, State, 
+                  Latitude, Longitude, geoid, Source_aftermanual, Date) %>%
+  dplyr::summarise(
+    Concentration = sum(Concentration),
+    Percent = sum(Percent),
+    .groups = "drop"
+  )
+head(daily_contri_both); dim(daily_contri_both)
+
+subset(daily_contri_both, serial.No == 1 & Source_aftermanual == "F3-Secondary Sulfate" & Date == as.Date("2011-01-03"))
+subset(daily_contri_both, serial.No == 157 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-03"))
+subset(daily_contri_both, serial.No == 114 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-09"))
+
+# More duplicates in the Decision, two Factor.No for one site
+site_factor = dplyr::select(daily_contri_both, SiteCode, Factor.No)
+site_factor = site_factor[!duplicated(site_factor), ]
+site_factor$dup = duplicated(site_factor$SiteCode)
+
+site_factor_dup = 
+  subset(site_factor, 
+         SiteCode %in% subset(site_factor, dup)$SiteCode)
+# 482011039, COGO1, ORPI1, remove results with 7 factors for these 3 sites and keep 8 factor ones
+
+site_factor_dup = subset(site_factor_dup, Factor.No == 7)
+site_factor_dup
+
+# Remove duplicates
+daily_contri_both_nodup = 
+  subset(daily_contri_both, 
+         !(SiteCode %in% site_factor_dup$SiteCode & 
+             Factor.No %in% site_factor_dup$Factor.No))
+dim(daily_contri_both_nodup)
+
+daily_pm_both_nodup =
+  subset(daily_pm_both, 
+         !(SiteCode %in% site_factor_dup$SiteCode & 
+             Factor.No %in% site_factor_dup$Factor.No))
+dim(daily_pm_both_nodup)
+
+subset(daily_contri_both_nodup, serial.No == 114 & Source_aftermanual == "F1-Traffic" & Date == as.Date("2011-01-09"))
+subset(daily_pm_both_nodup, serial.No == 114 & Date == as.Date("2011-01-09"))
+
+# Add time
+daily_contri_both_nodup$Year = year(daily_contri_both_nodup$Date)
+daily_contri_both_nodup$Month = month(daily_contri_both_nodup$Date)
+
+daily_pm_both_nodup$Year = year(daily_pm_both_nodup$Date)
+daily_pm_both_nodup$Month = month(daily_pm_both_nodup$Date)
+
+# Change source name
+replacement_sourcename <- 
+  c("F7-Non-tailpipe" = "F4-Non-tailpipe",
+    "F6-Fresh Sea Salt" = "F6-Salt",
+    "F4-Aged Sea Salt" = "F6-Salt",
+    "F7-Industry" = "F5-Industry",
+    "F8-Biomass Burning" = "F7-Biomass",
+    "F9-Soil/Dust" = "F8-Soil/Dust", 
+    "F10-OP-rich" = "F9-OP-rich",
+    "OP-rich" = "F9-OP-rich")
+
+unique(daily_contri_both_nodup$Source_aftermanual)
+daily_contri_both_nodup <- 
+  daily_contri_both_nodup %>%
+  mutate(Source_aftermanual = 
+           ifelse(Source_aftermanual %in% names(replacement_sourcename), 
+                  replacement_sourcename[Source_aftermanual], 
+                  Source_aftermanual))
+unique(daily_contri_both_nodup$Source_aftermanual)
+
+length(unique(daily_contri_both_nodup$SiteCode))
+length(unique(daily_pm_both_nodup$SiteCode))
+
+daily_contri_site = select(daily_contri_both_nodup, Dataset, SiteCode)
+daily_contri_site = daily_contri_site[!duplicated(daily_contri_site), ]
+dim(daily_contri_site); table(daily_contri_site$Dataset)
+
+write.csv(daily_contri_both_nodup, "CSN_IMPROVE_Daily_Source_Impacts_2011-20.csv")
+write.csv(daily_pm_both_nodup, "CSN_IMPROVE_Daily_PM_2011-20.csv")
+
+# Check the trend
+daily_contri_both_nodup = fread("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/CSN_IMPROVE_Daily_Source_Impacts_2011-20.csv")
+daily_contri_both_nodup$V1 = NULL
+
+source_annual =
+  ddply(daily_contri_both_nodup, .(Year, Source_aftermanual), summarise,
+        Concentration_mean = mean(Concentration),
+        Concentration_min = min(Concentration),
+        Percent_mean = mean(Percent),
+        Percent_median = median(Percent),
+        Concentration_001 = quantile(Concentration, 0.001),
+        Concentration_999 = quantile(Concentration, 0.999),
+        Percent_001 = quantile(Percent, 0.001),
+        Percent_999 = quantile(Percent, 0.999))
+
+source_overall =
+  ddply(daily_contri_both_nodup, .(Source_aftermanual), summarise,
+        Concentration_mean = mean(Concentration),
+        Concentration_min = min(Concentration),
+        Percent_mean = mean(Percent),
+        Percent_median = median(Percent),
+        Concentration_001 = quantile(Concentration, 0.001),
+        Concentration_999 = quantile(Concentration, 0.999),
+        Percent_001 = quantile(Percent, 0.001),
+        Percent_999 = quantile(Percent, 0.999))
+
+quantile(subset(daily_contri_both_nodup, Source_aftermanual == "F1-Traffic")$Concentration, 0.01)
+
+pm_annual = 
+  ddply(daily_pm_both_nodup, .(Year), summarise,
+        PM2.5_pred_org_mean = mean(PM2.5_pred_org),
+        PM2.5_pred_org_median = median(PM2.5_pred_org),
+        PM2.5_obs_mean = mean(PM2.5_obs),
+        PM2.5_obs_median = median(PM2.5_obs)
+  )
+
+
+source_annual_conc =
+  source_annual %>%
+  dplyr::select(Source_aftermanual, Year, Concentration_mean) %>%
+  dplyr::mutate(Concentration_mean = round(Concentration_mean, 3)) %>%
+  tidyr::pivot_wider(
+    names_from = "Year",
+    values_from = "Concentration_mean"
+  )
+
+source_annual_perc =
+  source_annual %>%
+  dplyr::select(Source_aftermanual, Year, Percent_mean) %>%
+  dplyr::mutate(Percent_mean = round(Percent_mean, 1)) %>%
+  tidyr::pivot_wider(
+    names_from = "Year",
+    values_from = "Percent_mean"
+  )
+
+View(source_annual_conc)
+View(source_annual_perc)
