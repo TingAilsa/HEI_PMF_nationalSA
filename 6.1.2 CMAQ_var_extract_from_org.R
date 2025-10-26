@@ -159,15 +159,16 @@ us_grid_raster_001 =
   raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_001.tif"))
 
 # Choose the US grid resolution to project
-us_grid_raster = us_grid_raster_001
+# us_grid_raster = us_grid_raster_001
+us_grid_raster = us_grid_raster_01
 
-included_years = c(2011, 2017)
+included_years = c(2018, 2019, 2020)
 
 for (study_year in included_years){ # study_year = 2017
   
   # Folder for each year to save the CMAQ outputs
-  # year_folder = paste0(cmaq_org_folder, study_year, "/output")
-  year_folder = paste0(cmaq_org_folder, study_year, "/outputs")
+  year_folder = paste0(cmaq_org_folder, study_year, "/output")
+  # year_folder = paste0(cmaq_org_folder, study_year, "/outputs")
   
   # Get the list of monthly data in subfolders
   included_month_folders <- list.files(year_folder, full.names = TRUE)
