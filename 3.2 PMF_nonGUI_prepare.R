@@ -613,6 +613,7 @@ summary(comp_error_fraction)
 # write.csv(site_code_serial, "CSN_IMPROVE_site.serial.csv")
 
 site_code_serial_all = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial_all$V1 = NULL
+table(site_code_serial_all$Dataset)
 
 # add 0 to force the serial.No being three digits
 site_code_serial_all$serial.No =
