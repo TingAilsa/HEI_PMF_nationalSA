@@ -6,9 +6,9 @@
 # getwd()
 # data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
 
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
 getwd()
-data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
+data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
 
 ##packages in need
 library(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
@@ -31,7 +31,7 @@ library(ggsci)
 ####### 1. Data Preparation ####### 
 ##########################################################################################
 #### primary exploration & process, data prepration, START ####
-imp_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE sites.txt",
+imp_meta_sites = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE sites.txt",
                           sep = ",", dec = ".")
 imp_meta_sites$StartDate = as.Date(imp_meta_sites$StartDate, format = "%m/%d/%Y")
 imp_meta_sites$EndDate = as.Date(imp_meta_sites$EndDate, format = "%m/%d/%Y")
@@ -53,11 +53,11 @@ imp_meta_sites_use.1 =
          EndDate > as.Date("2011-01-01"))
 
 # other meta data
-imp_meta_site_history = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE sites history.txt",
+imp_meta_site_history = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE sites history.txt",
                                  sep = ",", dec = ".")
-imp_meta_flags = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE flags.txt",
+imp_meta_flags = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE flags.txt",
                           sep = ",", dec = ".")
-imp_meta_para = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE parameters.txt",
+imp_meta_para = read.csv("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/IMPROVE parameters.txt",
                          sep = ",", dec = ".")
 
 imp_meta_para[c("CompName", "anyname")] = 
@@ -79,7 +79,7 @@ write.csv(imp_meta_flags, "IMPROVE metadata 19 flags 2010-20.csv")
 write.csv(imp_meta_para, "IMPROVE metadata 109 parameters 2010-20.csv")
 
 # species concentrations, methods, etc.
-imp_data = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20221008_205315_uNQ0v IMPROVE.txt",
+imp_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20221008_205315_uNQ0v IMPROVE.txt",
                     sep = ",", dec = ".")
 # imp_data$V1 = NULL
 head(imp_data)
@@ -239,7 +239,7 @@ for(site_imp in unique(imp_plot$SiteCode)) {
     ts_plots <- list(Val_year, Unc_year, MDL_year,
                      Val_month, Unc_month, MDL_month,
                      Val_Unc, Val_MDL, MDL_Unc)
-    pdf(file.path("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE",
+    pdf(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE",
                   paste0("IMPROVE_", site_imp, "_",comp_name, "_Val MD & Unc.pdf")), height = 8, width = 12)
     grid.arrange(grobs = ts_plots, ncol = 3, nrow = 3)
     
