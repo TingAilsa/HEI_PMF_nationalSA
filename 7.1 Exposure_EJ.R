@@ -315,49 +315,49 @@ for(i in 1:length(census_periods)){
   
 }
 
-# read rf predictions
-bb <- read.fst( 
-  file.path( loc, paste0(exposure_prefix, 'Biomass_', census_period, '.fst')),
-  as.data.table = TRUE)
-ss <- read.fst( 
-  file.path( loc, paste0(exposure_prefix, 'Sulfate_', census_period, '.fst')),
-  as.data.table = TRUE)
-dust <- read.fst( 
-  file.path( loc, paste0(exposure_prefix, 'Dust_', census_period, '.fst')),
-  as.data.table = TRUE)
-traffic <- read.fst( 
-  file.path( loc, paste0(exposure_prefix, 'Traffic_', census_period, '.fst')),
-  as.data.table = TRUE)
-
-# remove duplicates
-bb <- bb[ !duplicated( bb[,.( Date, Longitude, Latitude)])]
-ss <- ss[ !duplicated( ss[,.( Date, Longitude, Latitude)])]
-dust <- dust[ !duplicated( dust[,.( Date, Longitude, Latitude)])]
-traffic <- traffic[ !duplicated( traffic[,.( Date, Longitude, Latitude)])]
-
-# take annual average
-bb.avg <- 
-  bb[, .( Biomass = mean( Predictions)), by = .( Longitude, Latitude)]
-ss.avg <- 
-  ss[, .( Sulfate = mean( Predictions)), by = .( Longitude, Latitude)]
-traffic.avg <- 
-  traffic[, .( Traffic = mean( Predictions)), by = .( Longitude, Latitude)]
-dust.avg <- 
-  dust[, .( Dust = mean( Predictions)), by = .( Longitude, Latitude)]
-
-# Merge sources
-all_sources_dt <- 
-  merge.data.table( bb.avg, ss.avg, by = c( "Longitude", "Latitude")) %>%
-  merge.data.table( traffic.avg, by = c( "Longitude", "Latitude")) %>%
-  merge.data.table( dust.avg, by = c( "Longitude", "Latitude"))
-
-##### Merge with Census
-all_sources_census_grid <-
-  merge(all_sources_dt, census_grid_us)
-all_sources_census_grid$cell = NULL
-head(all_sources_census_grid); dim(all_sources_census_grid)
-summary(all_sources_census_grid)
-
+# # read rf predictions
+# bb <- read.fst( 
+#   file.path( loc, paste0(exposure_prefix, 'Biomass_', census_period, '.fst')),
+#   as.data.table = TRUE)
+# ss <- read.fst( 
+#   file.path( loc, paste0(exposure_prefix, 'Sulfate_', census_period, '.fst')),
+#   as.data.table = TRUE)
+# dust <- read.fst( 
+#   file.path( loc, paste0(exposure_prefix, 'Dust_', census_period, '.fst')),
+#   as.data.table = TRUE)
+# traffic <- read.fst( 
+#   file.path( loc, paste0(exposure_prefix, 'Traffic_', census_period, '.fst')),
+#   as.data.table = TRUE)
+# 
+# # remove duplicates
+# bb <- bb[ !duplicated( bb[,.( Date, Longitude, Latitude)])]
+# ss <- ss[ !duplicated( ss[,.( Date, Longitude, Latitude)])]
+# dust <- dust[ !duplicated( dust[,.( Date, Longitude, Latitude)])]
+# traffic <- traffic[ !duplicated( traffic[,.( Date, Longitude, Latitude)])]
+# 
+# # take annual average
+# bb.avg <- 
+#   bb[, .( Biomass = mean( Predictions)), by = .( Longitude, Latitude)]
+# ss.avg <- 
+#   ss[, .( Sulfate = mean( Predictions)), by = .( Longitude, Latitude)]
+# traffic.avg <- 
+#   traffic[, .( Traffic = mean( Predictions)), by = .( Longitude, Latitude)]
+# dust.avg <- 
+#   dust[, .( Dust = mean( Predictions)), by = .( Longitude, Latitude)]
+# 
+# # Merge sources
+# all_sources_dt <- 
+#   merge.data.table( bb.avg, ss.avg, by = c( "Longitude", "Latitude")) %>%
+#   merge.data.table( traffic.avg, by = c( "Longitude", "Latitude")) %>%
+#   merge.data.table( dust.avg, by = c( "Longitude", "Latitude"))
+# 
+# ##### Merge with Census
+# all_sources_census_grid <-
+#   merge(all_sources_dt, census_grid_us)
+# all_sources_census_grid$cell = NULL
+# head(all_sources_census_grid); dim(all_sources_census_grid)
+# summary(all_sources_census_grid)
+# 
 
 #### Grid population exposure: data preparation #### 
 
@@ -894,6 +894,9 @@ ggsave(
 #   file.path("EJ_plot",
 #             paste0("Income_nation_PWE_US_01_grid_", cmaq_period, ".pdf")), 
 #   plot = income_pwe_bar, width = 8, height = 6)
+
+
+
 
 #### PWE: Census Tract #### 
 # Census GEOID
