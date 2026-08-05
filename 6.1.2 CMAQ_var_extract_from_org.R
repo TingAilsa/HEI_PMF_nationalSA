@@ -73,16 +73,17 @@ get_nc_grid_create_crs <- function(nc_file) {
   return(list(lon = lon, lat = lat, p4s = p4s))
 }
 
-# nc_file = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_SA_v54_gcc_CMAQ_ISAM_201102.nc"
-nc_file = nc_cmaq_month_path
-grid_info <- get_nc_grid_create_crs(nc_file)
-lon = grid_info$lon; lat = grid_info$lat; p4s = grid_info$p4s
-# cmaq_var = "PM25_TOT_NRD"
-cmaq_var = "NO2"
+# # nc_file = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_SA_v54_gcc_CMAQ_ISAM_201102.nc"
+# nc_file = nc_cmaq_month_path
+# grid_info <- get_nc_grid_create_crs(nc_file)
+# lon = grid_info$lon; lat = grid_info$lat; p4s = grid_info$p4s
+# # cmaq_var = "PM25_TOT_NRD"
+# cmaq_var = "NO2"
 
 ###### Daily, extract selected variable from .nc file, add crs and date and return the corresponding raster brick ###### 
 daily_cmaq_var_add_date <- 
   function(nc_file, us_grid_raster, cmaq_var, lon, lat, p4s) {
+    # nc_file = nc_cmaq_month_path
     
     # Open the .nc file
     # nc_cmaq_file <- nc_open(nc_file)
@@ -90,6 +91,20 @@ daily_cmaq_var_add_date <-
     nc_cmaq_file <- brick(nc_file,
                           varname = cmaq_var,
                           crs = p4s)
+    
+    # # Check the variable value range, cmaq_var_use_list is from below code
+    # for (var in cmaq_var_use_list) {
+    #   vals <- ncvar_get(nc_temp, var)
+    #   cat(var, "-> min:", min(vals, na.rm=TRUE),
+    #       " max:", max(vals, na.rm=TRUE), "\n")
+    # }
+    
+    # # Check the variable value range, cmaq_var_use_list is from below code
+    # for (var in cmaq_var_use_list) {
+    #   vals <- ncvar_get(nc_cmaq_file, var)
+    #   cat(var, "-> min:", min(vals, na.rm=TRUE),
+    #       " max:", max(vals, na.rm=TRUE), "\n")
+    # }
     
     #create an empty raster for grids with crs descriotion
     latlon_raster.r <- 
@@ -123,6 +138,9 @@ daily_cmaq_var_add_date <-
     #                          xmn = min(lon), xmx = max(lon), 
     #                          ymn = min(lat), ymx = max(lat), 
     #                          crs = p4s)
+    
+    cat("Before projection - min:", minValue(nc_cmaq_file), 
+        "max:", maxValue(nc_cmaq_file), "\n")
     
     # Then project pollu_var_brick to match the target US grid of 0.1 or 0.01 degree
     pollu_var_projected <- projectRaster(nc_cmaq_file, # pollu_var_brick, 
@@ -187,9 +205,12 @@ for (study_year in included_years){ # study_year = 2017
     
     month_folder = paste0(study_month, "/POST")
     
+    # month_folder <- "/projects/HAQ_LAB/Sumaiya/cmaq/cmaq_output/POST/2020"
+    
     # List all .nc files in the subfolder
     month_nc_files <- list.files(month_folder, pattern = "\\.nc$", full.names = TRUE)
-    month_nc_files <- month_nc_files[str_detect(basename(month_nc_files),  "^hr2day_v54_")]
+    # month_nc_files <- month_nc_files[str_detect(basename(month_nc_files),  "^hr2day_v54_")]
+    month_nc_files <- month_nc_files[str_detect(basename(month_nc_files),  "^hr2day_")]
     
     for (nc_cmaq_month_path in month_nc_files) { # nc_cmaq_month_path = month_nc_files[1]
       print("Path of the .nc to be processed:")
@@ -199,6 +220,7 @@ for (study_year in included_years){ # study_year = 2017
       # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_v54_gcc_CMAQ_ISAM_201701.nc"
       # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/hr2day_v54_gcc_CMAQ_ISAM_201102.nc"
       # nc_cmaq_month_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/COMBINE_ACONC_v54_gcc_CMAQ_ISAM_2017_Jan_201701.nc"
+      # nc_cmaq_month_path = "/projects/HAQ_LAB/Sumaiya/cmaq/cmaq_output/R/data/filtered_hr2day/median_ratio/hr2day_filtered_w_organics_201711.nc"
       nc_cmaq_month = nc_open(nc_cmaq_month_path)
       cmaq_var_names <- names(nc_cmaq_month$var) 
       
