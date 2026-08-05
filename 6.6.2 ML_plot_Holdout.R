@@ -45,9 +45,10 @@ modeling_perform_metrics <- function(observed, predicted) {
 
 #### Pre-setting #### 
 
-# setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
 # setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
-setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/Aim3_ML_predictions")
+# setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/Aim3_ML_predictions")
+# setwd("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/outputs/Aim3_inputs_predictions")
 getwd()
 
 ## Extract long & points with the continental US
@@ -55,7 +56,7 @@ us_states = USAboundaries::us_states()
 us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
 
 ## Parameter settings
-pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass") # , "Traffic", "Dust"
+pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass", "Nitrate", "PM25") # , "Traffic", "Dust"
 # pred_sources = c("Traffic") # , "Traffic", "Dust"
 
 ## CMAQ/Study Period
@@ -566,17 +567,18 @@ for(used_model in applied_model){ # used_model = applied_model[1]
 
 #### Plot, comparison among different years (flexible number of years) ####
 
-setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
+# setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
 # setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
+setwd("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/outputs/Aim3_inputs_predictions")
 getwd()
 
 ## Parameter settings
-pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass")
+pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass", "Nitrate", "PM25") # , "Traffic", "Dust"
 applied_model = c("RF")
 dataset = c("noCoords_")
 
 # Define the years you want to include (can be 2 to 10 years)
-cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017) 
+cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020) 
 # Create period strings for each year
 cmaq_periods = paste0(cmaq_years, "-01_", cmaq_years, "-12")
 
@@ -896,17 +898,17 @@ for(used_model in applied_model) {
 #### Plot, all years, all sources ####
 
 # setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
+setwd("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/outputs/Aim3_inputs_predictions_10year_model")
 getwd()
 
-
 ## Parameter settings
-pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass")
+pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass", "Nitrate", "PM25") # , "Traffic", "Dust"
 applied_model = c("RF")
 dataset = c("noCoords_")
 
 # Define the years you want to include (can be 2 to 10 years)
-cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017) 
+cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020) 
 # Create period strings for each year
 cmaq_periods = paste0(cmaq_years, "-01_", cmaq_years, "-12")
 
