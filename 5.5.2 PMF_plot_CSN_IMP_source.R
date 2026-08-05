@@ -21,10 +21,18 @@ library(patchwork)
 library(ggpubr)
 library(corrplot)
 library(psych)
+library(ggh4x)
+# library(openair)
+# install.packages("openair", dependencies = TRUE)
+library(mblm)
+library(forcats)
 
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/")
+# data.dir <- "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/"
+# getwd()
 
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/")
-data.dir <- "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/"
+setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/")
+data.dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/"
 getwd()
 
 # generate the US county boundary data
@@ -104,6 +112,61 @@ us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "M
 # 
 # write_fst(pmf_both_perc, "CSN_IMPROVE_daily_SA_conc_perc.fst")
 
+
+#### 0.0 Extract site with Residual Oil ####
+## This is based on dataset generated in 2024-11, some mismatch in source concentrations, but site info is correct
+pmf_2024 = fread("CSN_IMPROVE_source_daily_contribution.csv")
+head(pmf_2024)
+
+# Extract sites with residual oil
+pmf_2024_resOil = 
+  subset(pmf_2024, Source_aftermanual == "F1-Traffic-ResOil") %>%
+  dplyr::select(-Date, -Concentration)
+pmf_2024_resOil = pmf_2024_resOil[!duplicated(pmf_2024_resOil), ]
+dim(pmf_2024_resOil)
+head(pmf_2024_resOil)
+
+subset(pmf_2024_resOil, Longitude < -90 & Longitude >-100)
+# SAFO1, Kansas, 20% of source featured with V Na Ni Mg Rb, also in other factor results
+# SOGP1, Oklahoma, Br Na Se V S, changed to sulfate?
+# STIL1, Oklahoma, near Dahlonegah Lake; Akensas River, wind from southwest bring the pollutants?
+
+subset(pmf_2024_resOil, 
+       Latitude > 37.5 & Latitude < 40.5 & Longitude < -74 & Longitude >-80)
+# BRIG1, New Jersey
+# FRRE1, Maryland, change to gas??
+# WASH1, DC
+
+# Plot positions of these sites
+ggplot() +
+  geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
+  geom_point(
+    data = subset(pmf_2024_resOil), 
+    mapping = aes(              
+      x = Longitude, 
+      y = Latitude
+    ),
+    size = 2.5, 
+    alpha = 0.9, 
+    shape = 21, 
+    color = "grey66"
+  ) +
+  labs(
+    title = "Sites with Residual Oil"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    strip.text = element_text(color = "black", size = 16),
+    strip.text.y = element_text(size = 10),
+    axis.title = element_text(size = 0),
+    legend.text = element_text(size = 14), 
+    legend.key.size = unit(1.5, "lines"),
+    legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
+    legend.spacing.y = unit(1, "cm")
+  )
+
+
 #### 0.2 Prepare data for plotting ####
 
 # "CSN_IMPROVE_Daily_Source_Impacts_2011-20.csv"
@@ -118,13 +181,31 @@ table(pmf_both_perc$Dataset, pmf_both_perc$SiteCode)
 pmf_both_perc$V1 = NULL
 dim(pmf_both_perc); head(pmf_both_perc) # 1585748  8; 1428020   15
 head(pm_both)
+unique(pmf_both_perc$Source_aftermanual)
 
+## The negative fraction by source
+pmf_both_perc[, .(
+  n_total_source = .N,
+  n_negative_source = sum(Concentration < 0),
+  frac_negative_source = sum(Concentration < 0) / .N * 100
+), by = Source_aftermanual]
+# 3.89% for traffic, 6.33 for SN, 6.42 SS, 5.92 Non-taiopipe, 6.78 Industry, 18.4 salt, 4.8 BB, 9.62 soil, 5.0 OP-Rich
+
+## Annual and overall PM for all sites
 all_site_annual_pm = 
   ddply(pm_both, .(Year), summarise,
         PM2.5_pred_org_mean = mean(PM2.5_pred_org),
         PM2.5_pred_org_median = median(PM2.5_pred_org),
         PM2.5_obs_mean = mean(PM2.5_obs),
         PM2.5_obs_median = median(PM2.5_obs))
+
+all_site_month_pm = 
+  ddply(pm_both, .(Month), summarise,
+        PM2.5_pred_org_mean = mean(PM2.5_pred_org),
+        PM2.5_pred_org_median = median(PM2.5_pred_org),
+        PM2.5_obs_mean = mean(PM2.5_obs),
+        PM2.5_obs_median = median(PM2.5_obs))
+head(all_site_annual_pm); head(all_site_month_pm)
 
 all_site_overall_pm = 
   ddply(pm_both, .(Dataset, SiteCode, serial.No), summarise,
@@ -134,6 +215,35 @@ all_site_overall_pm =
         PM2.5_obs_median = median(PM2.5_obs))
 # View(all_site_overall_pm)
 
+
+ggplot(all_site_overall_pm,
+       aes(x = " ", y = PM2.5_pred_org_mean)) +
+  geom_jitter(width = 0.28, alpha = 0.35, color = "gray50") +
+  geom_boxplot(outlier.shape = NA, 
+               linewidth = 0.6, width = 0.5, alpha = 0.65) +
+  labs(y = expression("Concentration (" * mu * "g/m"^3 * ")"), 
+       x = expression("PM"[2.5])) +
+  theme_base() +
+  theme(axis.text.x = element_text( color = "gray25", size = 20, 
+                                    angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_text(color = "gray25", size = 20),
+        axis.title = element_text(color = "gray25", size = 24),
+        strip.text = element_text(color = "gray30", size = 14, face = "bold"), 
+        strip.background = element_blank(), # Remove frame lines and background
+        strip.text.y.left = element_text(color = "gray30", size = 22, 
+                                         face = "bold", angle = 90),
+        strip.placement = "outside", # Place facet labels outside (as y axis titles)
+        legend.position = "bottom",
+        legend.margin = margin(t = -15, r = 0, b = 0, l = 0), # Reduce space between legend and figure
+        legend.text=element_text(size = 20), legend.title=element_text(size = 20),
+        panel.spacing.y = unit(0.8, "cm"), # Change space between facet panels
+        panel.background = element_blank(),
+        plot.background = element_rect(fill = "white", colour = NA))
+
+  
+
+
+## Annual PM for each site
 annual_site_overall_pm = 
   ddply(pm_both, .(Dataset, SiteCode, serial.No, Year), summarise,
         PM2.5_pred_org_mean = mean(PM2.5_pred_org),
@@ -141,6 +251,46 @@ annual_site_overall_pm =
         PM2.5_obs_mean = mean(PM2.5_obs),
         PM2.5_obs_median = median(PM2.5_obs))
 # View(annual_site_overall_pm)
+
+site_pm_slope_diff_conc_ts <- 
+  annual_site_overall_pm %>%
+  group_by(SiteCode) %>% 
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "PM2.5_pred_org_mean")
+  ) %>%
+  ungroup()
+names(site_pm_slope_diff_conc_ts) = c("Source", "diff_slope_conc", "pvalue_conc", "intercept_conc")
+
+site_pm_slope_diff_conc_ts = na.omit(site_pm_slope_diff_conc_ts)
+head(site_pm_slope_diff_conc_ts)
+summary(site_pm_slope_diff_conc_ts)
+
+ggplot(site_pm_slope_diff_conc_ts,
+       aes(x = " ", y = diff_slope_conc)) +
+  geom_jitter(width = 0.28, alpha = 0.35, color = "gray50") +
+  geom_boxplot(outlier.shape = NA, 
+               linewidth = 0.6, width = 0.5, alpha = 0.65) +
+  labs(y = expression("Concentration (" * mu * "g/m"^3 * ")"), 
+       x = expression("PM"[2.5])) +
+  theme_base() +
+  theme(axis.text.x = element_text( color = "gray25", size = 20, 
+                                    angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_text(color = "gray25", size = 20),
+        axis.title = element_text(color = "gray25", size = 24),
+        strip.text = element_text(color = "gray30", size = 14, face = "bold"), 
+        strip.background = element_blank(), # Remove frame lines and background
+        strip.text.y.left = element_text(color = "gray30", size = 22, 
+                                         face = "bold", angle = 90),
+        strip.placement = "outside", # Place facet labels outside (as y axis titles)
+        legend.position = "bottom",
+        legend.margin = margin(t = -15, r = 0, b = 0, l = 0), # Reduce space between legend and figure
+        legend.text=element_text(size = 20), legend.title=element_text(size = 20),
+        panel.spacing.y = unit(0.8, "cm"), # Change space between facet panels
+        panel.background = element_blank(),
+        plot.background = element_rect(fill = "white", colour = NA))
+
+mean(site_pm_slope_diff_conc_ts$diff_slope_conc)
+sd(site_pm_slope_diff_conc_ts$diff_slope_conc)
 
 pm_both_prediction_perform = 
   pm_both %>%
@@ -186,6 +336,47 @@ pmf_both_perc$Source =
   gsub("F[0-9]+-", "", pmf_both_perc$Source_aftermanual)
 head(pmf_both_perc)
 
+# Update source names
+pmf_both_perc <- 
+  pmf_both_perc %>%
+  dplyr::mutate(
+    Source = case_when(
+    Source == "Biomass" ~ "Biomass Burning/SOA",
+    Source == "Traffic" ~ "Traffic Exhaust",
+    Source == "Secondary Sulfate" ~ "Sulfate",
+    Source == "Soil/Dust" ~ "Dust",
+    TRUE ~ Source  # Keep original value if no match
+  ))
+unique(pmf_both_perc$Source)
+
+# Define the sequence of sources for later plotting
+source_sequence <- 
+  c("Traffic Exhaust", "Secondary Nitrate", "Sulfate", "Non-tailpipe",
+    "Industry", "Salt", "Biomass Burning/SOA", "Dust", "OP-rich")
+
+# Assign source sequence
+pmf_both_perc <-
+  pmf_both_perc %>%
+  mutate(Source = factor(Source, levels = source_sequence))
+unique(pmf_both_perc$Source)
+levels(pmf_both_perc$Source)
+class(pmf_both_perc$Source)
+
+# write.csv(pmf_both_perc, "PMF_CSN_IMPROVE_SA_adjustedName_20260316.csv")
+
+# Set preset source labels, when needing a second raw for source names
+source_labels_2row <- c(
+  "Traffic Exhaust" = "Traffic Exhaust",
+  "Secondary Nitrate" = "Secondary Nitrate",
+  "Sulfate" = "Sulfate",
+  "Non-tailpipe" = "Non-tailpipe",
+  "Industry" = "Industry",
+  "Salt" = "Salt",
+  "Biomass Burning/SOA" = "Biomass Burning/\nSOA",
+  "Dust" = "Dust",
+  "OP-rich" = "OP-rich"
+)
+
 # Get the total contributions from all sources (PM2.5 itself)
 pmf_daily_pm =
   pmf_both_perc %>%
@@ -202,7 +393,7 @@ subset(pmf_daily_pm, Percent < -50)
 
 pmf_annual_pm =
   pmf_daily_pm %>%
-  dplyr::group_by(SiteCode, Year) %>%
+  dplyr::group_by(Year) %>%
   dplyr::summarise(
     Concentration = median(Concentration),
     Percent = median(Percent),
@@ -210,6 +401,17 @@ pmf_annual_pm =
   )
 head(pmf_annual_pm)
 summary(pmf_annual_pm)
+
+pmf_month_pm =
+  pmf_daily_pm %>%
+  dplyr::group_by(Month) %>%
+  dplyr::summarise(
+    Concentration = median(Concentration),
+    Percent = median(Percent),
+    .groups = "drop"
+  )
+head(pmf_month_pm)
+summary(pmf_month_pm)
 
 # nationwide
 pmf_daily_pm %>%
@@ -230,18 +432,20 @@ pmf_daily_pm %>%
 
 # Nationwide source: annual median & range
 Year_naiton_annual <- 
-  ddply(pmf_both_perc, 
-        .(Year, Source, Source_aftermanual), 
-        summarise,
-        Conc_mean = mean(Concentration),
-        Conc_sd = sd(Concentration),
-        Conc_min = min(Concentration),
-        Conc_max = max(Concentration),
-        Perc_mean = mean(Percent),
-        Perc_sd = sd(Percent),
-        Perc_min = min(Percent),
-        Perc_max = max(Percent))
-
+  pmf_both_perc %>%
+  dplyr::group_by(Year, Source, Source_aftermanual) %>%
+  dplyr::summarise(
+    Conc_mean = mean(Concentration),
+    Conc_sd = sd(Concentration),
+    Conc_min = min(Concentration),
+    Conc_max = max(Concentration),
+    Perc_mean = mean(Percent),
+    Perc_sd = sd(Percent),
+    Perc_min = min(Percent),
+    Perc_max = max(Percent),
+    .groups = "drop"
+  )
+  
 Year_naiton_2011_20 <-
   subset(Year_naiton_annual, Year %in% c(2011, 2020))
 
@@ -279,17 +483,19 @@ pmf_both_conc_sd_absMean_source =
 
 # Get annual median & range
 Year_aggregated_use <- 
-  ddply(pmf_both_perc, 
-        .(Dataset, State, SiteCode, Year, Source, Source_aftermanual), 
-        summarise,
-        Longitude = mean(Longitude),
-        Latitude = mean(Latitude),
-        Concentration = median(Concentration),
-        conc_up = quantile(Concentration, 0.975),
-        conc_down = quantile(Concentration, 0.025),
-        Percent = median(Percent),
-        perc_up = quantile(Percent, 0.975),
-        perc_down = quantile(Percent, 0.025))
+  pmf_both_perc %>%
+  dplyr::group_by(Dataset, State, SiteCode, Year, Source, Source_aftermanual) %>%
+  dplyr::summarise(
+    Longitude = mean(Longitude),
+    Latitude = mean(Latitude),
+    Concentration = median(Concentration),
+    conc_up = quantile(Concentration, 0.975),
+    conc_down = quantile(Concentration, 0.025),
+    Percent = median(Percent),
+    perc_up = quantile(Percent, 0.975),
+    perc_down = quantile(Percent, 0.025),
+    .groups = "drop"
+  )
 summary(Year_aggregated_use); head(Year_aggregated_use)
 
 summary(subset(Year_aggregated_use, Source_aftermanual == "F1-Traffic"))
@@ -297,56 +503,62 @@ summary(subset(Year_aggregated_use, Source_aftermanual == "F8-Biomass"))
 
 head(Year_aggregated_use)
 overall_aggregated_use =
-  ddply(Year_aggregated_use, 
-        .(Dataset, State, SiteCode, Source), 
-        summarise,
-        Longitude = mean(Longitude),
-        Latitude = mean(Latitude),
-        Concentration = median(Concentration),
-        conc_up = quantile(Concentration, 0.975),
-        conc_down = quantile(Concentration, 0.025),
-        Percent = median(Percent),
-        perc_up = quantile(Percent, 0.975),
-        perc_down = quantile(Percent, 0.025))
+  pmf_both_perc %>%
+  dplyr::group_by(Dataset, State, SiteCode, Source) %>%
+  dplyr::summarise(
+    Longitude = mean(Longitude),
+    Latitude = mean(Latitude),
+    Concentration = median(Concentration),
+    conc_up = quantile(Concentration, 0.975),
+    conc_down = quantile(Concentration, 0.025),
+    Percent = median(Percent),
+    perc_up = quantile(Percent, 0.975),
+    perc_down = quantile(Percent, 0.025),
+    .groups = "drop"
+  )
 head(overall_aggregated_use)
 summary(overall_aggregated_use)
 
-# write.csv(overall_aggregated_use, 
+# write.csv(overall_aggregated_use,
 #           "CSN_IMPROVE_Overall_Source_Impacts_2011-20.csv")
-
 
 # Get monthly median & range
 Month_aggregated_use <- 
-  ddply(pmf_both_perc, 
-        .(Dataset, SiteCode, Month, Source, Source_aftermanual), 
-        summarise,
-        Longitude = mean(Longitude),
-        Latitude = mean(Latitude),
-        Concentration = median(Concentration),
-        conc_up = quantile(Concentration, 0.975),
-        conc_down = quantile(Concentration, 0.025),
-        Percent = median(Percent),
-        perc_up = quantile(Percent, 0.975),
-        perc_down = quantile(Percent, 0.025))
+  pmf_both_perc %>%
+  dplyr::group_by(Dataset, SiteCode, Month, Source, Source_aftermanual) %>%
+  dplyr::summarise(
+    Longitude = mean(Longitude),
+    Latitude = mean(Latitude),
+    Concentration = median(Concentration),
+    conc_up = quantile(Concentration, 0.975),
+    conc_down = quantile(Concentration, 0.025),
+    Percent = median(Percent),
+    perc_up = quantile(Percent, 0.975),
+    perc_down = quantile(Percent, 0.025),
+    .groups = "drop"
+  )
 summary(Month_aggregated_use); head(Month_aggregated_use)
 unique(Month_aggregated_use$Source_aftermanual)
-
+unique(Month_aggregated_use$Source); class(Month_aggregated_use$Source)
+unique(pmf_both_perc$Source)
 
 # Get DOW median & range
 pmf_both_perc$DOW = weekdays(pmf_both_perc$Date)
 head(pmf_both_perc)
 DOW_aggregated_use <- 
-  ddply(pmf_both_perc, 
-        .(SiteCode, DOW, Source, Source_aftermanual), 
-        summarise,
-        Longitude = mean(Longitude),
-        Latitude = mean(Latitude),
-        Concentration = median(Concentration),
-        conc_up = quantile(Concentration, 0.975),
-        conc_down = quantile(Concentration, 0.025),
-        Percent = median(Percent),
-        perc_up = quantile(Percent, 0.975),
-        perc_down = quantile(Percent, 0.025))
+  pmf_both_perc %>%
+  dplyr::group_by(SiteCode, DOW, Source, Source_aftermanual) %>%
+  dplyr::summarise(
+    Longitude = mean(Longitude),
+    Latitude = mean(Latitude),
+    Concentration = median(Concentration),
+    conc_up = quantile(Concentration, 0.975),
+    conc_down = quantile(Concentration, 0.025),
+    Percent = median(Percent),
+    perc_up = quantile(Percent, 0.975),
+    perc_down = quantile(Percent, 0.025),
+    .groups = "drop"
+  )
 summary(DOW_aggregated_use); head(DOW_aggregated_use)
 unique(DOW_aggregated_use$Source_aftermanual)
 
@@ -358,15 +570,17 @@ unique(DOW_aggregated_use$Source_aftermanual)
 
 # the median and 99% of data
 DOW_aggregated_summary = 
-  ddply(DOW_aggregated_use, 
-        .(Source_aftermanual, Source, DOW),
-        summarise,
-        conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
-        conc_Median = median(Concentration, na.rm = T),
-        conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
-        perc_Lower = quantile(Percent, 0.0025, na.rm = T),
-        perc_Median = median(Percent, na.rm = T),
-        perc_Upper = quantile(Percent, 0.9975, na.rm = T))
+  DOW_aggregated_use %>%
+  dplyr::group_by(Source_aftermanual, Source, DOW) %>%
+  dplyr::summarise(
+    conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
+    conc_Median = median(Concentration, na.rm = T),
+    conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
+    perc_Lower = quantile(Percent, 0.0025, na.rm = T),
+    perc_Median = median(Percent, na.rm = T),
+    perc_Upper = quantile(Percent, 0.9975, na.rm = T),
+    .groups = "drop"
+  )
 
 # Generate source for plotting
 DOW_plot_data = 
@@ -430,19 +644,143 @@ line_DOW =
   )
 line_DOW
 
+###### Trends 1.1.2 : DOW, median line, by Dataset ######
+DOW_aggregated_dataset <- 
+  pmf_both_perc %>%
+  dplyr::group_by(Dataset, SiteCode, DOW, Source, Source_aftermanual) %>%
+  dplyr::summarise(
+    Longitude = mean(Longitude),
+    Latitude = mean(Latitude),
+    Concentration = median(Concentration),
+    conc_up = quantile(Concentration, 0.975),
+    conc_down = quantile(Concentration, 0.025),
+    Percent = median(Percent),
+    perc_up = quantile(Percent, 0.975),
+    perc_down = quantile(Percent, 0.025),
+    .groups = "drop"
+  )
+
+# the median and 99% of data
+DOW_aggregated_sum_dataset = 
+  DOW_aggregated_dataset %>%
+  dplyr::group_by(Dataset, Source_aftermanual, Source, DOW) %>%
+  dplyr::summarise(
+    conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
+    conc_Median = median(Concentration, na.rm = T),
+    conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
+    perc_Lower = quantile(Percent, 0.0025, na.rm = T),
+    perc_Median = median(Percent, na.rm = T),
+    perc_Upper = quantile(Percent, 0.9975, na.rm = T),
+    .groups = "drop"
+  )
+
+# Generate source for plotting
+DOW_plot_data_dataset = 
+  subset(DOW_aggregated_sum_dataset, 
+         Source_aftermanual %in% 
+           c("F1-Traffic", "F2-Secondary Nitrate", "F3-Secondary Sulfate",
+             "F8-Biomass", "F8-Soil/Dust"))
+
+# Make sure DOW is a factor with proper order
+DOW_plot_data_dataset$DOW <- 
+  factor(DOW_plot_data_dataset$DOW, 
+         levels = c("Sunday", "Monday", "Tuesday", "Wednesday", 
+                    "Thursday", "Friday", "Saturday"))
+head(DOW_plot_data_dataset)
+# View(DOW_plot_data)
+
+# Plotting
+line_conc_DOW_dataset <-
+  ggplot(DOW_plot_data_dataset,
+         aes(x = DOW, y= conc_Median, color = Source, group = Source)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 2.5) +
+  facet_grid(Dataset~.) +
+  scale_color_manual(values = color_source_noF) +
+  scale_x_discrete(
+    limits = c("Sunday", "Monday", "Tuesday", "Wednesday", 
+               "Thursday", "Friday", "Saturday")) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(y = format_variable("Concentration µg/m3")) +
+  theme_minimal(base_size = 28) + 
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.5),
+    axis.title.x = element_text(vjust = 0, hjust = 0.5))
+line_conc_DOW_dataset
+
+line_perc_DOW_dataset <-
+  ggplot(DOW_plot_data_dataset,
+         aes(x = DOW, y= perc_Median, color = Source, group = Source)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2.5) +
+  facet_grid(Dataset~.) +
+  scale_color_manual(values = color_source_noF) +
+  scale_x_discrete(
+    limits = c("Sunday", "Monday", "Tuesday", "Wednesday", 
+               "Thursday", "Friday", "Saturday")) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(y = "Percent %") +
+  theme_minimal(base_size = 28)  + 
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.5))
+# line_perc_DOW_dataset
+
+# combine two figures and show the legend once
+line_DOW_dataset = 
+  ggarrange(line_conc_DOW_dataset, NULL, line_perc_DOW_dataset, 
+            widths = c(1, 0.2, 1), # add space between figure by NULL and widths setting
+            nrow=1, align = "v", # Align vertically
+            common.legend = TRUE, legend="bottom"
+  )
+line_DOW_dataset
+
+
+DOW_plot_data$Dataset = "Both"
+DOW_plot_data = relocate(DOW_plot_data, "Dataset", .before = "Source_aftermanual")
+dow_comb = rbind(DOW_plot_data, DOW_plot_data_dataset)
+head(dow_comb)
+
+dow_comb_traf = subset(dow_comb, Source == "Traffic")
+dow_comb_traf$weekday = "Y"
+dow_comb_traf$weekday[dow_comb_traf$DOW %in% c("Sunday", "Saturday", "Friday")] = "N"
+
+dow_comb_traf %>%
+  dplyr::group_by(Dataset, weekday) %>%
+  dplyr::summarise(
+    n = n(),
+    conc_mean = mean(conc_Median),
+    conc_median = median(conc_Median)
+  ) %>%
+  dplyr::summarise(
+    # Relative difference (assumes 2 groups)
+    rela_diff_mean = (conc_mean[1] - conc_mean[2]) / conc_mean[2] * 100,
+    rela_diff_median = (conc_median[1] - conc_median[2]) / conc_median[2] * 100,
+    
+    # For tests, we need to go back to original data
+    t_pvalue = t.test(conc_Median ~ weekday, data = dow_comb)$p.value,
+    wilcox_pvalue = wilcox.test(conc_Median ~ weekday, data = dow_comb)$p.value
+  )
+
+
 ###### Trends 1.2: monthly, median line ######
 
 # the median and 99% of data
 Month_aggregated_summary = 
-  ddply(Month_aggregated_use, 
-        .(Source_aftermanual, Source, Month),
-        summarise,
-        conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
-        conc_Median = median(Concentration, na.rm = T),
-        conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
-        perc_Lower = quantile(Percent, 0.0025, na.rm = T),
-        perc_Median = median(Percent, na.rm = T),
-        perc_Upper = quantile(Percent, 0.9975, na.rm = T))
+  Month_aggregated_use %>%
+  dplyr::group_by(Source_aftermanual, Source, Month) %>%
+  dplyr::summarise(
+    conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
+    conc_Median = median(Concentration, na.rm = T),
+    conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
+    perc_Lower = quantile(Percent, 0.0025, na.rm = T),
+    perc_Median = median(Percent, na.rm = T),
+    perc_Upper = quantile(Percent, 0.9975, na.rm = T),
+    .groups = "drop"
+  )
 Month_aggregated_summary$Month = as.integer(Month_aggregated_summary$Month)
 
 # Generate source for plotting
@@ -500,15 +838,17 @@ line_Month
 
 # the median and 99% of data
 Month_aggregated_summary_csnimp = 
-  ddply(Month_aggregated_use, 
-        .(Dataset, Source_aftermanual, Source, Month),
-        summarise,
-        conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
-        conc_Median = median(Concentration, na.rm = T),
-        conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
-        perc_Lower = quantile(Percent, 0.0025, na.rm = T),
-        perc_Median = median(Percent, na.rm = T),
-        perc_Upper = quantile(Percent, 0.9975, na.rm = T))
+  Month_aggregated_use %>%
+  dplyr::group_by(Dataset, Source_aftermanual, Source, Month) %>%
+  dplyr::summarise(
+    conc_Lower = quantile(Concentration, 0.0025, na.rm = T),
+    conc_Median = median(Concentration, na.rm = T),
+    conc_Upper = quantile(Concentration, 0.9975, na.rm = T),
+    perc_Lower = quantile(Percent, 0.0025, na.rm = T),
+    perc_Median = median(Percent, na.rm = T),
+    perc_Upper = quantile(Percent, 0.9975, na.rm = T),
+    .groups = "drop"
+  )
 Month_aggregated_summary_csnimp$Month = as.integer(Month_aggregated_summary_csnimp$Month)
 
 # Generate source for plotting
@@ -583,8 +923,8 @@ Month_aggregated_area =
 Month_aggregated_area_p <- 
   subset(
     Month_aggregated_area,
-    Source %in% c("Traffic", "Secondary Nitrate", "Secondary Sulfate",
-                  "Industry", "Salt", "Non-tailpipe", "Biomass", "Soil/Dust")) %>%
+    Source %in% c("Traffic Exhaust", "Secondary Nitrate", "Sulfate",
+                  "Industry", "Salt", "Non-tailpipe", "Biomass Burning/SOA", "Dust")) %>%
   group_by(Month) %>%
   dplyr::mutate(
     conc_sum = sum(conc_Median)) %>%
@@ -627,7 +967,12 @@ area_conc_Month <-
   ggplot(Month_aggregated_area_p, 
          aes(x = Month, y = conc_Median, fill = Source)) +
   geom_area(alpha = 0.8, position = "stack", color = "grey88") +
+  geom_line(data = all_site_month_pm, 
+            aes(x = Month, y = PM2.5_obs_mean), 
+            inherit.aes = FALSE,
+            color = "black", linewidth = 1) +
   scale_fill_manual(values = color_source_noF) +
+  ylim(0,8) +
   scale_x_continuous(breaks = 1:12) +
   labs(y = format_variable("Concentration µg/m3")) +
   theme_minimal(base_size = 32) + # 28
@@ -873,6 +1218,46 @@ Year_aggregated_summary =
     .groups = "drop"
   )
 
+###### Check NY/NJ/LA data ###### 
+annual_check_njnyla =
+  subset(Year_aggregated_use, State %in% c("NY", "NJ") | SiteCode %in% c("60371103", "60658001"))
+
+annual_check_njnyla_traffic = 
+  subset(annual_check_njnyla, Source == "Traffic Exhaust")
+
+annual_check_njnyla_conc_ts = 
+  annual_check_njnyla %>%
+  dplyr::group_by(State, SiteCode, Source, Source_aftermanual, Longitude, Latitude) %>%
+  reframe(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
+  ) %>%
+  ungroup()
+
+annual_check_njnyla_conc_ts_traffic =
+  subset(annual_check_njnyla_conc_ts, Source == "Traffic Exhaust")
+View(annual_check_njnyla_conc_ts_traffic)
+
+annual_check_njnyCA =
+  Year_aggregated_use %>%
+  subset(State %in% c("NY", "NJ", "CA")) %>%
+  dplyr::group_by(State, Source_aftermanual, Source, Year) %>%
+  dplyr::summarise(
+    Concentration = mean(Concentration),
+    .groups = "drop"
+  )
+
+annual_check_njnyCA_conc_ts = 
+  annual_check_njnyCA %>%
+  dplyr::group_by(State, Source, Source_aftermanual) %>%
+  reframe(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
+  ) %>%
+  ungroup()
+subset(annual_check_njnyCA_conc_ts, Source == "Traffic Exhaust")
+
+
+###### Rest annual trend ###### 
+
 # # Use the overall median/averages of all sites all day instead of site first, then year
 # Year_aggregated_summary = 
 #   pmf_both_perc %>%
@@ -932,10 +1317,15 @@ area_conc_Year <-
   ggplot(Year_aggregated_area_p, 
          aes(x = Year, y = conc_Median, fill = Source)) +
   geom_area(alpha = 0.8, position = "stack", color = "grey88") +
+  geom_line(data = all_site_annual_pm, 
+            aes(x = Year, y = PM2.5_obs_mean), 
+            inherit.aes = FALSE,
+            color = "grey30", linewidth = 1) +
   scale_fill_manual(values = color_source_noF) +
+  ylim(0,8) +
   scale_x_continuous(breaks = 2011:2020) +
   labs(y = format_variable("Concentration µg/m3")) +
-  theme_minimal(base_size = 28) + # 32
+  theme_minimal(base_size = 32) + # 32
   theme(
     panel.grid.minor = element_blank(),
     panel.grid.major = element_blank(),
@@ -943,6 +1333,8 @@ area_conc_Year <-
     axis.text.x = element_text(angle = 45, vjust = 0.5),
     axis.text.y = element_text(vjust = 0.5, hjust = 0))
 area_conc_Year
+
+area_conc_Month + area_conc_Year
 
 area_perc_Year <-
   ggplot(Year_aggregated_area_p, 
@@ -969,6 +1361,137 @@ area_Year =
 area_Year
 
 
+#### Overall, Relative Spatial Homogeneity - Concentration ####
+# Site-specific source mean/median across the study period
+nation_aggregated_use <- 
+  ddply(pmf_both_perc, 
+        .(Dataset, State, SiteCode, Latitude, Longitude, geoid, Source, Source_aftermanual), 
+        summarise,
+        conc_median = median(Concentration),
+        conc_up = quantile(Concentration, 0.75),
+        conc_down = quantile(Concentration, 0.25),
+        conc_mean = mean(Concentration),
+        conc_sd = sd(Concentration),
+        perc_median = median(Percent),
+        perc_up = quantile(Percent, 0.75),
+        perc_down = quantile(Percent, 0.25),
+        perc_mean = mean(Percent),
+        perc_sd = sd(Percent))
+head(nation_aggregated_use)
+
+###### Spatial Homogeneity 1: Coefficient of Variation - Concentration ######
+## Coefficient of Variation (CV) based on mean/median concentrations
+nation_aggregated_use$conc_cv_mean =
+  nation_aggregated_use$conc_sd/nation_aggregated_use$conc_mean
+nation_aggregated_use$conc_iqr =
+  nation_aggregated_use$conc_up - nation_aggregated_use$conc_down
+nation_aggregated_use$conc_cv_median =
+  nation_aggregated_use$conc_iqr/nation_aggregated_use$conc_median
+
+nation_source_cv =
+  ddply(nation_aggregated_use, 
+        .(Source), 
+        summarise,
+        conc_cv_mean_median = median(conc_cv_mean),
+        conc_cv_mean_up= quantile(conc_cv_mean, 0.75),
+        conc_cv_mean_down = quantile(conc_cv_mean, 0.25),
+        conc_cv_mean_mean = mean(conc_cv_mean),
+        conc_cv_mean_sd = sd(conc_cv_mean),
+        conc_cv_median_median = median(conc_cv_median),
+        conc_cv_median_up = quantile(conc_cv_median, 0.75),
+        conc_cv_median_down = quantile(conc_cv_median, 0.25),
+        conc_cv_median_mean = mean(conc_cv_median),
+        conc_cv_median_sd = sd(conc_cv_median))
+# View(nation_source_cv)
+
+###### Spatial Homogeneity 1: Moran's I - Concentration ######
+## Moran's I analyses
+library(spdep)
+library(ape) # install.packages("ape", type = "binary"), because compiling from source failed
+
+#### Function to perform Moran's I for all source
+# Source concentration normalized
+process_all_sources_normalized <- 
+  function(data, value_column, max_dist_index) {
+  results_list <- list()
+  
+  for(source in unique(data$Source)) { # source = unique(data$Source)[8]
+    source_data <- data[data$Source == source, ]
+    
+    if(nrow(source_data) >= 3) {
+      # Calculate source-specific statistics
+      source_mean <- mean(source_data[[value_column]], na.rm = TRUE)
+      source_sd <- sd(source_data[[value_column]], na.rm = TRUE)
+      source_range <- max(source_data[[value_column]], na.rm = TRUE) - min(source_data[[value_column]], na.rm = TRUE)
+      
+      # Normalize concentrations to Z-scores within this source
+      normalized_conc <- (source_data[[value_column]] - source_mean) / source_sd
+      
+      coords <- cbind(source_data$Longitude, source_data$Latitude)
+      dist_mat <- as.matrix(dist(coords))
+      max_dist <- max(dist_mat) * max_dist_index
+      proximity_mat <- 1 / (dist_mat + 0.0001)
+      proximity_mat[dist_mat > max_dist] <- 0
+      diag(proximity_mat) <- 0
+      # proximity_mat <- 1
+      
+      # Moran's I on normalized values
+      moran_result <- ape::Moran.I(normalized_conc, proximity_mat)
+      
+      results_list[[as.character(source)]] <- data.frame(
+        source = as.character(source),
+        n_sites = nrow(source_data),
+        mean_conc = source_mean,
+        sd_conc = source_sd,
+        conc_range = source_range,
+        cv_conc = source_sd / source_mean,  # Coefficient of variation
+        moran_i = moran_result$observed,
+        moran_i_normalized = moran_result$observed,
+        expected_i = moran_result$expected,
+        p_value = moran_result$p.value,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  
+  if(length(results_list) > 0) {
+    results_df <- do.call(rbind, results_list)
+    rownames(results_df) <- NULL
+    return(results_df)
+  } else {
+    return(data.frame())
+  }
+}
+
+# Run with normalized concentrations
+moran_conc_normalized <- 
+  process_all_sources_normalized(nation_aggregated_use, "conc_mean", 0.0005)
+
+# Add interpretation columns 
+moran_source_conc_normalized <- 
+  moran_conc_normalized %>%
+  mutate(
+    # Strength of spatial pattern
+    spatial_pattern_strength = case_when(
+      abs(moran_i) < 0.1 ~ "Very weak",
+      abs(moran_i) < 0.3 ~ "Weak", 
+      abs(moran_i) < 0.5 ~ "Moderate",
+      abs(moran_i) < 0.7 ~ "Strong",
+      TRUE ~ "Very strong"
+    ),
+    
+    # Pattern type with interpretation
+    pattern_interpretation = case_when(
+      moran_i > 0 & p_value < 0.05 ~ "Sig CLUSTERING: Nearby sites SIMILAR values",
+      moran_i < 0 & p_value < 0.05 ~ "Sig DISPERSION: Nearby sites DIFFERENT values",
+      moran_i > 0 & p_value >= 0.05 ~ "Weak clustering (not significant)",
+      moran_i < 0 & p_value >= 0.05 ~ "Weak dispersion (not significant)",
+      TRUE ~ "No spatial pattern"
+    )
+  )
+
+moran_source_conc_normalized
+
 
 ########################################
 ############# Annual Change, mapping ############
@@ -987,37 +1510,88 @@ Year_aggregated_ts <-
   subset(Year_aggregated_use,
          SiteCode %in% 
            unique(subset(Year_aggregated_use_unique, Freq >= 3)$SiteCode))
+head(Year_aggregated_ts)
 length(unique(Year_aggregated_ts$SiteCode))
 length(unique(Year_aggregated_use$SiteCode))
 
 ###### 2.1 Thiel-Sen, the slope for each site across the study period ######
 ### Thiel-Sen, estimate the slope for each site across the study period 
 # concentration-based slope
-slope_diff_conc_ts <- 
+# slope_diff_conc_ts <-
+#   Year_aggregated_ts %>%
+#   dplyr::group_by(SiteCode, Source_aftermanual, Longitude, Latitude) %>% # Dataset.x,
+#   dplyr::summarize(
+#     results = get_slope_ts(cur_data(), "Year", "Concentration"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
+# ## eming::theilsen, Weighted Theil-Sen estimator, use Kendall's tau to weight pairwise slopes, more sensitive to the distribution of data points
+# slope_diff_conc_ts_1 <-
+#   Year_aggregated_ts %>%
+#   group_by(SiteCode, Source_aftermanual, Longitude, Latitude) %>% # Dataset.x,
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(cur_data(), "Year", "Concentration"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+# slope_diff_conc_ts_1
+# 
+# slope_diff_conc_ts_1 %>%
+#   dplyr::group_by(Source_aftermanual) %>%
+#   dplyr::summarise(
+#     diff_slope_mean = mean(diff_slope),
+#     diff_slope_median = median(diff_slope)
+#   ) %>%
+#   ungroup()
+
+### Thiel-Sen, estimate the slope for each site across the study period, use mblm function
+## mblm::mblm, Classic (unweighted) Theil-Sen estimator, takes simple median of all pairwise slopes, ives equal weight to all data pairs
+slope_diff_conc_ts <-
   Year_aggregated_ts %>%
-  dplyr::group_by(SiteCode, Source_aftermanual, Longitude, Latitude) %>% # Dataset.x, 
-  dplyr::summarize(
-    diff_slope = get_slope_ts(cur_data(), "Year", "Concentration"),
-    .groups = "drop"
+  dplyr::group_by(SiteCode, Source_aftermanual, Source, Longitude, Latitude) %>%
+  reframe(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
+slope_diff_conc_ts
+
+# slope_diff_conc_ts %>%
+#   dplyr::group_by(Source_aftermanual) %>%
+#   dplyr::summarise(
+#     diff_slope_mean = mean(slope),
+#     diff_slope_median = median(slope)
+#   ) %>%
+#   ungroup()
 
 # percent-based slope
-slope_diff_perc_ts <- 
+# slope_diff_perc_ts <-
+#   Year_aggregated_ts %>%
+#   group_by(SiteCode, Source_aftermanual, Longitude, Latitude) %>% # Dataset.x,
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(cur_data(), "Year", "Percent"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
+slope_diff_perc_ts <-
   Year_aggregated_ts %>%
-  group_by(SiteCode, Source_aftermanual, Longitude, Latitude) %>% # Dataset.x, 
-  dplyr::summarize(
-    diff_slope = get_slope_ts(cur_data(), "Year", "Percent"),
-    .groups = "drop"
+  dplyr::group_by(SiteCode, Source_aftermanual, Source, Longitude, Latitude) %>%
+  reframe(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Percent")
   ) %>%
   ungroup()
 
 slope_diff_conc = slope_diff_conc_ts
 slope_diff_perc = slope_diff_perc_ts
 summary(slope_diff_conc); summary(slope_diff_perc)
+unique(slope_diff_conc$Source)
+levels(slope_diff_conc$Source)
 
 ###### 2.2 Dominant source by site, mapping ######
 # Group by Longitude and Latitude, then find the row with max Concentration in each group
+domain_source_year = fread("Dominant_source_site_annual_CSN-IMPROVE.csv"); domain_source_year$V1 = NULL
+
 domain_source_year <- 
   subset(Year_aggregated_ts, Source != "OP-rich") %>% 
   group_by(SiteCode, Year, Longitude, Latitude) %>%
@@ -1031,6 +1605,9 @@ domain_source_year %>%
     total_count = n(),
     count_frac = total_count/length(unique(domain_source_year$SiteCode)) * 100
   )
+
+# Adjust the postion of columns
+domain_source_year = relocate(domain_source_year, Latitude, .before = Longitude)
 # write.csv(domain_source_year, "Dominant_source_site_annual_CSN-IMPROVE.csv")
 
 ggplot() +
@@ -1094,11 +1671,11 @@ ggplot() +
 # Check examples of adjacent sites with different dominant source 
 domain_source_year_IN =
   subset(domain_source_year, State == "IN") # Indianan
-View(domain_source_year_IN)
+# View(domain_source_year_IN)
 
 domain_source_year_NYC =
   subset(domain_source_year, SiteCode %in% c("360551007", "360610134", "360810124"))
-View(domain_source_year_NYC)
+# View(domain_source_year_NYC)
 
 
 # Count of dominate source by year
@@ -1115,12 +1692,12 @@ domain_source_year_conc =
     Percent_sd = sd(Percent), 
     .groups = "drop"
   )
-View(domain_source_year_conc)
+# View(domain_source_year_conc)
 
-domain_traffic_2019 = unique(subset(domain_source_year, Year == 2019 & Source == "Traffic")$SiteCode)
-domain_traffic_2020 = unique(subset(domain_source_year, Year == 2020 & Source == "Traffic")$SiteCode)
-domain_dust_2019 = unique(subset(domain_source_year, Year == 2019 & Source == "Soil/Dust")$SiteCode)
-domain_dust_2020 = unique(subset(domain_source_year, Year == 2020 & Source == "Soil/Dust")$SiteCode)
+domain_traffic_2019 = unique(subset(domain_source_year, Year == 2019 & Source == "Traffic Exhaust")$SiteCode)
+domain_traffic_2020 = unique(subset(domain_source_year, Year == 2020 & Source == "Traffic Exhaust")$SiteCode)
+domain_dust_2019 = unique(subset(domain_source_year, Year == 2019 & Source == "Dust")$SiteCode)
+domain_dust_2020 = unique(subset(domain_source_year, Year == 2020 & Source == "Dust")$SiteCode)
 
 domain_traffic_2019[!(domain_traffic_2019 %in% domain_traffic_2020)]
 new_site_dust_domain_20 = domain_dust_2020[!(domain_dust_2020 %in% domain_dust_2019)]
@@ -1160,30 +1737,66 @@ domain_source_year_conc$fraction =
     domain_source_year_conc$count/domain_source_year_conc$total_site_count*100, 1)
 
 # calculate the occurrence of each site in each source
-source_site_count = as.data.frame(t(table(slope_diff_conc$Source_aftermanual)))
-source_site_count$Var1 = NULL
+source_site_count = 
+  as.data.frame(t(table(slope_diff_conc$Source_aftermanual)))
+source_site_count_name = 
+  as.data.frame(t(table(slope_diff_conc$Source)))
+source_site_count$Var1 = source_site_count_name$Var1 = NULL
 colnames(source_site_count)[1] = c("Source_aftermanual")
+colnames(source_site_count_name)[1] = c("Source")
 
-source_site_count$Source_name = 
-  sapply(as.character(source_site_count$Source_aftermanual), function(x) strsplit(x, "-")[[1]][2])
+# Merge files
+source_site_count = merge(source_site_count, source_site_count_name)
+source_site_count
+
+# Remove rows that sources not match by detecting words in it
+source_site_count <- 
+  source_site_count %>%
+  rowwise() %>%
+  filter({
+    # Extract words from both columns
+    words1 <- unlist(str_extract_all(Source_aftermanual, "\\w+"))
+    words2 <- unlist(str_extract_all(Source, "\\w+"))
+    # Check if any words overlap
+    any(words1 %in% words2)
+  }) %>%
+  ungroup()
+source_site_count
+levels(source_site_count$Source)
 
 source_site_count$source_site_count = 
-  paste0(source_site_count$Source_name, 
+  paste0(source_site_count$Source, 
          "\nNo. of Sites: ", 
          source_site_count$Freq)
+head(source_site_count)
 
 # merge slope diff with site count of each source
 slope_diff_conc = merge(slope_diff_conc, source_site_count)
 slope_diff_perc = merge(slope_diff_perc, source_site_count)
+head(slope_diff_conc); head(slope_diff_perc)
 
-# Rename sources
-slope_diff_conc$Source_name[slope_diff_conc$Source_name == "Non"] = "Non-tailpipe"
-head(slope_diff_conc); summary(slope_diff_conc)
-unique(slope_diff_conc$Source_name)
+# Change plotting source sequence
+slope_diff_conc <-
+  slope_diff_conc %>%
+  arrange(Source) %>%
+  mutate(
+    source_site_count = fct_inorder(source_site_count))
+slope_diff_perc <-
+  slope_diff_perc %>%
+  arrange(Source) %>%
+  mutate(
+    source_site_count = fct_inorder(source_site_count))
+levels(slope_diff_conc$source_site_count)
+levels(slope_diff_perc$source_site_count)
 
-slope_diff_perc$Source_name[slope_diff_perc$Source_name == "Non"] = "Non-tailpipe"
-head(slope_diff_perc); summary(slope_diff_perc)
-unique(slope_diff_perc$Source_name)
+# # Rename sources
+# slope_diff_conc$Source[slope_diff_conc$Source == "Non"] = "Non-tailpipe"
+# head(slope_diff_conc); summary(slope_diff_conc)
+# unique(slope_diff_conc$Source)
+# 
+# slope_diff_perc$Source[slope_diff_perc$Source == "Non"] = "Non-tailpipe"
+# head(slope_diff_perc); summary(slope_diff_perc)
+# unique(slope_diff_perc$Source)
 
 ### check the distribution of slopes from regression
 # slopes from concentration
@@ -1216,11 +1829,11 @@ domain_year_nonBBSS =
   subset(!(Source %in% c("Biomass", "Secondary Sulfate")))
 head(domain_year_nonBBSS)
 
-cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
-cty_rural_urban$X = cty_rural_urban$Longitude = cty_rural_urban$Latitude = NULL
+# cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban = fread("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban$V1 = cty_rural_urban$Longitude = cty_rural_urban$Latitude = NULL
 cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ] 
 head(cty_rural_urban)
-
 
 domain_source_year_cty =
   merge(domain_source_year, cty_rural_urban, all.x = TRUE, by = "SiteCode")
@@ -1231,11 +1844,36 @@ table(domain_year_nonBBSS_cty$RuralUrban)
 table(domain_year_nonBBSS_cty$state_abbr)
 
 domain_year_traf_cty = 
-  subset(domain_year_nonBBSS_cty, Source == "Traffic")
+  subset(domain_year_nonBBSS_cty, Source == "Traffic Exhaust")
 head(domain_year_traf_cty)
 table(domain_year_traf_cty$RuralUrban)
 table(domain_year_traf_cty$state_abbr)
 
+### Check two sites, one dominated by Traffic, one by others
+# sites from WA or CA
+wa_sites_close = subset(domain_source_year, SiteCode %in% c("PUSO1", "530530029", "530330080"))
+# 530330080 to 530530029: ≈ 42.7 km, 530330080 to PUSO1: ≈ 0.29 km
+ca_sites_close = subset(domain_source_year, SiteCode %in% c("FRES1", "AGTI1", "60658001"))
+# AGTI1 and 60658001, 72 km; FRES1, ~ 400 km
+
+# plot and check positions of the sites
+ggplot() +
+  geom_sf(data = us_states, fill = "grey98", alpha = 0.8) +
+  geom_point(
+    data = subset(ca_sites_close, Year != 2020),  # moved data argument inside geom_point
+    mapping = aes(              # properly wrapped in mapping argument
+      x = Longitude, 
+      y = Latitude, 
+      fill = Source
+    ),
+    size = 2, 
+    alpha = 0.8, 
+    shape = 21, 
+    color = "grey66"
+  ) +
+  facet_wrap(Year~., ncol = 3) 
+uygh
+你不得2
 domain_year_ind_cty = 
   subset(domain_year_nonBBSS_cty, Source == "Industry")
 head(domain_year_ind_cty)
@@ -1275,9 +1913,9 @@ table(subset(domain_source_year_cty, Source == "Secondary Sulfate" & Year == 201
 table(subset(domain_source_year_cty, Source == "Secondary Sulfate" & Year == 2019)$RuralUrban)
 table(subset(domain_source_year_cty, Source == "Secondary Sulfate" & Year == 2020)$RuralUrban)
 
-table(subset(domain_source_year_cty, Source == "Biomass" & Year == 2011)$RuralUrban)
-table(subset(domain_source_year_cty, Source == "Biomass" & Year == 2019)$RuralUrban)
-table(subset(domain_source_year_cty, Source == "Biomass" & Year == 2020)$RuralUrban)
+table(subset(domain_source_year_cty, Source == "Biomass Burning/SOA" & Year == 2011)$RuralUrban)
+table(subset(domain_source_year_cty, Source == "Biomass Burning/SOA" & Year == 2019)$RuralUrban)
+table(subset(domain_source_year_cty, Source == "Biomass Burning/SOA" & Year == 2020)$RuralUrban)
 
 table(subset(domain_source_year_cty, Year == 2011)$RuralUrban)
 table(subset(domain_source_year_cty, Year == 2019)$RuralUrban)
@@ -1318,10 +1956,12 @@ source_cty_ruralurban$source_county_percent =
   round(source_cty_ruralurban$county_count/source_cty_ruralurban$county_source * 100, 1)
 head(source_cty_ruralurban)
 
+unique(source_cty_ruralurban$Source)
 # write.csv(source_cty_ruralurban, "CSN_IMPROVE_source_dominate_site_county_info.csv")
 
 ggplot(source_cty_ruralurban,
-       aes(x = as.factor(Year), y = year_county_percent, fill = Source)) +
+       aes(x = as.factor(Year), y = year_county_percent, 
+           fill = Source)) +
   geom_col(width = 0.7) +
   facet_wrap(RuralUrban ~., scales = "free", ncol = 3) +
   geom_text(aes(label = county_count), 
@@ -1348,7 +1988,7 @@ ggplot(subset(source_cty_ruralurban, Source != "Industry"),
             size = 3) +
   # scale_fill_manual(values = color_source_noF) +
   labs(x = "Year", 
-       y = "County Count") +
+       y = "Site Count") +
   theme_base(base_size = 20)   + 
   theme(
     panel.grid.minor = element_blank(),
@@ -1356,6 +1996,36 @@ ggplot(subset(source_cty_ruralurban, Source != "Industry"),
     legend.position = "bottom",
     axis.text.x = element_text(angle = 90, vjust = 0.5))
 
+# County count, county dominated by different sources
+# Color blind friendly version
+ggplot(subset(source_cty_ruralurban, Source != "Industry") %>%
+         # Use pre-set source sequence
+         mutate(Source = factor(Source, levels = source_sequence)),
+       aes(x = as.factor(Year), y = county_count, fill = RuralUrban)) +
+  geom_col(width = 0.7) +
+  facet_wrap(Source ~., scales = "free_y", ncol = 3) +
+  # Set ylimit for each source separately
+  facetted_pos_scales(
+    y = list(
+      Source == "Biomass Burning/SOA" ~ scale_y_continuous(limits = c(0, 150)),
+      Source == "Sulfate" ~ scale_y_continuous(limits = c(0, 150)),
+      Source == "Dust" ~ scale_y_continuous(limits = c(0, 40)),
+      Source == "Salt" ~ scale_y_continuous(limits = c(0, 40)),
+      Source == "Secondary Nitrate" ~ scale_y_continuous(limits = c(0, 40)),
+      Source == "Traffic Exhaust" ~ scale_y_continuous(limits = c(0, 40))
+    )
+  ) +
+  scale_fill_manual(values = c("Rural" = "#AED6F1", "Mix" = "#5DADE2", "Urban" = "#21618C")) +
+  # scale_fill_manual(values = c("Rural" = "#82E0AA", "Mix" = "#F7DC6F", "Urban" = "#A04000")) + 
+  labs(x = "Year", 
+       y = "Site Count") +
+  theme_base(base_size = 20)   + 
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.background = element_blank(),
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 90, vjust = 0.5))
 
 ggplot() +
   geom_sf(data = us_states, fill = "grey98", alpha = 0.8) +
@@ -1386,30 +2056,138 @@ ggplot() +
     legend.spacing.y = unit(1, "cm")
   )
 
+###### 2.2.2 Dominant source by site, Biomass ######
+state_regions_use = read.csv("CSN_IMPROVE_State_region_group.csv")
+state_regions_use$X = NULL
+domain_source_year = 
+  merge(domain_source_year, state_regions_use, by = "State")
+head(domain_source_year)
+
+domain_year_BB =
+  domain_source_year %>%
+  subset(Source == "Biomass")
+head(domain_year_BB)
+
+# Domainant source, by site, nationwide
+domain_site_count =
+  domain_source_year %>%
+  dplyr::group_by(Year) %>%
+  dplyr::summarise(
+    site_count = n()
+  )
+
+domain_site_source_count =
+  domain_source_year %>%
+  dplyr::group_by(Year, Source) %>%
+  dplyr::summarise(
+    site_source_count = n(),
+    .groups = "drop"
+  ) %>%
+  merge(domain_site_count, by = "Year")
+
+domain_site_source_count$site_count_fraction = 
+  round(domain_site_source_count$site_source_count/domain_site_source_count$site_count * 100, 0)
+head(domain_site_source_count)
+subset(domain_site_source_count, Source == "Biomass")
+# write.csv(domain_site_source_count, "Dominant_source_site_count.csv")
+
+domain_site_source_count_wd =
+  dplyr::select(
+    domain_site_source_count, Year, Source, site_count_fraction) %>%
+  pivot_wider(
+    names_from = Source,
+    values_from = site_count_fraction
+  )
+
+ggplot() +
+  geom_sf(data = us_states, fill = "grey98", alpha = 0.8) +
+  geom_point(
+    data = subset(domain_year_BB, Year != 2020),  # moved data argument inside geom_point
+    mapping = aes(              # properly wrapped in mapping argument
+      x = Longitude, 
+      y = Latitude, 
+      fill = Source
+    ),
+    size = 2, 
+    alpha = 0.8, 
+    shape = 21, 
+    color = "grey66"
+  ) +
+  facet_wrap(Year~., ncol = 3) +
+  scale_fill_manual(values = color_source_noF) +
+  coord_sf(datum = NA) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    strip.text = element_text(color = "black", size = 16),
+    strip.text.y = element_text(size = 10),
+    axis.title = element_text(size = 0),
+    legend.text = element_text(size = 14), 
+    legend.key.size = unit(1.5, "lines"),
+    legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
+    legend.spacing.y = unit(1, "cm")
+  )
+
+#### Domainant source, by site, regional scale
+domain_site_region_count =
+  domain_source_year %>%
+  dplyr::group_by(Year, Region) %>%
+  dplyr::summarise(
+    site_count = n(),
+    .groups = "drop"
+  )
+head(domain_site_region_count)
+
+domain_site_source_region_count =
+  domain_source_year %>%
+  dplyr::group_by(Year, Source, Region) %>%
+  dplyr::summarise(
+    site_source_count = n(),
+    .groups = "drop"
+  ) %>%
+  merge(domain_site_region_count, by = c("Year", "Region"))
+head(domain_site_source_region_count)
+
+domain_site_source_region_count$site_count_fraction = 
+  round(domain_site_source_region_count$site_source_count/
+          domain_site_source_region_count$site_count * 100, 0)
+head(domain_site_source_region_count)
+subset(domain_site_source_region_count, Source == "Biomass")
+# write.csv(domain_site_source_region_count, "Dominant_source_site_region_count.csv")
+
+domain_site_source_region_count_wd =
+  dplyr::select(
+    domain_site_source_region_count, Year, Source, Region, site_count_fraction) %>%
+  pivot_wider(
+    names_from = Source,
+    values_from = site_count_fraction
+  )
+View(domain_site_source_region_count_wd)
+
 ###### 2.3 Thiel-Sen, plotting, source slope, bar figure ######
 slope_diff_conc$Class = "Concentration"
 slope_diff_perc$Class = "Percent"
 
-# # Extract Source_name
-# slope_diff_conc$Source_name = 
+# # Extract Source
+# slope_diff_conc$Source = 
 #   sapply(slope_diff_conc$Source_aftermanual, function(x) strsplit(x, "-")[[1]][2])
-# slope_diff_perc$Source_name = 
+# slope_diff_perc$Source = 
 #   sapply(slope_diff_perc$Source_aftermanual, function(x) strsplit(x, "-")[[1]][2])
 
 # Main trends for different sources
-slope_diff_conc$Trend = "Mild"
+slope_diff_conc$Trend = "Neutral"
 slope_diff_conc$Trend[
-  slope_diff_conc$Source_name %in% c("Biomass")] = "B-Increase"
+  slope_diff_conc$Source %in% c("Biomass Burning/SOA")] = "Increase"
 slope_diff_conc$Trend[
-  slope_diff_conc$Source_name %in% c("Secondary Sulfate", "Secondary Nitrate")] = "B-Reduce"
+  slope_diff_conc$Source %in% c("Traffic Exhaust", "Sulfate", "Secondary Nitrate")] = "Decrease"
 
 head(slope_diff_conc)
 
-slope_diff_perc$Trend = "Mild"
+slope_diff_perc$Trend = "Neutral"
 slope_diff_perc$Trend[
-  slope_diff_perc$Source_name %in% c("Biomass", "Traffic", "Soil/Dust")] = "B-Increase" # , "Soil/Dust"
+  slope_diff_perc$Source %in% c("Biomass Burning/SOA", "Traffic Exhaust", "Industry", "Non-tailpipe")] = "Increase" # , "Soil/Dust"
 slope_diff_perc$Trend[
-  slope_diff_perc$Source_name %in% c("Secondary Sulfate", "Salt")] = "B-Reduce"
+  slope_diff_perc$Source %in% c("Sulfate", "Salt")] = "Decrease"
 
 # Combine dataset
 slope_diff_site = 
@@ -1472,13 +2250,13 @@ slope_diff_site_range_frac <-
          diff_slope_frac_995, diff_slope_frac_med, diff_slope_frac_005, 
          diff_slope_frac_mean, diff_slope_frac_sd)
 # View(slope_diff_site_range_conc)
-View(slope_diff_site_range_frac)
+# View(slope_diff_site_range_frac)
 
 # Check the frequency of positive and negative trends
 # how many sites experience increase/decrease in source-specific contributions
 neg_pos_perc_freq <- 
   slope_diff_perc %>%
-  dplyr::group_by(Source_name) %>%
+  dplyr::group_by(Source) %>%
   dplyr::summarize(
     negative_count = sum(diff_slope < 0, na.rm = TRUE),
     positive_count = sum(diff_slope > 0, na.rm = TRUE),
@@ -1493,21 +2271,40 @@ neg_pos_perc_freq$negative_frac = neg_pos_perc_freq$negative_count/neg_pos_perc_
 neg_pos_perc_freq$positive_frac = neg_pos_perc_freq$positive_count/neg_pos_perc_freq$total_count*100
 
 subset(neg_pos_perc_freq, 
-       Source_name %in% 
-         c("Biomass", "Industry", "Salt", "Soil/Dust",
-           "Secondary Nitrate", "Secondary Sulfate", "Traffic"))
+       Source %in% 
+         c("Biomass Burning/SOA", "Industry", "Salt", "Dust",
+           "Secondary Nitrate", "Sulfate", "Traffic Exhaust"))
 
 # Ranges of diff_slope
 
-ggplot(data = subset(slope_diff_site, 
-                     !(Source_name %in% c("OP"))), # , "Non-tailpipe", "Salt"
-       aes(x = Source_name, y = diff_slope, fill = Trend)) +
+slope_diff_site_plot = slope_diff_site
+# slope_diff_site_plot$Source[slope_diff_site_plot$Source == "Biomass"] = "Biomass burning/SOA"
+# slope_diff_site_plot$Source[slope_diff_site_plot$Source == "Secondary Sulfate"] = "Sulfate"
+# slope_diff_site_plot$Source[slope_diff_site_plot$Source == "Soil/Dust"] = "Dust"
+
+class_labels <- c(
+  "Concentration" = "Concentration\nµg/m³/year",
+  "Percent" = "Fraction\n%/year"
+  # Adjust these names to match your actual Class values
+)
+
+ggplot(data = subset(slope_diff_site_plot, 
+                     !(Source %in% c("OP-rich"))), # , "Non-tailpipe", "Salt"
+       aes(x = factor(Source, levels = source_sequence), 
+           y = diff_slope, 
+           fill = Trend)) +
   geom_jitter(width = 0.18, alpha = 0.35, color = "gray50") +
   geom_hline(yintercept=0, linetype='dashed', col = "gray25")+
   geom_boxplot(outlier.shape = NA, 
                linewidth = 0.6, width = 0.5, alpha = 0.65) +
-  facet_grid(Class ~., scales = "free") +
-  scale_fill_manual(values = c("#D95F02", "#1B9E77", "gray45")) + # ("#D95F02", "#2CA02C", "gray45") ("#E41A1C", "#377EB8", "gray45")
+  scale_x_discrete(labels = source_labels_2row) +
+  # facet_grid(Class ~., scales = "free") +
+  facet_grid(Class ~ ., scales = "free", 
+             switch = "y",
+             labeller = labeller(Class = class_labels)) + # Change y-axis name to strip.text.y.left
+  # remove original ylab
+  labs(y = NULL, x = NULL) +
+  scale_fill_manual(values = c("#1B9E77", "#D95F02", "gray45")) + # ("#2CA02C", "#D95F02", "gray45") ("#E41A1C", "#377EB8", "gray45")
   theme_base() +
   theme(axis.text.x = element_text( color = "gray25", size = 20, 
                                     angle = 45, hjust = 1, vjust = 1),
@@ -1515,8 +2312,16 @@ ggplot(data = subset(slope_diff_site,
         axis.title = element_text(color = "gray25", size = 24),
         strip.text = element_text(color = "gray30", size = 14, face = "bold"), 
         strip.background = element_blank(), # Remove frame lines and background
+        strip.text.y.left = element_text(color = "gray30", size = 22, 
+                                         face = "bold", angle = 90),
+        strip.placement = "outside", # Place facet labels outside (as y axis titles)
+        legend.position = "bottom",
+        legend.margin = margin(t = -15, r = 0, b = 0, l = 0), # Reduce space between legend and figure
+        legend.text=element_text(size = 20), legend.title=element_text(size = 20),
         panel.spacing.y = unit(0.8, "cm"), # Change space between facet panels
-        legend.position = "none")
+        panel.background = element_blank(),
+        plot.background = element_rect(fill = "white", colour = NA))
+        
   
 
 ###### 2.4 Thiel-Sen, plotting, spatial distribution ######
@@ -1526,16 +2331,16 @@ slope_range_conc <- c(-0.2, 0.2)
 ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
   geom_point(data = subset(slope_diff_conc, 
-                           !(Source_name %in% 
-                               c("OP"))), # , "Non-tailpipe", "Salt"
+                           !(Source %in% 
+                               c("OP-rich"))), # , "Non-tailpipe", "Salt"
              aes(x = Longitude, y = Latitude, 
                  fill = diff_slope),
              size = 2.5, alpha = 0.8, 
              shape = 21, color = "grey66") +
   scale_fill_gradient2(limits = slope_range_conc,
-                       low = "#2CA02C",  
+                       low = "#4575B4",  
                        mid = "ivory",  
-                       high = "#D62728", 
+                       high = "#D73027", 
                        midpoint = 0,
                        oob = scales::squish) + # oob = scales::squish, show the extreme values outside of range.
   # guides(color=guide_legend(title="Slope: µg/m3")) + 
@@ -1566,16 +2371,16 @@ ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
   geom_point(data = subset(slope_diff_perc, 
                            # !(Source_aftermanual %in% c("F4-Non-tailpipe", "F10-OP-rich"))), 
-                           !(Source_name %in% 
-                               c("OP"))), # , "Non-tailpipe", "Salt"
+                           !(Source %in% 
+                               c("OP-rich"))), # , "Non-tailpipe", "Salt"
              aes(x = Longitude, y = Latitude, 
                  fill = diff_slope),
              size = 2.5, alpha = 0.8, 
              shape = 21, color = "grey66") +
   scale_fill_gradient2(limits = slope_range_perc,
-                       low = "#2CA02C",  
+                       low = "#1B9E77",   
                        mid = "ivory",  
-                       high = "#D62728", 
+                       high = "#D95F02", 
                        midpoint = 0,
                        oob = scales::squish) + # oob = scales::squish, show the extreme values outside of range.
   # guides(color=guide_legend(title="Slope: µg/m3")) + 
@@ -1603,9 +2408,9 @@ ggplot() +
 # Group sources as BB, sulfate & others
 Year_aggregated_newClass = Year_aggregated_ts
 Year_aggregated_newClass$Source_group = Year_aggregated_newClass$Source
-Year_aggregated_newClass$Source_group[!(Year_aggregated_newClass$Source %in% c("Biomass", "Secondary Sulfate"))] = "Other Sources"
-Year_aggregated_newClass$Source_group[Year_aggregated_newClass$Source == "Biomass"] = "Biomass Burning"
-Year_aggregated_newClass$Source_group[Year_aggregated_newClass$Source == "Secondary Sulfate"] = "Sulfate"
+Year_aggregated_newClass$Source_group[!(Year_aggregated_newClass$Source %in% c("Biomass Burning/SOA", "Sulfate"))] = "Other Sources"
+# Year_aggregated_newClass$Source_group[Year_aggregated_newClass$Source == "Biomass"] = "Biomass Burning/SOA"
+# Year_aggregated_newClass$Source_group[Year_aggregated_newClass$Source == "Secondary Sulfate"] = "Sulfate"
 table(Year_aggregated_newClass$Source_group)
 
 Year_aggregated_newClass =
@@ -1623,29 +2428,59 @@ Year_aggregated_newClass =
 
 ### Thiel-Sen, estimate the slope for each site across the study period 
 # concentration-based slope
+# slope_diff_conc_ts_newClass <- 
+#   Year_aggregated_newClass %>%
+#   dplyr::group_by(SiteCode, Source_group, Longitude, Latitude) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(cur_data(), "Year", "Concentration"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
 slope_diff_conc_ts_newClass <- 
   Year_aggregated_newClass %>%
   dplyr::group_by(SiteCode, Source_group, Longitude, Latitude) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope_ts(cur_data(), "Year", "Concentration"),
-    .groups = "drop"
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
 
 # percent-based slope
+# slope_diff_perc_ts_newClass <- 
+#   Year_aggregated_newClass %>%
+#   group_by(SiteCode, Source_group, Longitude, Latitude) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(cur_data(), "Year", "Percent"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
 slope_diff_perc_ts_newClass <- 
   Year_aggregated_newClass %>%
-  group_by(SiteCode, Source_group, Longitude, Latitude) %>% # Dataset.x, 
+  dplyr::group_by(SiteCode, Source_group, Longitude, Latitude) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope_ts(cur_data(), "Year", "Percent"),
-    .groups = "drop"
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Percent")
   ) %>%
   ungroup()
+
+# To set the plot order in facet_
+# Before plotting, add this line to set the order:
+slope_diff_conc_ts_newClass$Source_group <- 
+  factor(
+  slope_diff_conc_ts_newClass$Source_group,
+  levels = c("Biomass Burning/SOA", "Sulfate", "Other Sources")
+)
+slope_diff_perc_ts_newClass$Source_group <- 
+  factor(
+    slope_diff_perc_ts_newClass$Source_group,
+    levels = c("Biomass Burning/SOA", "Sulfate", "Other Sources")
+  )
 
 # Create the plot
 slope_range_conc <- c(-0.2, 0.2)
 
-ggplot() +
+bb_ss_other_conc_trend <- 
+  ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
   geom_point(data = slope_diff_conc_ts_newClass, 
              aes(x = Longitude, y = Latitude, 
@@ -1653,9 +2488,9 @@ ggplot() +
              size = 2.5, alpha = 0.8, 
              shape = 21, color = "grey66") +
   scale_fill_gradient2(limits = slope_range_conc,
-                       low = "#2CA02C",  
+                       low = "#4575B4",  
                        mid = "ivory",  
-                       high = "#D62728", 
+                       high = "#D73027", 
                        midpoint = 0,
                        oob = scales::squish) + # oob = scales::squish, show the extreme values outside of range.
   # guides(color=guide_legend(title="Slope: µg/m3")) + 
@@ -1678,12 +2513,13 @@ ggplot() +
         legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
         legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
         legend.spacing.y = unit(1, "cm")) 
-
+bb_ss_other_conc_trend
 
 slope_range_perc <- c(-0.4, 0.4)
 # slope_range_perc <- c(-0.2, 0.2)
 
-ggplot() +
+bb_ss_other_frac_trend <-
+  ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
   geom_point(data = slope_diff_perc_ts_newClass, 
              aes(x = Longitude, y = Latitude, 
@@ -1691,9 +2527,9 @@ ggplot() +
              size = 2.5, alpha = 0.8, 
              shape = 21, color = "grey66") +
   scale_fill_gradient2(limits = slope_range_perc,
-                       low = "#2CA02C",  
+                       low = "#1B9E77",  
                        mid = "ivory",  
-                       high = "#D62728", 
+                       high = "#D95F02", 
                        midpoint = 0,
                        oob = scales::squish) + # oob = scales::squish, show the extreme values outside of range.
   # guides(color=guide_legend(title="Slope: µg/m3")) + 
@@ -1716,12 +2552,150 @@ ggplot() +
         legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
         legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
         legend.spacing.y = unit(1, "cm")) 
+bb_ss_other_frac_trend
+
+# Placing two figures together while editing space between them
+bb_ss_other_conc_trend <- 
+  bb_ss_other_conc_trend +
+  theme(plot.margin = margin(t = 5, r = 5, b = -5, l = 5, unit = "pt"))
+
+bb_ss_other_frac_trend <- 
+  bb_ss_other_frac_trend +
+  theme(plot.margin = margin(t = -10, r = 5, b = 5, l = 5, unit = "pt"))
+
+bb_ss_other_conc_trend / bb_ss_other_frac_trend 
+
+#### Overall, Relative Spatial Homogeneity - Conc Changing Rate ####
+# Site-specific source conc changing rate across the study period
+head(slope_diff_conc)
+head(slope_diff_perc)
+
+# ###### Spatial Homogeneity 1: Coefficient of Variation - Conc Changing Rate ######
+# ## Coefficient of Variation (CV) based on mean/median concentrations
+# nation_aggregated_use$conc_cv_mean =
+#   nation_aggregated_use$conc_sd/nation_aggregated_use$conc_mean
+# nation_aggregated_use$conc_iqr =
+#   nation_aggregated_use$conc_up - nation_aggregated_use$conc_down
+# nation_aggregated_use$conc_cv_median =
+#   nation_aggregated_use$conc_iqr/nation_aggregated_use$conc_median
+# 
+# nation_source_cv =
+#   ddply(nation_aggregated_use, 
+#         .(Source), 
+#         summarise,
+#         conc_cv_mean_median = median(conc_cv_mean),
+#         conc_cv_mean_up= quantile(conc_cv_mean, 0.75),
+#         conc_cv_mean_down = quantile(conc_cv_mean, 0.25),
+#         conc_cv_mean_mean = mean(conc_cv_mean),
+#         conc_cv_mean_sd = sd(conc_cv_mean),
+#         conc_cv_median_median = median(conc_cv_median),
+#         conc_cv_median_up = quantile(conc_cv_median, 0.75),
+#         conc_cv_median_down = quantile(conc_cv_median, 0.25),
+#         conc_cv_median_mean = mean(conc_cv_median),
+#         conc_cv_median_sd = sd(conc_cv_median))
+# View(nation_source_cv)
+
+###### Spatial Homogeneity 1: Moran's I - Conc Changing Rate ######
+## Moran's I analyses
+library(spdep)
+library(ape) # install.packages("ape", type = "binary"), because compiling from source failed
+
+#### Function to perform Moran's I for all source
+# Source concentration normalized
+process_all_sources_normalized <- 
+  function(data, value_column, max_dist_index) {
+    results_list <- list()
+    
+    for(source in unique(data$Source)) { # source = unique(data$Source)[6]; source
+      source_data <- data[data$Source == source, ]
+      
+      if(nrow(source_data) >= 3) {
+        # Calculate source-specific statistics
+        source_mean <- mean(source_data[[value_column]], na.rm = TRUE)
+        source_sd <- sd(source_data[[value_column]], na.rm = TRUE)
+        source_range <- max(source_data[[value_column]], na.rm = TRUE) - min(source_data[[value_column]], na.rm = TRUE)
+        
+        # Normalize concentrations to Z-scores within this source
+        normalized_conc <- (source_data[[value_column]] - source_mean) / source_sd
+        
+        coords <- cbind(source_data$Longitude, source_data$Latitude)
+        dist_mat <- as.matrix(dist(coords))
+        max_dist <- max(dist_mat) * max_dist_index
+        proximity_mat <- 1 / (dist_mat + 0.0001)
+        proximity_mat[dist_mat > max_dist] <- 0
+        diag(proximity_mat) <- 0
+        
+        # Moran's I on normalized values
+        moran_result <- ape::Moran.I(normalized_conc, proximity_mat)
+        
+        results_list[[as.character(source)]] <- data.frame(
+          source = as.character(source),
+          n_sites = nrow(source_data),
+          mean_conc = source_mean,
+          sd_conc = source_sd,
+          conc_range = source_range,
+          cv_conc = source_sd / source_mean,  # Coefficient of variation
+          moran_i = moran_result$observed,
+          moran_i_normalized = moran_result$observed,
+          expected_i = moran_result$expected,
+          p_value = moran_result$p.value,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+    
+    if(length(results_list) > 0) {
+      results_df <- do.call(rbind, results_list)
+      rownames(results_df) <- NULL
+      return(results_df)
+    } else {
+      return(data.frame())
+    }
+  }
+
+
+slope_diff_file = 
+  slope_diff_conc %>%
+  # slope_diff_perc %>%
+  dplyr::select(SiteCode, Longitude, Latitude,  diff_slope, Source)
+names(slope_diff_file)[5] = "Source"
+
+# Run with normalized concentrations
+moran_conc_changeRate_normalized <- 
+  process_all_sources_normalized(slope_diff_file, "diff_slope", 0.15)
+
+# Add interpretation columns 
+moran_source_conc_changeRate_normalized <- 
+  moran_conc_changeRate_normalized %>%
+  mutate(
+    # Strength of spatial pattern
+    spatial_pattern_strength = case_when(
+      abs(moran_i) < 0.1 ~ "Very weak",
+      abs(moran_i) < 0.3 ~ "Weak", 
+      abs(moran_i) < 0.5 ~ "Moderate",
+      abs(moran_i) < 0.7 ~ "Strong",
+      TRUE ~ "Very strong"
+    ),
+    
+    # Pattern type with interpretation
+    pattern_interpretation = case_when(
+      moran_i > 0 & p_value < 0.05 ~ "Sig CLUSTERING: Nearby sites SIMILAR values",
+      moran_i < 0 & p_value < 0.05 ~ "Sig DISPERSION: Nearby sites DIFFERENT values",
+      moran_i > 0 & p_value >= 0.05 ~ "Weak clustering (not significant)",
+      moran_i < 0 & p_value >= 0.05 ~ "Weak dispersion (not significant)",
+      TRUE ~ "No spatial pattern"
+    )
+  )
+moran_source_conc_changeRate_normalized
+
+
 
 
 #### 3. Spatial & temporal (annual) ####
 
-cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
-cty_rural_urban$X = cty_rural_urban$Longitude = cty_rural_urban$Latitude = NULL
+# cty_rural_urban = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban = fread("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban$V1 = cty_rural_urban$Longitude = cty_rural_urban$Latitude = NULL
 cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ] 
 
 # match geoid
@@ -1867,6 +2841,7 @@ state_regions_use =
                c("state_abbr" = "State",
                  "region" = "Region"))
 head(state_regions_use)
+# write.csv(state_regions_use, "CSN_IMPROVE_State_region_group.csv")
 
 # Change full spelling state names to abbreviations
 pmf_both_perc$State = 
@@ -1888,7 +2863,7 @@ pmf_both_perc_region = merge(pmf_both_perc, state_regions_use)
 head(pmf_both_perc_region)
 dim(pmf_both_perc_region); dim(pmf_both_perc)
 
-write_fst(pmf_both_perc_region, "CSN_IMPROVE_Daily_Source_Impacts_region_2011-20.fst")
+# write_fst(pmf_both_perc_region, "CSN_IMPROVE_Daily_Source_Impacts_region_2011-20.fst")
 
 
 pmf_region_conc_sd_absMean =
@@ -2000,7 +2975,6 @@ source_region_wd =
     values_from = "Concentration"
   )
 
-
 source_region_dataset <-
   annual_source_site %>%
   group_by(Dataset, region, Source, Source_aftermanual) %>%
@@ -2060,18 +3034,41 @@ annual_source_nation %>%
     values_from = "Percent"
   )
 
-nation_slope_diff_ts <- 
+# nation_slope_diff_ts <- 
+#   annual_source_nation %>%
+#   group_by(Source_aftermanual) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope_conc = 
+#       round(get_slope_ts(pick(everything()), "Year", "Concentration"), 3),
+#     diff_slope_perc = 
+#       round(get_slope_ts(pick(everything()), "Year", "Percent"), 2),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+# View(nation_slope_diff_ts)
+
+nation_slope_diff_conc_ts <- 
   annual_source_nation %>%
   group_by(Source_aftermanual) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope_conc = 
-      round(get_slope_ts(pick(everything()), "Year", "Concentration"), 3),
-    diff_slope_perc = 
-      round(get_slope_ts(pick(everything()), "Year", "Percent"), 2),
-    .groups = "drop"
+      get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
+names(nation_slope_diff_conc_ts) = c("Source", "diff_slope_conc", "pvalue_conc", "intercept_conc")
+
+nation_slope_diff_perc_ts <- 
+  annual_source_nation %>%
+  group_by(Source_aftermanual) %>% # Dataset.x, 
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Percent")
+  ) %>%
+  ungroup()
+names(nation_slope_diff_perc_ts) = c("Source", "diff_slope_perc", "pvalue_perc", "intercept_perc")
+nation_slope_diff_ts = 
+  merge(nation_slope_diff_conc_ts, nation_slope_diff_perc_ts,
+        by = "Source")
 View(nation_slope_diff_ts)
+
 
 annual_dataset_source_nation <-
   annual_source_site %>%
@@ -2088,19 +3085,81 @@ annual_dataset_source_nation <-
     perc_001 = quantile(Percent, 0.001),
     .groups = "drop")
 
-nation_dataset_slope_diff_ts <-
+# nation_dataset_slope_diff_ts <-
+#   annual_dataset_source_nation %>%
+#   group_by(Dataset, Source_aftermanual) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope_conc = 
+#       round(get_slope_ts(pick(everything()), "Year", "Concentration"), 3),
+#     diff_slope_perc = 
+#       round(get_slope_ts(pick(everything()), "Year", "Percent"), 2),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+# View(nation_dataset_slope_diff_ts)
+
+nation_dataset_slope_diff_conc_ts <- 
   annual_dataset_source_nation %>%
   group_by(Dataset, Source_aftermanual) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope_conc = 
-      round(get_slope_ts(pick(everything()), "Year", "Concentration"), 3),
-    diff_slope_perc = 
-      round(get_slope_ts(pick(everything()), "Year", "Percent"), 2),
-    .groups = "drop"
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
+names(nation_dataset_slope_diff_conc_ts) = c("Dataset", "Source", "diff_slope_conc", "pvalue_conc", "intercept_conc")
+
+nation_dataset_slope_diff_perc_ts <- 
+  annual_dataset_source_nation %>%
+  group_by(Dataset, Source_aftermanual) %>% # Dataset.x, 
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Percent")
+  ) %>%
+  ungroup()
+names(nation_dataset_slope_diff_perc_ts) = c("Dataset", "Source", "diff_slope_perc", "pvalue_perc", "intercept_perc")
+nation_dataset_slope_diff_ts = 
+  merge(nation_dataset_slope_diff_conc_ts, nation_dataset_slope_diff_perc_ts,
+        by = c("Dataset", "Source"))
 View(nation_dataset_slope_diff_ts)
 
+#### Change to table format
+nation_slope_diff_ts_tb <-
+  nation_slope_diff_ts  %>%
+  dplyr::select(-intercept_conc, -intercept_perc) %>%
+  # Round diff_slope and p_value to 3 decimal places
+  mutate(
+    diff_slope_conc = round(diff_slope_conc, 3),
+    pvalue_conc = round(pvalue_conc, 3),
+    diff_slope_perc = round(diff_slope_perc, 2),
+    pvalue_perc = round(pvalue_perc, 2)
+  ) %>%
+  # Combine diff_slope and p_value into one column
+  mutate(
+    diff_slope_conc = paste0(diff_slope_conc, " (", pvalue_conc, ")"),
+    diff_slope_perc = paste0(diff_slope_perc, " (", pvalue_perc, ")")
+  ) %>%
+  select(-pvalue_conc, -pvalue_perc)
+nation_slope_diff_ts_tb$Dataset = "Combined"
+nation_slope_diff_ts_tb <-
+  relocate(nation_slope_diff_ts_tb, "Dataset", .before = Source)
+
+nation_dataset_slope_diff_ts_tb <-
+  nation_dataset_slope_diff_ts  %>%
+  dplyr::select(-intercept_conc, -intercept_perc) %>%
+  mutate(
+    diff_slope_conc = round(diff_slope_conc, 3),
+    pvalue_conc = round(pvalue_conc, 3),
+    diff_slope_perc = round(diff_slope_perc, 2),
+    pvalue_perc = round(pvalue_perc, 2)
+  ) %>%
+  mutate(
+    diff_slope_conc = paste0(diff_slope_conc, " (", pvalue_conc, ")"),
+    diff_slope_perc = paste0(diff_slope_perc, " (", pvalue_perc, ")")
+  ) %>%
+  select(-pvalue_conc, -pvalue_perc)
+
+nation_slope_diff_ts_tb_cb <-
+  rbind(nation_slope_diff_ts_tb, nation_dataset_slope_diff_ts_tb)
+
+write.csv(nation_slope_diff_ts_tb_cb, "CSN_IMP_dataset_nation_Theil-Sen_mblm.csv")
 
 ###### 3.1.2.2 Monthly Theil-Sen trend for each source in each area ######
 # select columns to use
@@ -2285,18 +3344,49 @@ View(month_region_bb_w)
 #   ) %>%
 #   ungroup()
 
+
+# region_slope_diff_conc_ts <- 
+#   annual_source_region %>%
+#   group_by(region, Source_aftermanual) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(pick(everything()), "Year", "Concentration"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
+## to get p-value, using mblm
 region_slope_diff_conc_ts <- 
   annual_source_region %>%
   group_by(region, Source_aftermanual) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope_ts(pick(everything()), "Year", "Concentration"),
-    .groups = "drop"
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
 
+# Change to a table format for use
+region_slope_diff_conc_ts_tb <- 
+  region_slope_diff_conc_ts %>%
+  st_drop_geometry() %>%
+  dplyr::select(-intercept) %>%
+  # Round diff_slope and p_value to 3 decimal places
+  mutate(
+    diff_slope = round(diff_slope, 3),
+    p_value = round(p_value, 3)
+  ) %>%
+  # Combine diff_slope and p_value into one column
+  mutate(
+    diff_slope = paste0(diff_slope, " (", p_value, ")")
+  ) %>%
+  select(-p_value) %>%
+  # Convert to a wider format
+  pivot_wider(
+    names_from = "Source_aftermanual",
+    values_from = "diff_slope"
+  )
+
 # # Overall 
 # subset(region_slope_diff_conc_ts, Source_aftermanual == "F3-Secondary Sulfate")
-# subset(region_slope_diff_conc_ts, Source_aftermanual == "F8-Biomass")
+subset(region_slope_diff_conc_ts, Source_aftermanual == "F8-Biomass")
 # 
 # 
 # subset(region_slope_diff_conc_ts, Source_aftermanual == "F1-Traffic")
@@ -2309,14 +3399,49 @@ region_slope_diff_conc_ts <-
 
 
 # percent-based slope
+# region_slope_diff_perc_ts <- 
+#   annual_source_region %>%
+#   group_by(region, Source_aftermanual) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(pick(everything()), "Year", "Percent"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
+## to get p-value, using mblm
 region_slope_diff_perc_ts <- 
   annual_source_region %>%
   group_by(region, Source_aftermanual) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope_ts(pick(everything()), "Year", "Percent"),
-    .groups = "drop"
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Percent")
   ) %>%
   ungroup()
+
+# Change to a table format for use
+region_slope_diff_perc_ts_tb <- 
+  region_slope_diff_perc_ts %>%
+  st_drop_geometry() %>%
+  dplyr::select(-intercept) %>%
+  # Round diff_slope and p_value to 3 decimal places
+  mutate(
+    diff_slope = round(diff_slope, 3),
+    p_value = round(p_value, 3)
+  ) %>%
+  # Combine diff_slope and p_value into one column
+  mutate(
+    diff_slope = paste0(diff_slope, " (", p_value, ")")
+  ) %>%
+  select(-p_value) %>%
+  # Convert to a wider format
+  pivot_wider(
+    names_from = "Source_aftermanual",
+    values_from = "diff_slope"
+  )
+
+
+region_slope_diff_ts_tb =
+  rbind(region_slope_diff_conc_ts_tb, region_slope_diff_perc_ts_tb)
+# write.csv(region_slope_diff_ts_tb, "Region_CSN_IMP_changing rate_mblm_theil-sen.csv")
 
 subset(region_slope_diff_perc_ts, Source_aftermanual == "F3-Secondary Sulfate")
 subset(region_slope_diff_perc_ts, Source_aftermanual == "F8-Biomass")
@@ -2382,8 +3507,8 @@ region_slope_diff_1 %>%
 # write.csv(region_slope_diff, "CSN_IMPROVE_region_Theil-Sen.csv")
 # write.csv(region_slope_diff_1, "CSN_IMPROVE_region_Theil-Sen_another_view.csv") # To use for table in supplement
 
-write.csv(region_slope_diff, "CSN_IMPROVE_region_Theil-Sen_2025.05.csv")
-write.csv(region_slope_diff_1, "CSN_IMPROVE_region_Theil-Sen_another_view_2025.05.csv") # To use for table in supplement
+# write.csv(region_slope_diff, "CSN_IMPROVE_region_Theil-Sen_2025.05.csv")
+# write.csv(region_slope_diff_1, "CSN_IMPROVE_region_Theil-Sen_another_view_2025.05.csv") # To use for table in supplement
 
 ###### 3.2. Dominant source by region - annual ###### 
 
@@ -2616,7 +3741,8 @@ ggplot(ruralurban_slope_diff_perc_ts,
 ###### 3.3.2 Annual rural urban, Theil-Sen, grouped by rural, mix, or urban ###### 
 
 # Site info, GPS assigned earlier
-cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+# cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban = fread("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_rural_urban$V1 = NULL
 cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ]
 head(cty_rural_urban); dim(cty_rural_urban)
@@ -2634,10 +3760,10 @@ slope_diff_perc_cty =
 head(slope_diff_perc_cty); dim(slope_diff_perc_cty)
 
 ggplot(subset(slope_diff_conc_cty, 
-              Source_name != "OP" &
+              Source != "OP" &
                 diff_slope > quantile(slope_diff_conc_cty$diff_slope, 0.0025) &
                 diff_slope < quantile(slope_diff_conc_cty$diff_slope, 0.9975)),
-       aes(x = Source_name, y = diff_slope, fill = RuralUrban)) +
+       aes(x = Source, y = diff_slope, fill = RuralUrban)) +
   geom_boxplot() +
   labs(y = paste("Changing Rate, ",format_variable("µg/m3/year"), "")) +
   theme_base(base_size = 24) +
@@ -2652,10 +3778,10 @@ ggplot(subset(slope_diff_conc_cty,
         legend.position = "bottom")
 
 ggplot(subset(slope_diff_perc_cty, 
-              Source_name != "OP" &
+              Source != "OP" &
                 diff_slope > quantile(slope_diff_perc_cty$diff_slope, 0.0025) &
                 diff_slope < quantile(slope_diff_perc_cty$diff_slope, 0.9975)),
-       aes(x = Source_name, y = diff_slope, fill = RuralUrban)) +
+       aes(x = Source, y = diff_slope, fill = RuralUrban)) +
   geom_boxplot() +
   labs(y = paste("Changing Rate, ",format_variable("%/year"), "")) +
   theme_base(base_size = 24) +
@@ -3206,8 +4332,11 @@ corrplot(pmf_perc_conc_n_matrix,
          )
 
 #### 5. Species trends ####
+# csn_imp_species = 
+#   read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/CSN_IMPROVE_Species_Csub.fst")
+# 
 csn_imp_species = 
-  read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/CSN_IMPROVE_Species_Csub.fst")
+  read_fst("/Users/ztttttt/Dropbox/HEI_US_PMF/PMF_results/CSN_IMPROVE_Species_Csub.fst")
 
 head(csn_imp_species); dim(csn_imp_species)
 table(csn_imp_species$Dataset)
@@ -3279,22 +4408,42 @@ csn_imp_main_species_ts <-
   csn_imp_species_ann_main %>%
   group_by(Type, Species) %>% # Dataset.x, 
   dplyr::summarize(
-    diff_slope = get_slope_ts(pick(everything()), "Year", "conc_mean"),
+    results = get_slope_ts(pick(everything()), "Year", "conc_mean"),
     .groups = "drop"
   ) %>%
-  ungroup()
+  ungroup() %>%
+  pivot_wider(
+    names_from = Dataset,
+    values_from = diff_slope
+  )
 csn_imp_main_species_ts
 summary(csn_imp_main_species_ts)
 
 ######  Species: annual Theil-Sen trends ######  
+# csn_imp_species_ts <- 
+#   csn_imp_species_ann %>%
+#   group_by(Species) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = round(get_slope_ts(pick(everything()), "Year", "conc_mean"), 3),
+#     p_value = round(sapply(results, function(x) x$p_value), 4),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
 csn_imp_species_ts <- 
   csn_imp_species_ann %>%
-  group_by(Species) %>% # Dataset.x, 
+  group_by(Species) %>%
   dplyr::summarize(
-    diff_slope = round(get_slope_ts(pick(everything()), "Year", "conc_mean"), 3),
+    results = list(get_slope_ts(pick(everything()), "Year", "conc_mean")),
     .groups = "drop"
   ) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(
+    diff_slope = round(sapply(results, function(x) x$slope), 3),
+    p_value = round(sapply(results, function(x) x$p_value), 4)
+  ) %>%
+  select(-results)
+
 # View(csn_imp_species_ts)
 
 csn_imp_species_ts_dataset <- 
@@ -3309,6 +4458,7 @@ csn_imp_species_ts_dataset <-
     names_from = Dataset,
     values_from = diff_slope
   )
+
 # View(csn_imp_species_ts_dataset)
 
 csn_imp_species_ts_dataset_main <-
@@ -3558,7 +4708,8 @@ ggplot(csn_imp_species_ion_comp,
 
 ######  Species: ion distributions - map ###### 
 # Site GPS
-cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+# cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban = fread("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_rural_urban$V1 = NULL
 cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ]
 head(cty_rural_urban); dim(cty_rural_urban)
@@ -3691,10 +4842,14 @@ ggplot() +
 
 #### 5.2 Species vs. Source ####
 
+# csn_imp_species = 
+#   read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/CSN_IMPROVE_Species_Csub.fst")
+# pmf_source = 
+#   read.fst("/Users/TingZhang/Dropbox/HEI_US_PMF/PMF_results/CSN_IMPROVE_Daily_Source_Impacts_region_2011-20.fst")
 csn_imp_species = 
-  read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/CSN_IMPROVE_Species_Csub.fst")
+  read_fst("/Users/ztttttt/Dropbox/HEI_US_PMF/PMF_results/CSN_IMPROVE_Species_Csub.fst")
 pmf_source = 
-  read.fst("/Users/TingZhang/Dropbox/HEI_US_PMF/PMF_results/CSN_IMPROVE_Daily_Source_Impacts_region_2011-20.fst")
+  read.fst("/Users/ztttttt/Dropbox/HEI_US_PMF/PMF_results/CSN_IMPROVE_Daily_Source_Impacts_region_2011-20.fst")
 site_region = dplyr::select(pmf_source, SiteCode, Region)
 head(csn_imp_species); head(pmf_source)
 
@@ -3711,9 +4866,10 @@ species_source_wide =
 
 names(species_source_wide)[52:59]
 names(species_source_wide)[52:59] =
-  c("Non_tailpipe", "Sulfate", "Salt", "Soil_Dust", "Traffic", 
+  c("Non_tailpipe", "Sulfate", "Salt", "Dust", "Traffic", 
     "Sec_Nitrate", "Industry", "OP_rich")
 head(species_source_wide)
+# View(species_source_wide)
 
 ######  Species-Source: correlations ###### 
 # Drop SiteCode and Date for correlation
@@ -3907,6 +5063,7 @@ species_region_dataset_ts_main_wd =
 # based on chemical mass balance
 
 species_source_mr = species_source_wide
+head(species_source_mr)
 
 ## Get OC/EC ratio primary
 # set the primary not the minimum, but 5th percentile of each ratios of the site
@@ -3976,6 +5133,7 @@ names(species_source_mr_use)
 species_source_mr_use =
   dplyr::select(species_source_mr_use, -oc_ec_ratio, -oc_ec_ratio_primary)
 summary(species_source_mr_use)
+head(species_source_mr_use)
 
 # Calculate correlation, relevance, and number of complete cases matrix
 species_source_mr_cor <- 
@@ -4081,11 +5239,83 @@ ggplot() +
         legend.spacing.y = unit(1, "cm")) 
 
 
+######  Species-Source: Mass Reconstruction, by dataset ###### 
+
+species_source_mr_dataset =
+  dplyr::select(species_source_mr, Dataset, Biomass:mr_trace)
+names(species_source_mr_dataset)
+species_source_mr_dataset =
+  dplyr::select(species_source_mr_dataset, -oc_ec_ratio, -oc_ec_ratio_primary)
+summary(species_source_mr_dataset)
+head(species_source_mr_dataset)
+
+# Calculate correlation, relevance, and number of complete cases matrix
+species_source_mr_dataset_cor <- 
+  species_source_mr_dataset %>%
+  dplyr::group_by(Dataset) %>%
+  dplyr::group_modify(~ {
+    # Select only numeric columns you want to correlate
+    cor_data <- .x %>% select(where(is.numeric))  # or select(col1, col2, col3, ...)
+    
+    cor_result <- psych::corr.test(cor_data, use = "pairwise")
+    
+    tibble(
+      cor_matrix = list(cor_result$r),
+      p_matrix = list(cor_result$p)
+    )
+  })
+
+species_source_mr_CSN_cor = species_source_mr_dataset_cor$cor_matrix[[1]]
+species_source_mr_CSN_p = species_source_mr_dataset_cor$p_matrix[[1]]
+species_source_mr_IMP_cor = species_source_mr_dataset_cor$cor_matrix[[2]]
+species_source_mr_IMP_p = species_source_mr_dataset_cor$p_matrix[[2]]
+
+# The mask for significant correlations (p < 0.05)
+species_source_mr_p_mask_CSN <- species_source_mr_CSN_p > 0.05
+species_source_mr_p_mask_IMP <- species_source_mr_IMP_p > 0.05
+
+# Set up color palette
+col_palette <- 
+  colorRampPalette(c("#4477AA", "white", "#EE6677"))(100)
+
+# Create and display correlation plot, only show those with p < 0.05
+corrplot(species_source_mr_CSN_cor, 
+         method = "color",
+         type = "upper",
+         diag = TRUE,
+         tl.col = "black",
+         tl.srt = 45,
+         col = col_palette,
+         p.mat = species_source_mr_p_mask_CSN,      # Add p-value matrix
+         sig.level = 0.05,      # Significance level
+         insig = "blank",       # Hide insignificant correlations
+         addCoef.col = "black", 
+         number.cex = 0.9,
+         tl.cex = 0.9,
+         cl.pos = "n"  # Remove the legend/colorbar
+)
+
+corrplot(species_source_mr_IMP_cor, 
+         method = "color",
+         type = "upper",
+         diag = TRUE,
+         tl.col = "black",
+         tl.srt = 45,
+         col = col_palette,
+         p.mat = species_source_mr_p_mask_IMP,      # Add p-value matrix
+         sig.level = 0.05,      # Significance level
+         insig = "blank",       # Hide insignificant correlations
+         addCoef.col = "black", 
+         number.cex = 0.9,
+         tl.cex = 0.9,
+         cl.pos = "n"  # Remove the legend/colorbar
+)
 
 #### 6. all site PM ####
 `
 # All observations, after interpolation
-site_species_daily = read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/CSN_IMPROVE_Species_Csub.fst")
+# site_species_daily = read_fst("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/CSN_IMPROVE_Species_Csub.fst")
+site_species_daily = read_fst("/Users/ztttttt/Dropbox/HEI_US_PMF/PMF_results/CSN_IMPROVE_Species_Csub.fst")
 site_species_daily$V1 = NULL
 head(site_species_daily); dim(site_species_daily)
 
@@ -4131,7 +5361,8 @@ head(pm_overal_annual)
 summary(site_pm_daily)
 
 # Site info, GPS assigned earlier
-cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+# cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban = fread("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 cty_rural_urban$V1 = NULL
 cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ]
 head(cty_rural_urban); dim(cty_rural_urban)
@@ -4200,6 +5431,33 @@ ggplot() +
         legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
         legend.spacing.y = unit(1, "cm")) 
 
+
+# Add region info
+ggplot() +
+  geom_sf(data = regions_dissolved, 
+          fill = "grey93", 
+          color = "white", lwd = 1.6) +  # Thicker borders for regions
+  geom_sf(data = us_states, fill = NA, color = "white", lwd = 0.4) +
+  geom_point(data = site_geo_overal,
+             aes(x = Longitude, y = Latitude, 
+                 size = PM25_med, shape = Dataset, color = Dataset, group = Dataset), # size = PM25_med, 
+             alpha = 0.5) +
+  coord_sf(datum = NA) +
+  scale_color_manual(values = c("royalblue3", "#ff7f0e")) + 
+  labs(color=addline_space(paste("Concentration",  
+                                 format_variable("µg/m3"), ""))) +
+  theme_minimal() +
+  theme(panel.background = element_blank(),
+        strip.text = element_text(color = "black", size = 16),
+        strip.text.y = element_text(size = 10),
+        axis.title = element_text(size = 0),
+        # legend.position = c(0.85, 0.18),
+        legend.text = element_text(size = 14), 
+        legend.key.size = unit(1.5, "lines"), # adjust the size of the legend keys
+        legend.title = element_text(size = 16, hjust = 0.1, vjust = 3),
+        legend.spacing.y = unit(1, "cm")) 
+
+
 # Two year comparison
 ggplot() +
   geom_sf(data = us_states, fill = "grey96", alpha = 0.8) +
@@ -4227,9 +5485,12 @@ ggplot() +
 
 #### Dominant source & non-attaintant ####
 domain_source_year = fread("Dominant_source_site_annual_CSN-IMPROVE.csv")
-non_attainment_cty = fread("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/EPA_52_Non-attainment_counties_NAAQS_by2032.csv")
+# non_attainment_cty = fread("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/EPA_52_Non-attainment_counties_NAAQS_by2032.csv")
+non_attainment_cty = fread("/Users/ztttttt/Dropbox/GMU_computer/HEI HAQ PMF/PMF_Results/EPA_52_Non-attainment_counties_NAAQS_by2032.csv")
 non_attainment_cty$Attainment = "FALSE"
-cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+
+# cty_rural_urban = fread("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+cty_rural_urban = fread("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 domain_source_year$V1 = non_attainment_cty$V1 = cty_rural_urban$V1 = NULL
 
 cty_rural_urban = cty_rural_urban[!duplicated(cty_rural_urban$SiteCode), ] 
@@ -4306,4 +5567,42 @@ attain_cty_domain_source_year_table <-
 table(non_attain_cty_domain_source$Source)/nrow(non_attain_cty_domain_source)
 table(attain_cty_domain_source$Source)/nrow(attain_cty_domain_source)
 
+#### 7. High dust day, dust storm ####
+tx_pmf =
+  subset(pmf_both_perc, SiteCode == "481130069")
+unique(tx_pmf$Source)
+
+tx_soil_2020 =
+  subset(tx_pmf,
+         Source == "Dust" &
+           Date > as.Date("2019-12-31"))
+
+dust_2020 =
+  subset(pmf_both_perc, 
+         Source == "Dust" &
+         Date > as.Date("2020-06-01") & Date < as.Date("2020-07-05"))
+subset(dust_2020, Concentration > 10)
+
+# Filter sites with at least one conc above 10
+dust_2020_above10 <- 
+  dust_2020 %>%
+  group_by(SiteCode) %>%
+  filter(any(Concentration > 10)) %>%
+  ungroup()
+
+ggplot(dust_2020_above10, aes(x = Date, y = Concentration)) +
+  geom_line(alpha = 0.5, linetype = 2) +
+  geom_point(size = 2) +
+  facet_wrap(~ SiteCode, ncol = 3) +
+  labs(y = format_variable("Concentration µg/m3")) +
+  theme_minimal(base_size = 18) +
+  theme(
+    strip.text = element_text(face = "bold", size = 16),
+    strip.background = element_rect(fill = "gray90", color = NA),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray85"),
+    plot.caption = element_text(color = "gray50", hjust = 1),
+    legend.position = "bottom"
+  )
 
