@@ -2,13 +2,13 @@
 # rm(list=ls())
 
 ##set working directory - for IMPROVE
-# setwd("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE")
-# getwd()
-# data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
-
-setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+setwd("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE")
 getwd()
-data.dir <- "/Users/TingZhangDropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
+data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
+
+# setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+# getwd()
+# data.dir <- "/Users/TingZhangDropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
 
 ##packages in need
 library(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
@@ -99,6 +99,10 @@ daily_commonRowCol_aft$Variables = row.names(daily_commonRowCol_aft)
 
 # combine two dataframe & remove rownames
 csn_daily_comb = rbind(daily_commonRowCol_bef, daily_commonRowCol_aft)
+length(unique(csn_daily_comb$SiteCode))
+# write.csv(csn_daily_comb, "CSN_daily_with_missing_2026.03")
+
+csn_daily_comb = fread( "/Users/ztttttt/Documents/HEI PMF/CSN_IMPROVE/CSN_daily_with_missing_2026.03")
 
 # estimate the overall NA rate
 sum(is.na(csn_daily_comb)) *100 /
@@ -115,6 +119,12 @@ csn_daily_comb$year = format(csn_daily_comb$Date, "%Y")
 csn_daily_comb$month = format(csn_daily_comb$Date, "%m")
 ddply(csn_daily_comb, .(year), summarise, NA.rate = mean(NA.rate))
 ddply(csn_daily_comb, .(month), summarise, NA.rate = mean(NA.rate))
+
+# lost_site_during_intp is generately in 2026, 2.1.2 SA_site_excluding
+lost_site_during_intp = 
+  c("20900035", "220150008", "370670022", "530530031",
+    "540390011", "550790010", "60850005")
+lost_site_during_intp %in% csn_daily_comb$SiteCode
 
 # NA rate of each species
 csn_daily_NA_comp = data.frame(
@@ -150,7 +160,8 @@ plot(us_states_csn_NA)
 ##### 11111. CSN - Fill the Missing, till & after 2015 separately #####
 ####################################################################################
 #### generate basic data for filling ####
-aqs_PM25 = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/EPA_CSN_AQS_daily_PM25.csv")
+# aqs_PM25 = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/EPA_CSN_AQS_daily_PM25.csv")
+aqs_PM25 = fread("/Users/ztttttt/Documents/HEI PMF/EPA_AQS_monitor/EPA_CSN_AQS_daily_PM25.csv")
 aqs_PM25$V1 = NULL
 aqs_PM25$Date = as.Date(aqs_PM25$Date)
 sapply(aqs_PM25, class)
@@ -161,6 +172,12 @@ sapply(aqs_PM25, class)
 csn_daily = fread("CSN_Component_with_missing_Before_2015_2023.02.csv")
 csn_daily = fread("CSN_Component_with_missing_After_2015_2023.02.csv")
 # csn_daily$Accept.PM2.5 = NULL # after 2015
+
+# lost_site_during_intp is generately in 2026, 2.1.2 SA_site_excluding
+lost_site_during_intp = 
+  c("20900035", "220150008", "370670022", "530530031",
+    "540390011", "550790010", "60850005")
+lost_site_during_intp[lost_site_during_intp %in% csn_daily$SiteCode]
 
 # Count rows that contain at least one NA
 sum(!complete.cases(select(csn_daily, Ag:Zr))) # 23200 for before; 51244 for after
@@ -281,8 +298,12 @@ csn_miss_halfNA = subset(csn_miss, SiteCode %in% site.lots.NA)
 # subset(csn_miss, SiteCode == site.lots.NA[34])[1:110, 2:5]
 
 # plot their distribution
-csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
-csn_sites = select(csn_meta_sites, SiteCode, State, Latitude,  Longitude)
+# csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
+csn_meta_sites = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
+length(unique(csn_meta_sites$SiteCode)) # 157
+csn_sites = select(csn_meta_sites, SiteCode, State, Latitude, Longitude)
+csn_sites = csn_sites[!duplicated(csn_sites), ]
+length(unique(csn_sites$SiteCode)) # 157
 csn_sites$High.P.NA = "N"
 csn_sites$High.P.NA[csn_sites$SiteCode %in% site.lots.NA] = "Y"
 
@@ -291,12 +312,15 @@ csn_sites = subset(csn_sites,
                    SiteCode %in% 
                      unique(csn_miss$SiteCode))
 table(csn_sites$High.P.NA)
+length(unique(csn_sites$SiteCode)) # 137
+
+lost_site_during_intp[lost_site_during_intp %in% csn_sites$SiteCode]
 
 # mainland US
 csn_sites = subset(csn_sites,
                    Latitude < 50 & Latitude > 20 &
                      Longitude > -130 & Longitude < -60)
-length(unique(csn_sites$SiteCode))
+length(unique(csn_sites$SiteCode)) # 137
 # site 20900035 is in AK, not included
 
 UScounty <- map_data("county")
@@ -1197,11 +1221,13 @@ ggplot(miss_plot,
 ####################################################################################
 #### generate basic data for filling ####
 imp_daily = fread("IMPROVE_Component_with_missing.csv")
+length(unique(imp_daily$SiteCode)) # 196
 
 imp_daily$V1 = NULL
 # imp_daily$Date = as.Date(imp_daily$Date)
 sapply(imp_daily, class)
 imp_daily = subset(imp_daily, Date > as.Date("2010-12-31"))
+length(unique(imp_daily$SiteCode)) # 196
 
 # remove OPC subgroup
 colnames(imp_daily)[35:48] # OPC sub-group
@@ -1226,6 +1252,8 @@ imp_daily = subset(imp_daily,
                   !(SiteCode %in% c("DETR1", "RENO1", "RENO2", "RENO3")))
 imp_daily_siteNA = subset(imp_daily, 
                           SiteCode %in% c("DETR1", "RENO1", "RENO2", "RENO4"))
+length(imp_daily_siteNA$SiteCode)
+length(unique(imp_daily$SiteCode)) # 192
 
 #### prepare data used for interpolation ####
 # imp_miss = subset(imp_daily, !(SiteCode %in% site.lots.NA))
@@ -1249,6 +1277,7 @@ imp_miss_noAllNA = subset(imp_miss,
                           rowSums(is.na(imp_miss[, cols.comp.pm])) != 
                             col.component.pm)
 n.site = length(unique(imp_miss_noAllNA$SiteCode))
+n.site # 169
 dim(imp_miss_noAllNA) # 171563, 44
 dim(imp_miss) #383448, 44
 
