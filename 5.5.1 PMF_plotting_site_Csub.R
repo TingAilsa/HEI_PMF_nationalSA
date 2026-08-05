@@ -18,8 +18,12 @@ library(patchwork)
 library(ggpubr)
 
 
-setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/")
-data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
+# setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/")
+# data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
+
+setwd("/Users/ztttttt/Dropbox/GMU_computer/HEI HAQ PMF/PMF_Results")
+data.dir <- "/Users/ztttttt/Dropbox/GMU_computer/HEI HAQ PMF/PMF_Results"
+
 getwd()
 
 #### 1. Prepare & merge info for manual source assignment ####
@@ -36,13 +40,13 @@ getwd()
 # data_use = "CSN_Site_15t1mdl0unc"
 # data.pre = "CSN_noCsub_15t1mdl0unc_"
 
-# # 0 uncertainty, dispersion normalization
-# data_use = "CSN_Site_15t1mdl0unc_DN"
-# data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
+# 0 uncertainty, dispersion normalization
+data_use = "CSN_Site_15t1mdl0unc_DN"
+data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
 
-# 0 uncertainty, dispersion normalization, Csub, Ni V
-data_use = "CSN_Site_15t1mdlVNi_DN"
-data.pre = "CSN_Csub_15t1mdlVNi_DN_"
+# # 0 uncertainty, dispersion normalization, Csub, Ni V
+# data_use = "CSN_Site_15t1mdlVNi_DN"
+# data.pre = "CSN_Csub_15t1mdlVNi_DN_"
 
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
 # data_use = "IMPROVE_Site_15t1mdlVNi_DN"
@@ -64,8 +68,8 @@ time = Sys.Date()
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-04.csv")
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-05.csv")
 # source_org = read.csv("CSN_Site_15t1mdl0unc_PMF_decision_2024-05-30.csv")
-# source_org = read.csv("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv") # Final use for total OC/EC
-source_org = read.csv("CSN_Site_15t1mdlVNi_DN_PMF_decision_2025-08-05.csv") # Final use for total C-Subgroups
+source_org = read.csv("CSN_Site_15t1mdl0unc_DN_PMF_decision_2024-06-30.csv") # Final use for total OC/EC
+# source_org = read.csv("CSN_Site_15t1mdlVNi_DN_PMF_decision_2025-08-05.csv") # Final use for total C-Subgroups
 
 
 ##### IMPROVE

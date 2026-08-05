@@ -6,9 +6,9 @@
 # getwd()
 # data.dir <- "/Users/ztttttt/Documents/HEI PMF/CSN_IMPROVE"
 
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC")
-getwd()
-data.dir <- "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC"
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC")
+# getwd()
+# data.dir <- "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC"
 
 library(tidyverse)
 library(readxl)
@@ -484,6 +484,10 @@ for( i in 1:25){
 #### Non-GUI-2 - NO EXTREMES - Origin_MDL ####
 ################################################################################
 
+setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC")
+getwd()
+data.dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/CSN_IMPROVE_ownPC"
+
 ##### Read data files #####
 
 ########## read.1 OOB & Missing rate ##########
@@ -520,8 +524,8 @@ OOB_comb_avg =
 OOB_comb_avg = OOB_comb_avg[-1, ]
 names(OOB_comb_avg)[1] = "SiteCode"
 
-miss_comb_avg = fread("IMPROVE_Missing_Qualifier_interpolation_All.csv")
-
+# miss_comb_avg = fread("IMPROVE_Missing_Qualifier_interpolation_All.csv")
+miss_comb_avg = fread("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_Missing_Qualifier_interpolation_All.csv")
 
 ### CSN & IMPROVE
 OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
@@ -543,6 +547,8 @@ summary(names(OOB_comb_avg) == names(miss_comb_avg))
 names(miss_comb_avg)
 summary(OOB_comb_avg)
 summary(miss_comb_avg)
+
+OOB_comb_avg$V1 = miss_comb_avg$V1 = NULL
 
 ########## read.2 concentration ##########
 # uncertainties would be re-estimated after removing and replacing the extreme data points
@@ -575,8 +581,8 @@ summary(conc_pmf)
 
 ########## read.3 test uncertainty, error_fraction  ##########
 
-# comp_error_fraction = fread("/Users/ztttttt/Documents/HEI PMF/IMPROVE & CSN original/CSN_k_Error Fraction.csv")
-comp_error_fraction = fread("CSN_k_Error-Fraction_2023.04.csv")
+comp_error_fraction = fread("/Users/ztttttt/Documents/HEI PMF/IMPROVE & CSN original/CSN_k_Error Fraction.csv")
+# comp_error_fraction = fread("CSN_k_Error-Fraction_2023.04.csv")
 comp_error_fraction$data = NULL
 
 # set EF of subgroups to the same of OC, EC
@@ -591,6 +597,7 @@ summary(comp_error_fraction)
 
 ##### VC for dispersion normalization, based on ERA5 data 
 # dn_vc = fread("Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
+# dn_vc = fread("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/Nearest_ERA5_Wind_BLH_VC_CSN&IMPROVE.csv")
 # dn_vc$V1 = NULL
 # # dn_vc$Date = as.Date(dn_vc$Date)
 # dn_vc_use = select(dn_vc,
@@ -599,20 +606,29 @@ summary(comp_error_fraction)
 #   dn_vc_use[
 #     with(dn_vc_use,
 #       order(Dataset, SiteCode, Date)), ]
+# 
+# site_check = dplyr::select(dn_vc_use, Dataset, SiteCode)
+# site_check = site_check[!duplicated(site_check), ]
+# table(site_check$Dataset) # 151 CSN & 179 IMPROVE
+# "60731018" %in%site_check$SiteCode # "60731018" is the missing site from non-GUI data preparetion
+# "MOOS1" %in%site_check$SiteCode # "MOOS1" is the second missing site from non-GUI data preparetion, out of mainland US
 
 #### get SiteCode & site.serial matching list for both CSN & IMPROVE datasets
 
-# site_code_serial = select(dn_vc_use, Dataset, SiteCode)
-# site_code_serial = unique(site_code_serial)
-# site_code_serial$serial.No = 1:nrow(site_code_serial)
-# 
-# site_code_serial$serial.No =
-#   ifelse(site_code_serial$serial.No < 100,
-#          sprintf("%03d", site_code_serial$serial.No),
-#          as.character(site_code_serial$serial.No))
-# write.csv(site_code_serial, "CSN_IMPROVE_site.serial.csv")
+site_code_serial = select(dn_vc_use, Dataset, SiteCode)
+table(site_code_serial$Dataset)
+site_code_serial = unique(site_code_serial)
+site_code_serial$serial.No = 1:nrow(site_code_serial)
 
-site_code_serial_all = fread("CSN_IMPROVE_site.serial.csv"); site_code_serial_all$V1 = NULL
+site_code_serial$serial.No =
+  ifelse(site_code_serial$serial.No < 100,
+         sprintf("%03d", site_code_serial$serial.No),
+         as.character(site_code_serial$serial.No))
+write.csv(site_code_serial, "CSN_IMPROVE_site.serial.csv")
+
+# site_code_serial_all = fread("CSN_IMPROVE_site.serial.csv")
+site_code_serial_all = fread("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/CSN_IMPROVE_site.serial.csv")
+site_code_serial_all$V1 = NULL
 table(site_code_serial_all$Dataset)
 
 # add 0 to force the serial.No being three digits
@@ -2017,8 +2033,15 @@ library(usmap)
 library(USAboundaries)
 
 site_geoid = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Intp_IMPROVE_CSN/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+site_geoid = read.csv("/Users/ztttttt/Downloads/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 site_geoid$X = NULL
 site_geoid = site_geoid[!duplicated(site_geoid), ] 
+
+site_geoid_check = dplyr::select(site_geoid, Dataset, SiteCode, geoid)
+site_geoid_check = site_geoid_check[!duplicated(site_geoid_check), ] 
+dim(site_geoid_check)
+table(site_geoid_check$Dataset)
+
 site_vc_all_plot = site_vc_all[!duplicated(site_vc_all), ] 
 dim(site_vc_all_plot)
 

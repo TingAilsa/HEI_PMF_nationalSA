@@ -19,8 +19,12 @@ library(ggpubr)
 library(lubridate)
 
 
-setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/")
-data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
+# setwd("/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/")
+# data.dir <- "/Users/TingZhang/Documents/HEI HAQ PMF/PMF_Results/"
+
+setwd("/Users/ztttttt/Dropbox/GMU_computer/HEI HAQ PMF/PMF_Results/")
+data.dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/PMF_results/"
+
 getwd()
 
 #### 1. Prepare & merge info for manual source assignment ####
@@ -38,16 +42,16 @@ getwd()
 # data.pre = "CSN_noCsub_15t1mdl0unc_"
 
 # # 0 uncertainty, dispersion normalization
-# data_use = "CSN_Site_15t1mdl0unc_DN"
-# data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
+data_use = "CSN_Site_15t1mdl0unc_DN"
+data.pre = "CSN_noCsub_15t1mdl0unc_DN_"
 
 # 0 uncertainty, dispersion normalization, Csub, Ni V
 # data_use = "CSN_Site_Csub_15t1mdlVNi_DN"
 # data.pre = "CSN_Csub_15t1mdlVNi_DN_"
 
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
-data_use = "IMPROVE_Site_15t1mdlVNi_DN"
-data.pre = "IMPROVE_Csub_15t1mdlVNi_DN_"
+# data_use = "IMPROVE_Site_15t1mdlVNi_DN"
+# data.pre = "IMPROVE_Csub_15t1mdlVNi_DN_"
 
 # # 0 uncertainty, dispersion normalization, Csub, Ni V, NO3, S
 # data_use = "IMPROVE_Site_15tAmmIonVNi_DN"
@@ -63,6 +67,8 @@ csv.series <- c("source_profile.csv", "overall.csv", "daily.csv", "annual.csv", 
 ###### 1.1. merge overall contribution - for Manual Source Apportionment  ######
 
 csv_overall_list <- list.files(dir_path, pattern = ".*overall\\.csv$", full.names = TRUE)
+# csv_overall_list <- list.files(dir_path, pattern = ".*source_profile\\.csv$", full.names = TRUE)
+
 
 csv_overall <- 
   do.call(
@@ -746,7 +752,8 @@ pm_perform
 
 source_org = read.csv("IMPROVE_Site_15t1mdlVNi_DN_PMF_2024-07-23.csv")
 
-site_gps = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+# site_gps = read.csv("/Users/TingZhang/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/intermediate/pmf/PMF_progress_files/CSN_IMPROVE/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
+site_gps = read.csv("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/CSN_IMPROVE_ownPC/IMPROVE_CSN_PopDensity_Urban_Rural_classify_331sites.csv")
 head(site_gps)
 site_gps = select(site_gps, SiteCode, Longitude, Latitude)
 head(site_gps)
@@ -831,6 +838,9 @@ source_org_unique = select(source_org_long,
                            State, Latitude, Longitude, geoid, Species,
                            Factor_source, Source_aftermanual, Fraction_nm)
 names(source_org_unique)[8] = "Main_Species"
+head(source_org_unique)
+
+write.csv(source_org_unique, "CSN_Site_15t1mdl0unc_DN_unique_source_match.csv")
 
 ###### source profile
 # csv_source_profile = fread("CSN_Site_15t1mdl0unc_source_profile_2024-04-19.csv")
