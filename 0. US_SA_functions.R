@@ -219,16 +219,20 @@ color_source = c(
 
 color_source_noF = c(
   "Traffic" = "#C71000FF",         # red 
+  "Traffic Exhaust" = "#C71000FF",         # red 
   "Traffic-Diesel" = "#FF95A8FF",         # red 
   "Traffic-Gasoline" = "#FF410DFF",         # red 
   "Traffic-ResOil" = "#FB6467FF",         # red 
   "Secondary Nitrate" = "#0073C2FF", # blue
   "Secondary Sulfate" = "#16A085FF", # green 16A085FF 00A087FF
+  "Sulfate" = "#16A085FF", # green 16A085FF 00A087FF
   "Non-tailpipe" = "#F7C530FF",     # yellow FAFD7CFF F7C530FF
   "Industry" = "#E89242FF",         # orange
   "Salt" = "#00B5E2FF",             # cyan 6EE2FFFF  84D7E1FF  00B5E2FF
   "Biomass" = "#8A4198FF",          # purple #8A4198FF violetred
+  "Biomass Burning/SOA" = "#8A4198FF",          # purple #8A4198FF violetred
   "Soil/Dust" = "grey40",         # Gray, brown
+  "Dust" = "grey40",         # Gray, brown
   "OP-rich" = "#5A9599FF"         # , brown
 )
 
@@ -1431,21 +1435,48 @@ get_slope_ts <- function(df, x, y) {
 get_slope_ts <- function(df, x, y) {
   # Remove rows where either x or y is NA
   clean_df <- df[complete.cases(df[[x]], df[[y]]), ]
-  
   # Check if we have enough data points (need at least 2 for a slope)
   if (nrow(clean_df) < 2) {
     return(NA)
   }
-  
   # Try to fit the model with error handling
   tryCatch({
     formula <- as.formula(paste(y, "~", x))
+    # deming::theilsen, Weighted Theil-Sen estimator, use Kendall's tau to weight pairwise slopes, more sensitive to the distribution of data points
     model_ts <- theilsen(formula, data = clean_df)
     slope_ts <- coef(model_ts)[x]
     return(slope_ts)
   }, error = function(e) {
     # Return NA if model fails
     return(NA)
+  })
+}
+
+# Use mblm for theil-sen slope and p-value
+get_slope_pvalue_ts_mblm <- function(df, x, y) {
+  clean_df <- df[complete.cases(df[[x]], df[[y]]), ]
+  
+  if (nrow(clean_df) < 2) {
+    return(data.frame(diff_slope = NA, p_value = NA, intercept = NA))
+  }
+  
+  tryCatch({
+    # Fit the Theil-Sen model using mblm
+    formula <- as.formula(paste(y, "~", x))
+    # mblm::mblm, Classic (unweighted) Theil-Sen estimator, takes simple median of all pairwise slopes, ives equal weight to all data pairs
+    model <- mblm::mblm(formula, data = clean_df)
+    
+    # Extract coefficients and summary
+    model_summary <- summary(model)
+    diff_slope <- coef(model)[2] # The slope coefficient for x
+    intercept <- coef(model)[1]
+    # p-value for the slope is typically in the summary's coefficients table
+    p_value <- model_summary$coefficients[2, 4]
+    
+    return(data.frame(diff_slope = diff_slope, p_value = p_value, intercept = intercept))
+    
+  }, error = function(e) {
+    return(data.frame(diff_slope = NA, p_value = NA, intercept = NA))
   })
 }
 
@@ -1857,7 +1888,8 @@ extract_source_name <- function(filepath, file_usage, time_year) {
   filename <- basename(filepath)
   file_pattern = paste0("(?<=", file_usage, "_)[^_]+(?=_", time_year, "\\.fst)")
   # Extract everything between "train_test_" and "_2011-2020.fst"
-  source_name <- str_extract(filename, "(?<=train_test_)[^_]+(?=_2011-2020\\.fst)")
+  # source_name <- str_extract(filename, "(?<=train_test_)[^_]+(?=_2011-2020\\.fst)")
+  source_name <- str_extract(filename, file_pattern)
   return(source_name)
 }
 
