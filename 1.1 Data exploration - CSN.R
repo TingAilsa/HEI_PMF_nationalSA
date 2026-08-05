@@ -2,13 +2,13 @@
 # rm(list=ls())
 
 ##set working directory
-# setwd("/Users/ztttttt/Documents/HEI PMF/R - original CSN")
-# getwd()
-# data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original CSN"
-
-setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN")
+setwd("/Users/ztttttt/Documents/HEI PMF/R - original CSN")
 getwd()
-data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN"
+data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original CSN"
+
+# setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN")
+# getwd()
+# data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN"
 
 ##packages in need
 library(tidyr) 
@@ -38,13 +38,16 @@ write.csv(csn_meta_sites, "CSN metadata 157 sample sites info 2010-20.csv")
 write.csv(csn_meta_flags, "CSN metadata 18 flags 2010-20.csv")
 write.csv(csn_meta_para, "CSN metadata 118 parameters 2010-20.csv")
 
-csn_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20220816_221221_OJ1LO CSN.txt", sep = ",", dec = ".")
+# csn_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/IMPROVE & CSN original/ailsa2be_20220816_221221_OJ1LO CSN.txt", sep = ",", dec = ".")
+csn_data = fread("/Users/ztttttt/Documents/HEI PMF/IMPROVE & CSN original/ailsa2be_20220816_221221_OJ1LO CSN.txt", sep = ",", dec = ".")
 csn_data$Date = as.Date(csn_data$Date, format = "%m/%d/%Y")
 csn_data$year = year(csn_data$Date)
 csn_data$month = month(csn_data$Date)
 csn_data$day = day(csn_data$Date)
 # csn_data$dow = weekdays(csn_data$Date); csn_data$dow = NULL
 View(csn_data)
+
+
 
 #### detect and remove variables barely changed in value ####
 # ChatGPT: I have a dataset with multiple columns, for those that are not numeric, I want to get 1, the number of unique info in this column, and 2) list the first 10 info in the column. The info can be get via unique(dataset$XX) or so. I want to create a three column dataset based on the result, variable, number of unique info, and the first 10 unique info.
@@ -185,7 +188,6 @@ csn_data$State[csn_data$State == -999] = "US.Mex"
 
 write.csv(csn_data,"CSN data for analysis 10232022.csv")
 
-
 #############################################################################################################
 ####### 2. explore data with qualifiers #######
 #############################################################################################################
@@ -194,6 +196,8 @@ csn_data = fread("CSN data for analysis 10232022.csv") ## with extracted collect
 csn_data = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/CSN_IMPROVE_comp/CSN data for analysis 10232022.csv")
 csn_data$Date = as.Date(csn_data$Date)
 csn_data$X = csn_data$X.1 = csn_data$V1 = NULL
+length(unique(csn_data$SiteCode)) # 156
+
 dim(csn_data)
 
 #### combine csn qualifier with EPA codes, calculated appearance frequency separately ####
