@@ -1,6 +1,8 @@
 # module load gnu10 openmpi r/4.3.1-gnu-openblas gdal/3.4.1-27 udunits geos/3.7.2-gj proj/7.1.0-3w
 # module load netcdf-c netcdf-fortran
 
+# rm(list=ls())
+
 library(ncdf4)
 library(ggrepel)
 library(base)
@@ -78,7 +80,7 @@ fill_na_with_adjacent_days <- function(df, variable_name, na_date) {
 }
 
 
-#### Files for all years ####
+#### Files used for all years ####
 
 ###### For plotting ######
 
@@ -101,8 +103,8 @@ us_point_coord =
 us_bbox <- c(xmin = -125, xmax = -66, ymin = 24, ymax = 50)
 crs_proj <- "+proj=longlat +datum=WGS84 +no_defs"
 
-us_grid_raster_01 = raster(file.path("base_raster_grid_sf/us_grid_raster_01.tif"))
-# us_grid_raster_001 = raster(file.path("base_raster_grid_sf/us_grid_raster_001.tif"))
+us_grid_raster_01 = rast(file.path("base_raster_grid_sf/us_grid_raster_01.tif"))
+# us_grid_raster_001 = rast(file.path("base_raster_grid_sf/us_grid_raster_001.tif"))
 
 # us_grid_sf_01 = st_read(file.path("base_raster_grid_sf/us_grid_sf_01.fgb"))
 # us_grid_sf_001 = st_read(file.path("base_raster_grid_sf/us_grid_sf_001.fgb"))
@@ -129,6 +131,19 @@ pmf_pm25 = read_fst("pmf_ncld_meteo_census/PMF_total_PM2.5.fst")
 # length(unique(pmf_salt$SiteCode))
 # length(unique(pmf_oprich$SiteCode))
 length(unique(pmf_pm25$SiteCode))
+
+###### LCZ & Elevation ######
+# elevation = read_fst("pmf_ncld_meteo_census/Elevation_CONUS_with_NAs.fst")
+# lcz = read_fst("pmf_ncld_meteo_census/LCZ_Local_Climate_Zones_2018.fst")
+# 
+# lcz_ele = elevation
+# lcz_ele$Elevation = lcz$LCZ
+# names(lcz_ele)[3] = "Elevation"
+# 
+# write_fst(us_point_coord, "pmf_ncld_meteo_census/Elevation_LCZ_2018.fst")
+# write_fst(us_point_coord, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/Elevation_LCZ_2018.fst")
+
+lcz_elevation = read_fst("pmf_ncld_meteo_census/Elevation_LCZ_2018.fst")
 
 ###### Roadiness ######
 # roadiness_with_nearest_sf =
@@ -202,21 +217,29 @@ hms_smoke_all$Latitude = round(hms_smoke_all$Latitude, 2)
 #################################################
 
 # All included years
-cmaq_years = 2012:2013 # 2011:2020  2017:2020  2013:2014 2015:2016 2018:2020
+cmaq_years = 2011:2020 # 2017:2020  2013:2014 2015:2016 2018:2020
 
-for (cmaq_year in cmaq_years) { # cmaq_year = cmaq_years[1]; cmaq_year = 2012
+for (cmaq_year in cmaq_years) { # cmaq_year = cmaq_years[1] # cmaq_year = 2012
   # Get the cmaq_period
   cmaq_period = 
     paste0(cmaq_year, "-01_", cmaq_year, "-12")
   cat("CMAQ_Period", cmaq_period, "& CMAQ_Year", cmaq_year)
   
   ###### CMAQ data ######
-  cmaq_sulfate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Sulfate_", cmaq_period, ".fst")))
-  cmaq_dust_rds_noExe = read_fst( file.path(paste0("base_raster_grid_sf/CMAQ_Dust_", cmaq_period, ".fst")))
-  cmaq_traffic_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Traffic_", cmaq_period, ".fst")))
-  cmaq_biom_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Biomass_", cmaq_period, ".fst")))
-  cmaq_nitrate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Nitrate_", cmaq_period, ".fst")))
-  cmaq_pm25_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_PM25_", cmaq_period, ".fst")))
+  # cmaq_sulfate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Sulfate_", cmaq_period, ".fst")))
+  # cmaq_dust_rds_noExe = read_fst( file.path(paste0("base_raster_grid_sf/CMAQ_Dust_", cmaq_period, ".fst")))
+  # cmaq_traffic_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Traffic_", cmaq_period, ".fst")))
+  # cmaq_biom_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Biomass_", cmaq_period, ".fst")))
+  # cmaq_nitrate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Nitrate_", cmaq_period, ".fst")))
+  # cmaq_pm25_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_PM25_", cmaq_period, ".fst")))
+
+  # cmaq_sulfate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Sulfate_noExe_", cmaq_year, ".fst")))
+  cmaq_dust_rds_noExe = read_fst( file.path(paste0("base_raster_grid_sf/CMAQ_Dust_noExe_", cmaq_year, ".fst")))
+  # cmaq_traffic_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Traffic_noExe_", cmaq_year, ".fst")))
+  cmaq_biom_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Biomass_noExe_", cmaq_year, ".fst")))
+  # cmaq_nitrate_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_Nitrate_noExe_", cmaq_year, ".fst")))
+  # cmaq_pm25_rds_noExe = read_fst(file.path(paste0("base_raster_grid_sf/CMAQ_PM25_noExe_", cmaq_year, ".fst")))
+
   # length(unique(hms_smoke_all$Date))
   # length(unique(pmf_traffic$Date))
   # length(unique(cmaq_sulfate_rds_noExe$Date))
@@ -435,7 +458,7 @@ for (cmaq_year in cmaq_years) { # cmaq_year = cmaq_years[1]; cmaq_year = 2012
   #             paste0("Census_commute_commute_time_", cmaq_period, ".pdf"),
   #             plot = census_commute_time, width = 9, height = 6))
   
-  ###### Common variables, GRIDMET, NCLD ###### 
+  ###### Common variables, GRIDMET, NCLD, Elevation ###### 
   ## NCLD
   
   # Determine the NCLD data to match
@@ -546,6 +569,15 @@ for (cmaq_year in cmaq_years) { # cmaq_year = cmaq_years[1]; cmaq_year = 2012
   met_ncld_us_grid_plot =
     merge(met_ncld_us_grid_plot, landcover_df,
           by = "NLCD.Land.Cover.Class", all.x = TRUE)
+  
+  ##### Elevation
+  # Grid_points is the temporary SpatVector, for extraction
+  grid_points <- vect(met_ncld_us_grid, 
+                      geom = c("Longitude", "Latitude"), 
+                      crs = "EPSG:4326")
+  
+  # elevation gets added back to the original data.frame
+  met_ncld_us_grid$elevation <- extract(us_elevation_wgs84, grid_points)[, 2]
   
   # land_use <-
   #   ggplot() +
@@ -1053,13 +1085,21 @@ for (cmaq_year in cmaq_years) { # cmaq_year = cmaq_years[1]; cmaq_year = 2012
   #           file.path(
   #             paste0("machine_learning_source_input/Dust_only_PMF_points_input_", cmaq_period, ".fst")))
 
+  # write_fst(dust_cmaq_pmf_met_landtype,
+  #           file.path(
+  #             paste0("machine_learning_source_input/Dust_all_CMAQ_points_Daily_", cmaq_period, ".fst")))
+  # 
+  # write_fst(dust_rf_use,
+  #           file.path(
+  #             paste0("machine_learning_source_input/Dust_only_PMF_points_Daily_", cmaq_period, ".fst")))
+  
   write_fst(dust_cmaq_pmf_met_landtype,
             file.path(
-              paste0("machine_learning_source_input/Dust_all_CMAQ_points_Daily_", cmaq_period, ".fst")))
+              paste0("machine_learning_source_input/Dust_all_CMAQ_points_Daily_", cmaq_year, ".fst")))
   
   write_fst(dust_rf_use,
             file.path(
-              paste0("machine_learning_source_input/Dust_only_PMF_points_Daily_", cmaq_period, ".fst")))
+              paste0("machine_learning_source_input/Dust_only_PMF_points_Daily_", cmaq_year, ".fst")))
   
   
   rm(cmaq_dust_rds_noExe) 
@@ -1530,5 +1570,4 @@ for (cmaq_year in cmaq_years) { # cmaq_year = cmaq_years[1]; cmaq_year = 2012
   rm(pm25_cmaq_pmf_met_landtype_smk_smkMet)
   rm(pm25_cmaq_pmf_met_land_smk_smkMet_road)
   rm(pm25_rf_use)
-  
 }
