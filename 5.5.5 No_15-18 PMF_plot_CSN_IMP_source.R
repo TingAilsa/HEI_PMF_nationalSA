@@ -51,22 +51,12 @@ pmf_both_perc_no1518 = subset(
 )
 
 #### 1. Annual averages ####
-pmf_site_no1518_ann =
-  pmf_both_perc_no1518 %>%
-  dplyr::group_by(Dataset, SiteCode, serial.No, Factor.No,
-                  State, Latitude, Longitude, geoid, Source_aftermanual, Year) %>%
-  dplyr::summarise(
-    Concentration = mean(Concentration),
-    Percent = mean(Percent),
-    .groups = "drop"
-  )
-
 pmf_all_no1518_ann =
   pmf_both_perc_no1518 %>%
   dplyr::group_by(Dataset, Source_aftermanual, Year) %>%
   dplyr::summarise(
-    Concentration = mean(Concentration),
-    Percent = mean(Percent),
+    Concentration = mdiean(Concentration),
+    Percent = median(Percent),
     .groups = "drop"
   )
 
@@ -74,28 +64,162 @@ pmf_all_ann =
   pmf_both_perc %>%
   dplyr::group_by(Dataset, Source_aftermanual, Year) %>%
   dplyr::summarise(
-    Concentration = mean(Concentration),
-    Percent = mean(Percent),
+    Concentration = median(Concentration),
+    Percent = median(Percent),
     .groups = "drop"
   )
 
-nation_slope_ts <- 
-  subset(pmf_all_ann, Dataset == "CSN") %>%
-  group_by(Source_aftermanual) %>% # Dataset.x, 
-  dplyr::summarize(
-    diff_slope = get_slope_ts(pick(everything()), "Year", "Concentration"),
+pmf_site_no1518_ann =
+  pmf_both_perc_no1518 %>%
+  dplyr::group_by(Dataset, SiteCode, serial.No, Factor.No,
+                  State, Latitude, Longitude, geoid, Source_aftermanual, Year) %>%
+  dplyr::summarise(
+    Concentration = median(Concentration),
+    Percent = median(Percent),
     .groups = "drop"
+  )
+
+pmf_site_no1518_ann_med <-
+  pmf_site_no1518_ann %>%
+  group_by(Dataset, Source_aftermanual, Year) %>%
+  dplyr::summarise(
+    Concentration = median(Concentration),
+    Percent = median(Percent),
+    Conc_mean = mean(Concentration),
+    Perc_mean = mean(Percent),
+    conc_999 = quantile(Concentration, 0.999),
+    conc_001 = quantile(Concentration, 0.001),
+    perc_999 = quantile(Percent, 0.999),
+    perc_001 = quantile(Percent, 0.001),
+    .groups = "drop")
+
+pmf_site_all_ann =
+  pmf_both_perc %>%
+  dplyr::group_by(Dataset, SiteCode, Source_aftermanual, Year) %>%
+  dplyr::summarise(
+    Concentration = median(Concentration),
+    Percent = median(Percent),
+    .groups = "drop"
+  )
+
+pmf_site_all_ann_med <-
+  pmf_site_all_ann %>%
+  group_by(Dataset, Source_aftermanual, Year) %>%
+  dplyr::summarise(
+    Concentration = median(Concentration),
+    Percent = median(Percent),
+    Conc_mean = mean(Concentration),
+    Perc_mean = mean(Percent),
+    conc_999 = quantile(Concentration, 0.999),
+    conc_001 = quantile(Concentration, 0.001),
+    perc_999 = quantile(Percent, 0.999),
+    perc_001 = quantile(Percent, 0.001),
+    .groups = "drop")
+
+# nation_slope_ts <- 
+#   subset(pmf_all_ann, Dataset == "CSN") %>%
+#   group_by(Source_aftermanual) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(pick(everything()), "Year", "Concentration"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+# 
+# nation_slope_no1518_ts <- 
+#   subset(pmf_all_no1518_ann, Dataset == "CSN") %>%
+#   group_by(Source_aftermanual) %>% # Dataset.x, 
+#   dplyr::summarize(
+#     diff_slope = get_slope_ts(pick(everything()), "Year", "Concentration"),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup()
+
+#### Add p-value, mlcm theil-sen method
+## overall, make less sense
+csn_slope_ts <- 
+  subset(pmf_site_all_ann_med, Dataset == "CSN") %>%
+  group_by(Source_aftermanual) %>%
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
 
-nation_slope_no1518_ts <- 
-  subset(pmf_all_no1518_ann, Dataset == "CSN") %>%
-  group_by(Source_aftermanual) %>% # Dataset.x, 
+imp_slope_ts <- 
+  subset(pmf_site_all_ann_med, Dataset == "IMPROVE") %>%
+  group_by(Source_aftermanual) %>% 
   dplyr::summarize(
-    diff_slope = get_slope_ts(pick(everything()), "Year", "Concentration"),
-    .groups = "drop"
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
   ) %>%
   ungroup()
+
+csn_slope_no1518_ts <- 
+  subset(pmf_all_no1518_ann_med, Dataset == "CSN") %>%
+  group_by(Source_aftermanual) %>% 
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
+  ) %>%
+  ungroup()
+
+## Based on each site change
+csn_site_slope_ts <- 
+  subset(pmf_site_all_ann_med, Dataset == "CSN") %>%
+  group_by(Source_aftermanual) %>%
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
+  ) %>%
+  ungroup()
+
+imp_site_slope_ts <- 
+  subset(pmf_site_all_ann_med, Dataset == "IMPROVE") %>%
+  group_by(Source_aftermanual) %>% 
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
+  ) %>%
+  ungroup()
+
+csn_slope_site_no1518_ts <-
+  subset(pmf_site_no1518_ann_med, Dataset == "CSN") %>%
+  group_by(Source_aftermanual) %>% 
+  dplyr::summarize(
+    get_slope_pvalue_ts_mblm(pick(everything()), "Year", "Concentration")
+  ) %>%
+  ungroup()
+
+
+## Convert to table format
+csn_site_slope_ts_tb <-
+  csn_site_slope_ts  %>%
+  dplyr::select(-intercept) %>%
+  # Round diff_slope and p_value to 3 decimal places
+  mutate(
+    diff_slope = round(diff_slope, 3),
+    p_value = round(p_value, 3)
+  ) %>%
+  # Combine diff_slope and p_value into one column
+  mutate(
+    diff_slope = paste0(diff_slope, " (", p_value, ")")
+  ) %>%
+  select(-p_value)
+
+csn_slope_site_no1518_ts_tb <-
+  csn_slope_site_no1518_ts  %>%
+  dplyr::select(-intercept) %>%
+  # Round diff_slope and p_value to 3 decimal places
+  mutate(
+    diff_slope = round(diff_slope, 3),
+    p_value = round(p_value, 3)
+  ) %>%
+  # Combine diff_slope and p_value into one column
+  mutate(
+    diff_slope = paste0(diff_slope, " (", p_value, ")")
+  ) %>%
+  select(-p_value)
+
+csn_slope_all_no1518_combine <-
+  merge(csn_site_slope_ts_tb, csn_slope_site_no1518_ts_tb,
+        by = "Source_aftermanual")
+names(csn_slope_all_no1518_combine)[2:3] = c("All", "No_2015.11-2018.09")
+# View(csn_slope_all_no1518_combine)
 
 ###### 2.1.2 Annual Theil-Sen trend for each source in each area ######
 # based on EPA Regions, but separate Midwest into two nearby area
