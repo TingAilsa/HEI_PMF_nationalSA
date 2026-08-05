@@ -47,7 +47,8 @@ modeling_perform_metrics <- function(observed, predicted) {
 
 # setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
 # setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
-setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/Aim3_ML_predictions")
+# setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/Aim3_ML_predictions")
+setwd("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/outputs/Aim3_inputs_predictions_10year_model")
 getwd()
 
 ## Extract long & points with the continental US
@@ -55,27 +56,132 @@ us_states = USAboundaries::us_states()
 us_states <- us_states[!(us_states$state_abbr %in% c( 'HI', 'AK', "AS", "GU", "MP", "PR", "VI")),]
 
 ## Parameter settings
-pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass") # , "Traffic", "Dust"
+pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass", "Nitrate", "PM25") # , "Traffic", "Dust"
 # pred_sources = c("Traffic") # , "Traffic", "Dust"
 
-## CMAQ/Study Period
-# cmaq_period = "2011-01_2011-12"; cmaq_year = 2011
-# cmaq_period = "2012-01_2012-12"; cmaq_year = 2012
-# cmaq_period = "2013-01_2013-12"; cmaq_year = 2013
-cmaq_period = "2014-01_2014-12"; cmaq_year = 2014
-# cmaq_period = "2015-01_2015-12"; cmaq_year = 2015
-# cmaq_period = "2016-01_2016-12"; cmaq_year = 2016
-# cmaq_period = "2017-01_2017-12"; cmaq_year = 2017
+#### Map Overall spatial pattern ####
+# Read combine overall concentrations from different modeling
+comb_overall = read_fst("Combined_US_01_overall.fst", as.data.table = TRUE)
+head(comb_overall); summary(comb_overall)
+comb_overall$Model_Data = paste0(comb_overall$Model, "_", comb_overall$Dataset)
 
-# applied_model = c("RF", "GBM")
-applied_model = c("RF")
-dataset = c("noCoords_") # "", "No_coords_"
+# Estimate Uncertainty
+comb_overall$Uncertainty = comb_overall$Pred.sd/comb_overall$Predictions*100
 
-print(paste0("Study period ", cmaq_period, " & Year ", cmaq_year, 
-             ", with df ", dataset, " from model ", applied_model))
+# Update source names
+comb_overall <- 
+  comb_overall %>%
+  dplyr::mutate(
+    Source = case_when(
+      Source == "Biomass" ~ "Biomass Burning/\n SOA",
+      Source == "Traffic" ~ "Traffic Exhaust",
+      Source == "Secondary Sulfate" ~ "Sulfate",
+      Source == "Soil/Dust" ~ "Dust",
+      Source == "Nitrate" ~ "Secondary Nitrate",
+      TRUE ~ Source  # Keep original value if no match
+    ))
+unique(comb_overall$Source)
 
-#### Mapping & other plotting, a single year #### 
-# used_model = applied_model[1]; used_source = pred_sources[4]; used_data = dataset[1]
+# Set the source order
+comb_overall$Model_Data <- 
+  factor(comb_overall$Model_Data, 
+         levels = c("RF_Both", "GBM_Both", "RF_CSN"))
+comb_overall$Source <- 
+  factor(comb_overall$Source, 
+         levels = c("Traffic Exhaust", "Secondary Nitrate", "Sulfate", 
+                    "Biomass Burning/\n SOA", "Dust", "PM25"))
+
+comb_overall_noPM = subset(comb_overall, Source != "PM25")
+
+orange_set = c("#F7F4F0", "#FDD49E", "#FDBB84", "#FC8D59", "#E34A33", "#7A2103")
+purple_set = c("#F5F4F7", "#D8D0E4", "#B5A8CF", "#8874B3", "#5C4490", "#2E1760")
+
+overall_pred_all <-
+  ggplot() +
+  geom_tile(data = comb_overall_noPM,
+            aes(x = Longitude, y = Latitude, fill = Predictions),
+            width = 0.1, height = 0.1) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", linewidth = 0.1) +
+  scale_fill_gradientn(
+    name   = expression("SI"[ML]~"\n µg/m"^3),
+    colors = purple_set,
+    limits = c(0, quantile(comb_overall_noPM$Predictions, 0.999)),
+    oob    = scales::squish,
+    guide  = guide_colorbar(
+      barwidth       = unit(10, "cm"),   # thin — now vertical
+      barheight      = unit(0.5, "cm"),    # tall — adjust to your figure height
+      title.position = "left",
+      title.hjust    = 0.5,
+      label.theme    = element_text(size = 11, angle = 0)
+    )) +
+  facet_grid(Model_Data ~ Source, switch = "y") +  # fixed: added switch = "y"
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  labs(title = "Overall predictions by source") +
+  theme_void(base_size = 19) +
+  theme(
+    strip.text.x      = element_text(size = 19, face = "bold", margin = margin(b = 6)),
+    strip.text.y.left = element_text(size = 19, face = "bold", angle = 90, margin = margin(r = 6)),
+    strip.placement   = "outside",
+    panel.spacing     = unit(0.3, "cm"),
+    panel.border      = element_blank(),
+    plot.title        = element_text(size = 22, face = "bold", hjust = 0.5, margin = margin(b = 10)),
+    plot.margin       = margin(10, 10, 10, 10),
+    legend.position  = "bottom",
+    legend.title     = element_text(size = 19, face = "bold", angle = 0, hjust = 0.5),
+    legend.margin     = margin(t = 8)
+  )
+overall_pred_all
+
+overall_uncert_all <-
+  ggplot() +
+  geom_tile(data = comb_overall_noPM,
+            aes(x = Longitude, y = Latitude, fill = Uncertainty),
+            width = 0.1, height = 0.1) +
+  geom_sf(data = us_states,
+          fill = NA, color = "grey70", linewidth = 0.1) +
+  scale_fill_gradientn(
+    name   = "Uncertainty\n (%)",
+    colors = orange_set,
+    limits = c(0, # CHECK the negative values later: quantile(comb_overall_noPM$Uncertainty, 0.005),
+               quantile(comb_overall_noPM$Uncertainty, 0.995)),
+    oob    = scales::squish,
+    guide  = guide_colorbar(
+      barwidth       = unit(10, "cm"),   # thin — now vertical
+      barheight      = unit(0.5, "cm"),    # tall — adjust to your figure height
+      title.position = "left",
+      title.hjust    = 0.5,
+      label.theme    = element_text(size = 11, angle = 0)
+    )) +
+  facet_grid(Model_Data ~ Source, switch = "y") +  # fixed: added switch = "y"
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  labs(title = "Overall predictions by source") +
+  theme_void(base_size = 19) +
+  theme(
+    strip.text.x      = element_text(size = 19, face = "bold", margin = margin(b = 6)),
+    strip.text.y.left = element_text(size = 19, face = "bold", angle = 90, margin = margin(r = 6)),
+    strip.placement   = "outside",
+    panel.spacing     = unit(0.3, "cm"),
+    panel.border      = element_blank(),
+    plot.title        = element_text(size = 22, face = "bold", hjust = 0.5, margin = margin(b = 10)),
+    plot.margin       = margin(10, 10, 10, 10),
+    legend.position  = "bottom",
+    legend.title     = element_text(size = 19, face = "bold", angle = 0, hjust = 0.5),
+    legend.margin     = margin(t = 8)
+  )
+
+overall_uncert_all
+
+ggsave("ML_Plot/Map_Overall_Predictions_5source_3modeling.png", overall_pred_all, 
+       width  = 18,   # wide enough for 5 columns
+       height = 10,   # tall enough for 3 rows
+       dpi    = 300)  # publication quality
+
+ggsave("ML_Plot/Map_Overall_Uncertainty_5source_3modeling.png", overall_uncert_all, 
+       width  = 18,   # wide enough for 5 columns
+       height = 10,   # tall enough for 3 rows
+       dpi    = 300)  # publication quality
+
 
 for(used_model in applied_model){ # used_model = applied_model[1]
   for(used_source in pred_sources){ # used_source = pred_sources[1]
@@ -211,7 +317,7 @@ for(used_model in applied_model){ # used_model = applied_model[1]
         file.path("ML_plot",
                   paste0(used_model, "_Pred_HD_US_01_grids_noUnc_", data_coords, "_", cmaq_period, "_", used_source, "_Overall.png")), 
         plot = all_grid_predictions_one, width = 14.5, height = 8.5)
-
+      
       ggsave(
         file.path("ML_plot",
                   paste0(used_model, "_Pred_HD_US_01_grids_noUnc_", data_coords, "_", cmaq_period, "_", used_source, "_Monthly.png")), 
@@ -265,7 +371,7 @@ for(used_model in applied_model){ # used_model = applied_model[1]
       ###### Model Performance ###### 
       
       ###### Performance-1, iteration, train & test results ######
-
+      
       # Predictions for train and test data from each iterations
       train_test_pred_name = 
         paste0(used_model, "_Pred_HD_US_01_grids_noUnc_", used_data, 
@@ -408,7 +514,7 @@ for(used_model in applied_model){ # used_model = applied_model[1]
                 fill = NA, color = "grey70", linewidth = 0.3) + 
         geom_point(data = train_test_site_perform, 
                    aes(x = Longitude, y = Latitude, color = R_Determine),
-                  size = 1.2, alpha = 0.8) +
+                   size = 1.2, alpha = 0.8) +
         scale_color_viridis_c(
           name = "R_determine", option = "viridis",
           limits = c(0, quantile(train_test_site_perform$R_Determine, 0.95))) +
@@ -435,8 +541,8 @@ for(used_model in applied_model){ # used_model = applied_model[1]
                 fill = NA, color = "grey70", linewidth = 0.3) + 
         geom_point(data = train_test_site_perform, 
                    aes(x = Longitude, y = Latitude, color = R_Pearson),
-                  width = 0.5, height = 0.5, 
-                  alpha = 0.8) +
+                   width = 0.5, height = 0.5, 
+                   alpha = 0.8) +
         scale_color_viridis_c(
           name = "R_Pearson", option = "viridis",
           limits = c(0, quantile(train_test_site_perform$R_Pearson, 0.95))) +
@@ -471,7 +577,7 @@ for(used_model in applied_model){ # used_model = applied_model[1]
                   paste0(used_model, "_Pred_HD_US_01_grids_noUnc_", data_coords, "_", cmaq_period, "_", used_source, "_model_performance.png")), 
         plot = perform_overall_plot, width = 12, height = 9)
       
-    
+      
       # calculate the limits based on the range of the data
       max_rf <- 
         max(c(train_test_pred_fst$PMF_conc, 
@@ -555,9 +661,9 @@ for(used_model in applied_model){ # used_model = applied_model[1]
       ggsave(
         plot = rf_var_influence_p, 
         file.path("ML_plot",
-             paste0(used_model, "_Pred_HD_US_01_grids_noUnc_", data_coords, "_",
-                    cmaq_period, "_", used_source, "_variable_Influence.png")), 
-             width = 9, height = 10.5)
+                  paste0(used_model, "_Pred_HD_US_01_grids_noUnc_", data_coords, "_",
+                         cmaq_period, "_", used_source, "_variable_Influence.png")), 
+        width = 9, height = 10.5)
       
     }
   }
@@ -566,17 +672,18 @@ for(used_model in applied_model){ # used_model = applied_model[1]
 
 #### Plot, comparison among different years (flexible number of years) ####
 
-setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
+# setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
 # setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
+setwd("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/outputs/Aim3_inputs_predictions")
 getwd()
 
 ## Parameter settings
-pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass")
+pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass", "Nitrate", "PM25") # , "Traffic", "Dust"
 applied_model = c("RF")
 dataset = c("noCoords_")
 
 # Define the years you want to include (can be 2 to 10 years)
-cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017) 
+cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020) 
 # Create period strings for each year
 cmaq_periods = paste0(cmaq_years, "-01_", cmaq_years, "-12")
 
@@ -597,7 +704,7 @@ for(used_model in applied_model) {
       
       # Get used data
       data_coords = ifelse(used_data == "", "With-coords", "No-coords")
-
+      
       # Define filled color  
       source_fill_col =
         case_when(
@@ -718,7 +825,7 @@ for(used_model in applied_model) {
           Predictions_median = median(Predictions), 
           Predictions_995th = quantile(Predictions, 0.995),
           Predictions_005th = quantile(Predictions, 0.005),
-
+          
           .groups = "drop"
         )
       
@@ -896,17 +1003,17 @@ for(used_model in applied_model) {
 #### Plot, all years, all sources ####
 
 # setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ml_daily_pred_holdout/Annual_combine")
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/National_SA_Results/Aim3_prediction_data")
+setwd("/Users/ztttttt/Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/Nationwide_SA/data/outputs/Aim3_inputs_predictions_10year_model")
 getwd()
 
-
 ## Parameter settings
-pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass")
+pred_sources = c("Sulfate", "Traffic", "Dust", "Biomass", "Nitrate", "PM25") # , "Traffic", "Dust"
 applied_model = c("RF")
 dataset = c("noCoords_")
 
 # Define the years you want to include (can be 2 to 10 years)
-cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017) 
+cmaq_years = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020) 
 # Create period strings for each year
 cmaq_periods = paste0(cmaq_years, "-01_", cmaq_years, "-12")
 

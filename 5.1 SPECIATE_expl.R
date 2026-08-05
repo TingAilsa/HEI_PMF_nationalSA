@@ -6,9 +6,14 @@
 # getwd()
 # data.dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/SPECIATE_2018"
 
-setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/SPECIATE_2018")
+
+setwd("/Users/ztttttt/Dropbox/HEI_US_PMF/SPECIATE_2018")
+data.dir <- "/Users/ztttttt/Dropbox/HEI_US_PMF/SPECIATE_2018"
 getwd()
-data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/SPECIATE_2018"
+
+# setwd("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/SPECIATE_2018")
+# getwd()
+# data.dir <- "/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/SPECIATE_2018"
 
 ##packages in need
 require(tidyr) # separate{tidyr}, gather{tidyr}, spread{tidyr},  spread is VIP function, str_split_fixed{stringr} is better than separate
@@ -26,6 +31,27 @@ library(gridExtra) #grid.arrange{}
 library(grid) #textGrob{}
 library(ggplot2)
 library(ggsci)
+
+#### Check the original SPECIATE V5.2 data #### 
+library(mdbr)
+mdb_tables("/Users/ztttttt/Documents/HEI PMF/SPECIATE_2018/SPECIATE 5.2 8-1-2022.accdb")
+speciate_acc <- 
+  read_mdb(
+    "/Users/ztttttt/Documents/HEI PMF/SPECIATE_2018/SPECIATE 5.2 8-1-2022.accdb", "PROFILES")
+
+# Change date format
+speciate_acc$PROFILE_DATE <- 
+  as.POSIXct(speciate_acc$PROFILE_DATE, format = "%m/%d/%y %H:%M:%S")
+names(speciate_acc)
+# Range of the date
+range(speciate_acc$PROFILE_DATE, na.rm = TRUE)
+# Check Test Year of the samples
+unique(speciate_acc$TEST_YEAR)
+# speciate_acc_testYear <- data.frame(table(unique(speciate_acc$TEST_YEAR)))
+
+
+references <- read_mdb("/Users/ztttttt/Documents/HEI PMF/SPECIATE_2018/SPECIATE 5.2 8-1-2022.accdb", "REFERENCES")
+revision <- read_mdb("/Users/ztttttt/Documents/HEI PMF/SPECIATE_2018/SPECIATE 5.2 8-1-2022.accdb", "REVISION_LIST")
 
 #### FINISHED -- data match and extract -- FINISHED ####
 pm_whole_speciate = read.csv("SPECIATE_PM2.5ProfileSimplified.csv")

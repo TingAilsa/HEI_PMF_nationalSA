@@ -32,8 +32,12 @@ library(missForest)
 # csn_daily_before = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2023.03.csv")
 # csn_daily_after = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_PMF_files_Ting/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2023.03.csv")
 
-csn_daily_before = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2024.04.csv")
-csn_daily_after = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2024.04.csv")
+# csn_daily_before = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2024.04.csv")
+# csn_daily_after = fread("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2024.04.csv")
+
+csn_daily_before = fread("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_until_2015_2024.04.csv")
+csn_daily_after = fread("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/CSN_interpulation_random-forest_from_2016_2024.04.csv")
+
 
 csn_daily_before$V1 = csn_daily_after$V1 = NULL
 csn_daily_before$Date = as.Date(csn_daily_before$Date)
@@ -79,6 +83,7 @@ csn_daily_after <- csn_daily_after[, ..conc_common_cols]
 # combine the dataset
 csn_daily_OrigOrder = rbind(csn_daily_before, csn_daily_after)
 # setDT(csn_daily_OrigOrder)
+length(unique(csn_daily_OrigOrder$SiteCode))
 
 # Remove variables not needed for PMF (C-subgroups)
 csn_remove = c("OC.unadjusted.88", "EC.unadjusted.88", 
@@ -757,7 +762,10 @@ write.csv(species_daily_fullMDL, "CSN_MDL_C-Sub_monthly_forPMF_expand_2024.04.cs
 #### missing MDLs were interpolated via random forest in 2024.07
 
 # read data
-species_daily = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv") # in fact, updated data from 2024.03, before HEI audit
+# species_daily = fread("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv") # in fact, updated data from 2024.03, before HEI audit
+species_daily = fread("/Users/ztttttt/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE/IMPROVE_interpulation_random-forest_2023.csv") # in fact, updated data from 2024.03, before HEI audit
+length(unique(species_daily$SiteCode))
+
 # species_mdl = fread("IMPROVE_MDL_monthly_2023.csv")
 species_mdl = fread("IMPROVE_MDL_monthly_RF_2024.csv") 
 

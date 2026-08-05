@@ -2,13 +2,13 @@
 # rm(list=ls())
 
 ##set working directory
-# setwd("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE")
-# getwd()
-# data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
- 
-setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+setwd("/Users/ztttttt/Documents/HEI PMF/R - original IMPROVE")
 getwd()
-data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
+data.dir <- "Users/ztttttt/Documents/HEI PMF/R - original IMPROVE"
+ 
+# setwd("/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE")
+# getwd()
+# data.dir <- "/Users/TingZhang/Dropbox/HEI_US_PMF/National_SA_PMF/R - original IMPROVE"
 
 
 ##packages in need
@@ -43,6 +43,7 @@ imp_data$class = 0
 imp_data$class[imp_data$Method == "A-XRF"] = "Element"
 imp_data$class[imp_data$Method == "B-IC"] = "Ion"
 imp_data$class[imp_data$Method == "C-TOR"] = "OC/EC subgroup"
+length(unique(imp_data$SiteCode)) #196
 
 imp_data$Qualifier = imp_data$Status
 imp_data_compare = select(imp_data, 
@@ -69,6 +70,7 @@ excluded.variables.csn =
     "MinT", "MaxT", "avgT", "MinP", "MaxP", "avgP")
 csn_data = subset(csn_data, !(CompName %in% excluded.variables.csn))
 # csn_data.1 = csn_data
+length(unique(csn_data$SiteCode)) # 156
 
 # csn_ocec = subset(csn_data, grepl("OC1", CompName, fixed = T) | grepl("EC1", CompName, fixed = T))
 
@@ -92,19 +94,25 @@ csn.exclude.site = c(800020014, 61072003, 20900034, 20904101,
 csn_data_compare = subset(csn_data_compare, 
                           !(SiteCode %in% csn.exclude.site))
 dim(csn_data_compare)
+length(unique(csn_data_compare$SiteCode)) # 150
+length(unique(imp_data_compare$SiteCode)) # 196
 
 imp_csn_data = rbind(imp_data_compare, csn_data_compare)
 
 #### site info ####
 imp_meta_sites = read.csv("IMPROVE metadata 196 sample sites info 2010-20.csv")
+length(unique(imp_meta_sites$SiteCode)) # 196
+
 imp_meta_sites$StartDate = as.Date(imp_meta_sites$StartDate)
 imp_meta_sites$EndDate = as.Date(imp_meta_sites$EndDate)
 imp_sites_use = subset(imp_meta_sites, Longitude > -999)
 head(imp_sites_use)
 imp_sites_use = select(imp_sites_use, 
                        Dataset, State, SiteCode, Latitude, Longitude, StartDate, EndDate)
+length(unique(imp_sites_use$SiteCode)) # 196
 
-csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
+# csn_meta_sites = read.csv("/Users/TingZhang/Library/CloudStorage/Dropbox/HEI_US_PMF/National_SA_PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
+csn_meta_sites = read.csv("/Users/ztttttt/Documents/HEI PMF/R - original CSN/CSN metadata sample sites 2010-20 use.csv")
 csn_sites_use = subset(csn_meta_sites, 
                        !(SiteCode %in% 
                            c("800020014", "61072003", "20900034", 
@@ -117,6 +125,8 @@ csn_sites_use = select(csn_sites_use,
                        Dataset, State, SiteCode, Latitude, Longitude, StartDate, EndDate)
 
 imp_csn_site = rbind(imp_sites_use, csn_sites_use)
+length(unique(imp_csn_site$SiteCode)) # 343
+table(imp_csn_site$Dataset) # CSN 150 IMPROVE 193
 
 ##########################################################################################
 ######## 222. site distance between CSN & IMPROVE ########
@@ -570,11 +580,13 @@ head(imp_data_compare)
 imp_data_use = 
   select(imp_data_compare, 
          Dataset, State, SiteCode, Date, Qualifier, CompName, Val)
+length(unique(imp_data_use$SiteCode)) # 196
 nrow(imp_data_use)/length(unique(imp_data_use$CompName))
 
 imp_state_site = select(imp_data_use, State, SiteCode)
 imp_state_site = imp_state_site[!duplicated(imp_state_site), ]
 imp_state_site$dup.site = duplicated(imp_state_site$SiteCode)
+length(unique(imp_state_site$SiteCode))
 summary(imp_state_site$dup.site)
 
 # create a data.frame with full dates and Components
@@ -934,6 +946,7 @@ csn_data_use = subset(csn_data_use, Date > as.Date("2010-12-31"))
 # nrow(csn_data_use)/length(unique(csn_data_use$CompName))
 dim(csn_data_use)
 head(csn_data_use)
+length(unique(csn_data_use$SiteCode))
 
 # csn_state_site = select(csn_data_use, State, SiteCode)
 # csn_state_site = csn_state_site[!duplicated(csn_state_site), ]

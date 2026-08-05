@@ -18,7 +18,96 @@ library(ff) # handle large files without hitting memory limits
 library(bigmemory)  # handle large files without hitting memory limits
 library(corrplot)
 library(tiff)
+library(gstat)
+library(fst)
 
+
+#### 00_build_grid_points, 0.01 degree #### 
+
+# Build us_point_coord.fst: the canonical 0.01 deg CONUS grid-point
+# table (Longitude, Latitude) used by every other script in the
+# pipeline. Points = cell centers of us_grid_raster_01.tif, restricted
+# to the CONUS boundary (with edge/coastal cells included, not
+# dropped, per "include the boundaries").
+#
+# CONUS bbox used only as a coarse pre-crop:
+#   lon: -124.65 to -67.05   lat: 24.55 to 49.35
+
+library(terra)
+library(fst)
+library(sf)
+
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds")
+
+PATH_ROOT <- getwd()
+PATH_RAW_GRID <- file.path(PATH_ROOT, "/base_raster_grid_sf/us_grid_raster_001.tif")
+PATH_TEMPLATE_OUT <- file.path(PATH_ROOT, "/pmf_ncld_meteo_census/CONUS_raster_001.tif")
+PATH_POINTS_OUT   <- file.path(PATH_ROOT, "/pmf_ncld_meteo_census/Long_lat_CONUS_0.01_degree.fst")
+
+us_grid_raster = 
+  raster(
+    file.path(
+      "/base_raster_grid_sf/us_grid_raster_001.tif"))
+
+conus_bbox <- ext(-124.65, -67.05, 24.55, 49.35)
+
+###### 0.01 grid 0. US boundary ###### 
+
+zip_url <- "https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_state_20m.zip"
+zip_dest <- file.path(tempdir(), "cb_2018_us_state_20m.zip")
+unzip_dir <- file.path(tempdir(), "cb_2018_us_state_20m")
+
+download.file(zip_url, zip_dest, mode = "wb")
+unzip(zip_dest, exdir = unzip_dir)
+
+us_states <- vect(file.path(unzip_dir, "cb_2018_us_state_20m.shp"))
+
+# keep the lower 48 + DC only; drop AK/HI/PR and other territories
+exclude_fips <- c("02","15","72","66","78","60","69")  # AK,HI,PR,VI,GU,AS,MP
+conus_states <- us_states[!us_states$STATEFP %in% exclude_fips, ]
+
+conus_boundary <- aggregate(conus_states)   # dissolve to one polygon
+
+writeVector(conus_boundary, 
+            "/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/CONUS_boundary.shp", 
+            overwrite = TRUE)
+
+###### 0.01 grid 1. load raster, crop to CONUS bbox (still WGS84, 0.01 deg) ###### 
+r <- rast(PATH_RAW_GRID)
+crs(r) <- "EPSG:4326"
+r <- crop(r, conus_bbox)
+dim(r) # 2480 5760    1
+global(r, "notNA")
+
+###### 0.01 grid 2. get CONUS boundary polygon &  mask raster to CONUS boundary ######
+# a boundary shapefile 
+conus_boundary <- vect("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/CONUS_boundary.shp")
+conus_boundary <- project(conus_boundary, crs(r))
+ext(conus_boundary)  
+
+# rasterize the boundary onto the raster's grid (this IS the mask,
+# independent of whatever values r itself has)
+r_mask <- rasterize(conus_boundary, r, field = 1, touches = TRUE)
+
+# extract cell centers of all non-NA (i.e., in-CONUS) cells
+pts <- as.points(r_mask, values = FALSE, na.rm = TRUE)
+coords <- crds(pts)
+dim(coords) # 8245412  2
+
+us_point_coord <- data.frame(
+  Longitude = coords[, 1],
+  Latitude  = coords[, 2]
+)
+
+us_point_coord$Longitude = round(us_point_coord$Longitude, 3)
+us_point_coord$Latitude = round(us_point_coord$Latitude, 3)
+
+message("Total CONUS grid points: ", nrow(us_point_coord)) # 8245412
+
+# save outputs 
+# save the cropped/masked raster too, as the template used everywhere else
+writeRaster(r_conus, PATH_TEMPLATE_OUT, overwrite = TRUE)
+write_fst(us_point_coord, PATH_POINTS_OUT, compress = 100)
 
 #### Read the generated census level geometry, after ACScensus step ####
 
@@ -1556,6 +1645,7 @@ dim(air_pollu_site) # 1046, 2
 # https://osf.io/mucs4/
 
 roadiness_org = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Roadiness/us_roadiness_dataset.csv")
+roadiness_org = fread("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Roadiness/us_roadiness_dataset.csv")
 
 # convert Lambert Conformal Conic (LCC) projection to longitude and latitude
 long_lat = 
@@ -1692,12 +1782,13 @@ write_fst(all_meteo_data, "combined_meteo_data.fst")
 write_fst(all_meteo_data, "combined_meteo_data_from_vwind.fst")
 
 
-#### Traffic: DANA TMAS ####
+#### Traffic volume & Road: DANA TMAS FHWA ####
 
 # mannual download from: https://www.fhwa.dot.gov/environment/air_quality/methodologies/dana/
 # download if via link, then from: https://www.fhwa.dot.gov/environment/air_quality/methodologies/dana/dana_tmas2015_installer.zip
 
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_DANA_TMAS")
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_DANA_TMAS")
+setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_DANA_TMAS")
 getwd()
 
 # tmas_year = fread("TMAS 2015/TMAS_Class_Clean_2015.csv") # not work, Error: vector memory limit of 16.0 Gb reached, see mem.maxVSize()
@@ -1709,10 +1800,13 @@ head(tmas_year)
 summary(tmas_year)
 
 # get colnames of the tmas file
-tmas_year_1k_row <- fread(file="TMAS 2015/TMAS_Class_Clean_2015.csv", nrows = 100) 
+tmas_year_1k_row <- fread(file="TMAS 2015/TMAS_Class_Clean_2015.csv", nrows = 50000) 
 head(tmas_year_1k_row)
 names(tmas_year_1k_row)
 View(tmas_year_1k_row)
+
+tmas_year_select = tmas_year_1k_row[, c(5, 6, 7, 18, 19, 22, 23, 24, 25, 26, 27)]
+unique(tmas_year_select$LAT); unique(tmas_year_select$LONG)
 
 # select(tmas_year, DATE, LAT, LONG, VOL, F_SYSTEM, URB_RURAL, REPCTY, HPMS_TYPE10, HPMS_TYPE25, HPMS_TYPE40, HPMS_TYPE50, HPMS_TYPE60, HPMS_ALL)
 # but non-numeric infor was not included in tmas_year matrix, so, only choose the numeric ones
@@ -1728,9 +1822,9 @@ tmas_year_select = write_fst(tmas_year_select, "TMAS 2015/TMAS_Class_Clean_2015_
 setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
 getwd()
 
-#### U.S. Traffic Volume Data, Highway ####
+#### Traffic Volume, Highway, FHWA ####
 
-###### Traffic Volume 1, download ###### 
+###### FHWA 1, download ###### 
 # "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2011/2011_station_data.zip"
 # "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2011/november_2011_ccs_data.zip"
 # "https://www.fhwa.dot.gov/policyinformation/tables/tmasdata/2012/feb_2012_tmas.zip"
@@ -1786,8 +1880,9 @@ for(study_year_use in study_year) {
 }
 
 
-###### Traffic Volume 2, extract volume info ###### 
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
+###### FHWA 2, extract volume info ###### 
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
+setwd("//Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
 getwd()
 base_dir = getwd()
 
@@ -1888,7 +1983,7 @@ for (study_year_use in study_years) {
 }
 
 
-###### Traffic Volume 3, station info ###### 
+###### FHWA 3, station info ###### 
 getwd()
 
 # List all txt files
@@ -1965,7 +2060,7 @@ traffic_vol_station_ids_NOgps =
 write_fst(traffic_vol_station_ids_NOgps, "Traffic_volume_station_Without_GPS.fst")
 dim(traffic_vol_station_ids_NOgps) # 3437    3
 
-###### Traffic Volume 4, combine volume and station GPS ###### 
+###### FHWA 4, combine volume and station GPS ###### 
 
 traf_vol_list =   
   list.files(
@@ -2063,7 +2158,15 @@ traf_vol_station_GPS_US <-
   dplyr::filter(Longitude >= us_bbox$xmin & Longitude <= us_bbox$xmax &
                   Latitude >= us_bbox$ymin & Latitude <= us_bbox$ymax)
 dim(traf_vol_station_GPS_US) # 11528055  5
-write_fst(traf_vol_station_GPS_US, "FHWA_Traffic_Volume_2011-20.fst")
+# write_fst(traf_vol_station_GPS_US, "FHWA_Traffic_Volume_2011-20.fst")
+
+# traf_vol_station_GPS_US = read_fst("FHWA_Traffic_Volume_2011-20.fst")
+# traf_vol_station_GPS_US_2011 = read_fst("Traffic_Volume_2011.fst")
+# setDT(traf_vol_station_GPS_US)
+
+dim(traf_vol_station_GPS_US)
+head(traf_vol_station_GPS_US)
+length(unique(traf_vol_station_GPS_US$Date))
 
 # get stations with volume record and with GPS
 traf_vol_stations_withGPS =
@@ -2071,11 +2174,13 @@ traf_vol_stations_withGPS =
 traf_vol_stations_withGPS =
   traf_vol_stations_withGPS[!duplicated(traf_vol_stations_withGPS), ]
 nrow(traf_vol_stations_withGPS) # 6894, after remvoing those outside of mainland US, 6084
+head(traf_vol_stations_withGPS)
 
 # get the median of volume across the study period
 traf_vol_station_GPS_US_med <-
   traf_vol_station_GPS_US[, .(Daily_Traffic_Volume = median(Daily_Traffic_Volume)),
                           by = .(Station_ID, Latitude, Longitude)]
+head(traf_vol_station_GPS_US_med)
 
 # transfer to sf
 traf_vol_station_GPS_US_med_sf <- 
@@ -2090,6 +2195,111 @@ ggplot(data = traf_vol_station_GPS_US_med_sf) +
   theme_minimal(base_size = 16) +
   labs(title = "Median Traffic Volume by Station across 2011-2020", 
        color = "Daily Traffic Volume")
+
+###### FHWA 4, projection ###### 
+# setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf")
+setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/")
+
+us_point_coord = 
+  read_fst("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+# rast("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/us_grid_raster_01.tif")
+
+output_fhwa <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Traffic_volume/FHWA_annual_projected"
+
+traf_vol_station_GPS_US = read_fst("FHWA_Traffic_Volume_2011-20.fst")
+traf_vol_station_GPS_US$Station_ID = NULL
+setDT(traf_vol_station_GPS_US)
+traf_vol_station_GPS_US$Year = year(traf_vol_station_GPS_US$Date)
+head(traf_vol_station_GPS_US)
+
+# Projection 
+for(yr in 2011:2020){ # yr = 2011
+  
+  cat("Processing year:", yr, "\n")
+  
+  # ── Step 1: Filter stations for this year ──────────────────────────────────
+  traf_yr <- traf_vol_station_GPS_US |>
+    filter(Year == yr)
+  
+  cat("  Stations this year:", 
+      length(unique(paste(traf_yr$Longitude, traf_yr$Latitude))), "\n")
+  
+  # ── Step 2: Calculate mean volume per station (spatial base for this year) ──
+  station_mean_yr <- 
+    traf_yr %>%
+    dplyr::group_by(Longitude, Latitude) %>%
+    dplyr::summarise(
+      mean_vol = mean(Daily_Traffic_Volume, na.rm = TRUE),
+      .groups = "drop")
+  # head(station_mean_yr)
+  
+  # ── Step 3: IDW interpolation to 0.1° grid for this year ──────────────────
+  # Convert stations to sf
+  station_sf <- 
+    st_as_sf(station_mean_yr,
+             coords = c("Longitude", "Latitude"),
+             crs = 4326)
+  
+  # Convert grid points to sf
+  grid_sf <- 
+    st_as_sf(us_point_coord,
+             coords = c("Longitude", "Latitude"),
+             crs = 4326)
+  
+  # IDW interpolation
+  idw_result <- 
+    idw(mean_vol ~ 1,
+        locations = station_sf,
+        newdata = grid_sf,
+        idp = 2)  # idp = power parameter, 2 is standard
+  
+  base_traffic_yr <- idw_result$var1.pred
+  
+  # ── Step 4: Calculate daily temporal factors for this year ─────────────────
+  daily_factors_yr <- 
+    traf_yr %>%
+    dplyr::group_by(Date) %>%
+    dplyr::summarise(
+      daily_mean = mean(Daily_Traffic_Volume, na.rm = TRUE),
+      .groups = "drop") %>%
+    dplyr::mutate(
+      annual_mean = mean(daily_mean),
+      temporal_factor = daily_mean / annual_mean
+    )
+  # head(daily_factors_yr); dim(daily_factors_yr)
+  
+  # ── Step 5: Build daily grid for this year ─────────────────────────────────
+  # All grid points × all days in year
+  grid_base <- 
+    us_point_coord %>%
+    dplyr::select(Longitude, Latitude) %>%
+    dplyr::mutate(base_traffic = base_traffic_yr)
+  
+  # Cross join grid × daily factors
+  traffic_daily_yr <- 
+    merge(grid_base,
+          daily_factors_yr[, c("Date", "temporal_factor")],
+          by = NULL) %>%  # cross join
+    dplyr::mutate(
+      traffic_vol = base_traffic * temporal_factor,
+      Year = yr
+    ) %>%
+    dplyr::select(Longitude, Latitude, Date, traffic_vol, Year)
+  # head(traffic_daily_yr); dim(traffic_daily_yr)
+  # summary(traffic_daily_yr); class(traffic_daily_yr)
+  
+  # ── Step 6: Save annual file ───────────────────────────────────────────────
+  setDT(traffic_daily_yr)
+  write_fst(traffic_daily_yr,
+            sprintf("traffic_vol_daily_%d.fst", yr))
+  
+  cat("  Saved:", nrow(traffic_daily_yr), "rows\n")
+  
+  # Clean up memory
+  rm(traf_yr, station_mean_yr, station_vect, traffic_rast, 
+     base_traffic_yr, grid_base, daily_factors_yr, traffic_daily_yr)
+  gc()
+}
 
 #### US Flights ####
 # https://www.transtats.bts.gov/Data_Elements.aspx?Data=1
@@ -2165,12 +2375,26 @@ topo_ned60m_use =
 # GRIDMET: University of Idaho Gridded Surface Meteorological Dataset
 # file downloaded with Python
 
-###### GRIDMET 1, combine daily to annual by variable by year ###### 
-
-setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET")
+# setwd("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET")
+setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET")
 # setwd("/groups/HAQ_LAB/tzhang/gridmet_daily")
 getwd()
 tif_directory = getwd()
+
+
+######  GRIDMET 0 , try downloaidng with R, download annual data. Phyton download daily data ###### 
+vars <- c("pr", "srad")  # pr, Precipitation amount; srad, solar radiation
+study_years <- 2011:2020
+
+for (year in study_years){ # year = 2011
+  for(var in vars){ # var = vars[1]
+    url <- sprintf("https://www.northwestknowledge.net/metdata/data/%s_%s.nc", 
+                   var, year)
+    download.file(url, destfile = sprintf("%s_%s.nc", var, year))
+  }
+}
+
+###### GRIDMET 1, combine daily to annual by variable by year ###### 
 
 # rm(list = ls()) # Removes all objects in the environment
 # gc() # Triggers garbage collection
@@ -2179,20 +2403,26 @@ tif_directory = getwd()
 study_years <- 2011:2020 # 2011:2020   2011:2015
 
 # Define the list of variables you want to download
+# meteo_variables <- 
+#   c("tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
+#     "vs", "th", # vs, wind velocity at 10m; th, wind direction
+#     "fm100", "fm1000", "bi", # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
+#     "pr", "vpd", "etr") # pr, Precipitation amount; vpd, Mean vapor pressure deficit; etr, Daily alfalfa reference evapotranspiration
+
 meteo_variables <- 
-  c("tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
-    "vs", "th", # vs, wind velocity at 10m; th, wind direction
-    "fm100", "fm1000", "bi", # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
-    "pr", "vpd", "etr") # pr, Precipitation amount; vpd, Mean vapor pressure deficit; etr, Daily alfalfa reference evapotranspiration
+  c("pr", "srad") # pr, Precipitation amount; srad, solar radiation
 
 # meteo_variables = "bi"
 
-# us_grid_raster_01 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_01.tif"))
+# us_grid_raster = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_01.tif"))
 # us_grid_raster_001 = raster(file.path("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_001.tif"))
 
-us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+us_grid_raster = 
+  raster(
+    file.path(
+      "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
 
-us_grid_raster = us_grid_raster_01
+us_grid_raster = us_grid_raster
 
 # b = raster("vs_2011_01_01.tif")
 # a = raster("vs_2011_merged.tif")
@@ -2203,8 +2433,8 @@ us_grid_raster = us_grid_raster_01
 failed_files <- c()
 
 # Merge and output file by meteorological variable and by year
-for (meteo_var in meteo_variables) {
-  for (meteo_year in study_years) {
+for (meteo_var in meteo_variables) { # meteo_var = meteo_variables[1]
+  for (meteo_year in study_years) { # meteo_year = 2011
     
     # List all .tif files for the specific variable and year
     tif_files <- 
@@ -2292,9 +2522,9 @@ brick_var_date_project <-
   }
 
 # The raster for projection
-us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
-us_grid_raster = us_grid_raster_01
-# us_grid_raster = rast(us_grid_raster_01)
+us_grid_raster = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+us_grid_raster = us_grid_raster
+# us_grid_raster = rast(us_grid_raster)
 
 # Set the paths for reading and saving files
 gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
@@ -2598,9 +2828,9 @@ brick_var_date_project <-
   }
 
 # The raster for projection
-us_grid_raster_01 = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
-us_grid_raster = us_grid_raster_01
-# us_grid_raster = rast(us_grid_raster_01)
+us_grid_raster = raster(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/CMAQ_Sumaiya/CMAQ_previous_extract_tries/us_grid_raster_01.tif"))
+us_grid_raster = us_grid_raster
+# us_grid_raster = rast(us_grid_raster)
 
 # Set the paths for reading and saving files
 gridmet_stack_path = "/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/aa_GRIDMET_stacked"
@@ -2881,5 +3111,722 @@ ggplot() +
           fill = NA, color = "grey70", size = 0.3) +
   scale_color_viridis_c(name = "rmax", option = "plasma") +
   coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE)
+
+
+###### GRIDMET 4, PROJECT downloaded .nc data directly, JUMP 1-3 steps, 4km to 10km ######  
+
+library(terra)
+
+# setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET")
+# us_grid_raster = rast("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/us_grid_raster_01.tif")
+# us_point_coord = read_fst("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/") # Meteorology_GRIDMET
+us_point_coord = 
+  read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Long_lat_Mainland_US_0.1_degree.fst")
+us_grid_raster = rast(file.path("us_grid_raster_01.tif"))
+
+# gmed_vars <- c("pr", "srad")
+gmed_vars <- c("pr", "srad", # pr, Precipitation amount; srad, solar radiation
+               "tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
+               "vs", "th", # vs, wind velocity at 10m; th, wind direction
+               "fm100", "fm1000", "bi") # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
+
+for(gmed_var in gmed_vars){ # gmed_var = gmed_vars[1]
+  
+  # Get all annual nc files for this variable
+  gmed_files <- 
+    list.files(
+      path = "Meteorology_GRIDMET",
+      pattern = paste0(gmed_var, ".*\\.nc$"),
+      full.names = TRUE)
+  gmed_files
+  
+  for(gmed_f in gmed_files){ # gmed_f = gmed_files[1]
+    
+    # Extract year from filename
+    yr <- gsub(".*_(\\d{4})\\.nc", "\\1", basename(gmed_f))
+    cat("Processing:", gmed_var, yr, "\n")
+    
+    # Read nc file — already gridded, all days as layers
+    gmed_rast <- rast(gmed_f)
+    
+    # Resample to 0.1° grid (same as elevation/LCZ pipeline)
+    # This step takes lots of memory
+    gmed_rast_01 <- resample(gmed_rast, us_grid_raster, method = "average")
+    
+    # Extract at CONUS points
+    grid_points <- 
+      vect(us_point_coord,
+           geom = c("Longitude", "Latitude"),
+           crs = "EPSG:4326")
+    
+    gmed_rast_01_us <- extract(gmed_rast_01, grid_points)
+    dim(gmed_rast_01_us)
+    
+    # Convert to long format (one row per grid cell per day)
+    gmed_rast_01_us_long <- 
+      gmed_rast_01_us %>%
+      dplyr::select(-ID) %>%
+      dplyr::mutate(
+        Longitude = us_point_coord$Longitude,
+        Latitude  = us_point_coord$Latitude) %>%
+      tidyr::pivot_longer(
+        cols = -c(Longitude, Latitude),
+        names_to = "Date",
+        values_to = gmed_var
+      ) %>%
+      dplyr::mutate(
+        Date = as.Date(Date, format = "%Y-%m-%d"),
+        Year = yr
+      )
+    # head(gmed_rast_01_us_long); dim(gmed_rast_01_us_long)
+    # summary(gmed_rast_01_us_long)
+    
+    # Save annual file
+    write_fst(gmed_rast_01_us_long,
+              sprintf("GridMET_%s_daily_%s.fst", gmed_var, yr))
+
+    cat("  Saved:", nrow(gmed_rast_01_us_long), "rows\n")
+    rm(gmed_rast, gmed_rast_01, gmed_rast_01_us, gmed_rast_01_us_long)
+    gc()
+  }
+}
+
+
+###### GRIDMET 5, PROJECT downloaded .nc data directly, JUMP 1-3 steps, 4km to 1km ######  
+
+library(terra)
+
+# setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/Meteorology_GRIDMET")
+# us_grid_raster = rast("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/us_grid_raster_01.tif")
+# us_point_coord = read_fst("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/") # Meteorology_GRIDMET
+us_point_coord = 
+  read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Long_lat_Mainland_US_0.1_degree.fst")
+us_grid_raster = rast(file.path("us_grid_raster_01.tif"))
+
+gmed_vars <- c("pr", "srad", # pr, Precipitation amount; srad, solar radiation
+               "tmmx", "tmmn", "rmax", "rmin", # max & min T, RH,
+               "vs", "th", # vs, wind velocity at 10m; th, wind direction
+               "fm100", "fm1000", "bi") # 100-hour  and 1000-hour dead fuel moisture, bi, burning index
+
+for(gmed_var in gmed_vars){ # gmed_var = gmed_vars[1]
+  
+  # Get all annual nc files for this variable
+  gmed_files <- 
+    list.files(
+      path = "Meteorology_GRIDMET",
+      pattern = paste0(gmed_var, ".*\\.nc$"),
+      full.names = TRUE)
+  gmed_files
+  
+  for(gmed_f in gmed_files){ # gmed_f = gmed_files[1]
+    
+    # Extract year from filename
+    yr <- gsub(".*_(\\d{4})\\.nc", "\\1", basename(gmed_f))
+    cat("Processing:", gmed_var, yr, "\n")
+    
+    # Read nc file — already gridded, all days as layers
+    gmed_rast <- rast(gmed_f)
+    
+    # Resample to 0.1° grid (same as elevation/LCZ pipeline)
+    # This step takes lots of memory
+    gmed_rast_01 <- resample(gmed_rast, us_grid_raster, method = "average")
+    
+    # Extract at CONUS points
+    grid_points <- 
+      vect(us_point_coord,
+           geom = c("Longitude", "Latitude"),
+           crs = "EPSG:4326")
+    
+    gmed_rast_01_us <- extract(gmed_rast_01, grid_points)
+    dim(gmed_rast_01_us)
+    
+    # Convert to long format (one row per grid cell per day)
+    gmed_rast_01_us_long <- 
+      gmed_rast_01_us %>%
+      dplyr::select(-ID) %>%
+      dplyr::mutate(
+        Longitude = us_point_coord$Longitude,
+        Latitude  = us_point_coord$Latitude) %>%
+      tidyr::pivot_longer(
+        cols = -c(Longitude, Latitude),
+        names_to = "Date",
+        values_to = gmed_var
+      ) %>%
+      dplyr::mutate(
+        Date = as.Date(Date, format = "%Y-%m-%d"),
+        Year = yr
+      )
+    # head(gmed_rast_01_us_long); dim(gmed_rast_01_us_long)
+    # summary(gmed_rast_01_us_long)
+    
+    # Save annual file
+    write_fst(gmed_rast_01_us_long,
+              sprintf("GridMET_1km_%s_daily_%s.fst", gmed_var, yr))
+    
+    cat("  Saved:", nrow(gmed_rast_01_us_long), "rows\n")
+    rm(gmed_rast, gmed_rast_01, gmed_rast_01_us, gmed_rast_01_us_long)
+    gc()
+  }
+}
+
+#### Elevation ####
+# library(elevatr) # point to point download, too slow
+library(rlang)
+library(terra)
+
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds")
+
+# CONUS wgs84 grid
+us_point_coord =
+  read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Long_lat_Mainland_US_0.1_degree.fst")
+dim(us_point_coord) # 82323
+range(us_point_coord$Longitude) # 24.55-49.35
+range(us_point_coord$Latitude) # 67.05-124.65
+
+# Download all SRTM tiles covering CONUS, 5x5 degree tiles, ~90x90 m
+# lat 24-49, lon -124 to -67
+tiles <- list()
+for (lat in seq(20, 45, by=5)) {
+  for (lon in seq(-125, -65, by=5)) {
+    tryCatch({
+      r <- elevation_3s(lon=lon, lat=lat, path=tempdir())
+      tiles[[length(tiles)+1]] <- r
+      cat("OK: lat", lat, "lon", lon, "\n")
+    }, error = function(e) cat("Skip: lat", lat, "lon", lon, "\n"))
+  }
+}
+
+cat("Valid tiles found:", length(tiles), "\n") # 65
+
+# Mosaic all tiles
+us_dem_full <- do.call(mosaic, tiles)
+
+# Resample to 0.1 degree
+elevation_01deg <-
+  terra::resample(us_dem_full, us_grid_raster, method = "average")
+
+# Extract elevation at CONUS points
+ele_grid_points <-
+  vect(us_point_coord,
+       geom = c("Longitude", "Latitude"),
+       crs = "EPSG:4326")
+
+us_point_coord$elevation <- extract(elevation_01deg, ele_grid_points)[, 2]
+
+sum(is.na(us_point_coord$elevation))
+head(us_point_coord); dim(us_point_coord)
+summary(us_point_coord)
+
+# Check where NAs are
+# 14656 NAs, 18% of data points, similar fraction of water area in the CONUS
+missing <- us_point_coord[is.na(us_point_coord$elevation), ]
+range(missing$Longitude)
+range(missing$Latitude)
+
+# Transfer NAs to 0
+us_point_coord_0 = us_point_coord
+us_point_coord_0$elevation[is.na(us_point_coord_0$elevation)] <- 0
+
+# Save elevation data with NAs
+# write_fst(us_point_coord, "pmf_ncld_meteo_census/Elevation_CONUS_with_NAs.fst")
+# write_fst(us_point_coord_0, "pmf_ncld_meteo_census/Elevation_CONUS_NAs_to_0.fst")
+# 
+# write_fst(us_point_coord, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/Elevation_CONUS_with_NAs.fst")
+# write_fst(us_point_coord_0, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/Elevation_CONUS_NAs_to_0.fst")
+
+write_fst(us_point_coord, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/Elevation_1km_CONUS_with_NAs.fst")
+write_fst(us_point_coord_0, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/Elevation_1km_CONUS_NAs_to_0.fst")
+
+
+#### LCZ, Local Climate Zones, WUDAPT ####
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds")
+us_grid_raster = rast(file.path("base_raster_grid_sf/us_grid_raster_01.tif"))
+
+# CONUS wgs84 grid
+us_point_coord =
+  read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Long_lat_Mainland_US_0.1_degree.fst")
+dim(us_point_coord) # 82323
+range(us_point_coord$Longitude) # 24.55-49.35
+range(us_point_coord$Latitude) # 67.05-124.65
+
+# Source: Demuzere et al. (2022), https://lcz-generator.rub.de/global-lcz-map
+lcz_url <- "/vsicurl/https://lcz-generator.rub.de/cogs/lcz_filter_v3_cog.tif"
+lcz_global <- rast(lcz_url)
+
+# Crop to CONUS extent to avoid handling global file
+conus_ext <- ext(-124.65, -67.05, 24.55, 49.35)
+lcz_conus <- crop(lcz_global, conus_ext)
+
+# Resample to 0.1 degree grid
+# LCZ is categorical, not continuous, , method = "near"
+lcz_01deg <- terra::resample(lcz_conus, us_grid_raster, method = "near")
+
+# Extract at CONUS points
+lcz_grid_points <-
+  vect(us_point_coord,
+       geom = c("Longitude", "Latitude"),
+       crs = "EPSG:4326")
+
+us_point_coord$lcz <- extract(lcz_01deg, lcz_grid_points)[, 2]
+
+# Set NA to 18 (Unknown/None)
+us_point_coord$lcz[is.na(us_point_coord$lcz)] <- 18
+
+# Convert to factor with labels
+us_point_coord$lcz <-
+  factor(us_point_coord$lcz,
+         levels = c(1:18),
+         labels = c(
+           "Compact high-rise",
+           "Compact mid-rise",
+           "Compact low-rise",
+           "Open high-rise",
+           "Open mid-rise",
+           "Open low-rise",
+           "Lightweight low-rise",
+           "Large low-rise",
+           "Sparsely built",
+           "Heavy industry",
+           "Dense trees",
+           "Scattered trees",
+           "Bush/scrub",
+           "Low plants",
+           "Bare rock/paved",
+           "Bare soil/sand",
+           "Water",
+           "None"
+         ))
+names(us_point_coord)[3] = "LCZ"
+head(us_point_coord)
+summary(us_point_coord)
+
+# write_fst(us_point_coord, "pmf_ncld_meteo_census/LCZ_Local_Climate_Zones_2018.fst")
+# write_fst(us_point_coord, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/LCZ_Local_Climate_Zones_2018.fst")
+
+write_fst(us_point_coord, "pmf_ncld_meteo_census/LCZ_Local_Climate_Zones_1km_CONUS_2018.fst")
+write_fst(us_point_coord, "/projects/HAQ_LAB/tzhang/var_combined_rds/pmf_ncld_meteo_census/LCZ_Local_Climate_Zones_1km_CONUS_2018.fst")
+
+#### Night Time Light, NTL ####
+# https://eogdata.mines.edu/nighttime_light/annual/v21/
+# downloaded raw files deleted after extraction
+# There is no 2011 data, use 2012 data to represent
+
+library(curl)
+library(R.utils)
+library(fst)
+library(terra)
+
+setwd("/Users/ztttttt/Downloads")
+
+ntl_path = "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/NTL_Nighttime_Light"
+
+# NTL file toooo big, so extract the CONUS and project 
+# US boundaries, and raster
+us_point_coord = 
+  read.fst("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+
+us_grid_raster = 
+  rast(
+    file.path(
+      "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/us_grid_raster_01.tif"))
+us_grid_raster = us_grid_raster
+
+dim(us_grid_raster); dim(us_point_coord)
+
+# Approximate CONUS bounding box
+conus_ext <- ext(
+  -125,  # xmin
+  -66.5, # xmax
+  24,    # ymin
+  50     # ymax
+)
+
+ntl <- rast("VNL_v21_npp_201204-201212_global_vcmcfg_c202205302300.average_masked.dat.tif")
+
+for (yr in 2019:2020){ # yr = 2013 # 2013:2020
+  
+  ## Read
+  # yr = 2012
+  # ntl <- rast("VNL_v21_npp_201204-201212_global_vcmcfg_c202205302300.average_masked.dat.tif")
+  ntl <- rast(sprintf("VNL_v21_npp_%s_global_vcmslcfg_c202205302300.average_masked.dat.tif", yr))
+  
+  ## Crop to CONUS immediately — reduces from ~11GB global to ~1GB CONUS
+  ntl_conus <- crop(ntl, conus_ext)
+  
+  ## Delete global file immediately
+  rm(ntl)
+  gc()
+  
+  ## Precisely extract CONUS data
+  ntl_01deg <- 
+    terra::resample(
+      ntl_conus,
+      us_grid_raster,
+      method = "average"
+    )
+  
+  ## Extract at CONUS points
+  us_pts <- 
+    vect(
+      us_point_coord,
+      geom = c("Longitude","Latitude"),
+      crs = "EPSG:4326"
+    )
+  ntl_extract <- 
+    terra::extract(
+      ntl_01deg,
+      us_pts,
+      ID = FALSE
+    )
+  us_point_coord$ntl <- ntl_extract[,1]
+  summary(us_point_coord)
+  dim(us_point_coord)
+  setDT(us_point_coord)
+  
+  ## Save
+  # write_fst(us_point_coord,
+  #           file.path(ntl_path, sprintf("NTL_annual_%s.fst", yr)))
+  write_fst(us_point_coord,
+            file.path(ntl_path, sprintf("NTL_Month_1km_CONUS_%s.fst", yr)))
+}
+
+
+# Now resample and extract on much smaller CONUS file
+ntl_01deg <- resample(ntl_conus, us_grid_raster, method = "average")
+ntl_vals <- extract(ntl_01deg, grid_points)[, 2]
+
+#### NDVI: Terra MODIS MOD13A3 ####
+# https://appeears.earthdatacloud.nasa.gov/task/area
+
+library(httr)
+library(jsonlite)
+library(terra)
+library(stringr)
+library(fst)
+library(data.table)
+
+#US boundaries, and raster
+us_point_coord =
+  read.fst("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+
+grid_points <- vect(us_point_coord,
+                    geom = c("Longitude", "Latitude"),
+                    crs  = "EPSG:4326")
+
+us_grid_raster =
+  rast(
+    file.path(
+      "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/us_grid_raster_01.tif"))
+
+setwd("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/NDVI_CONUS_org")
+
+###### NDVI 1: Download AppEEARS ######
+
+api <- "https://appeears.earthdatacloud.nasa.gov/api/"
+
+# --- 1a. Login (NASA Earthdata credentials) ---
+# token expires after 48 hours
+user     <- "xxx"
+password <- "xxx"
+# The long info xxxxxxx following https://appeears.earthdatacloud.nasa.gov/download/xxxxxxx
+task_id <- "xxxxxxx" 
+
+token_response <- POST(paste0(api, "login"),
+                       authenticate(user, password)) |>
+  content(as = "parsed")
+rm(user, password)  # remove credentials from memory immediately
+
+token <- paste("Bearer", token_response$token)
+# Token expires after 48 hours; re-run this block if needed
+
+# --- 1b. List your tasks and find your task_id ---
+tasks <- GET(paste0(api, "task"),
+             add_headers(Authorization = token)) |>
+  content(as = "parsed")
+
+# Print task names and IDs to find yours
+for (t in tasks) cat(t$task_name, "->", t$task_id, "\n")
+
+# --- 1c. List all files in the task bundle ---
+bundle <- GET(paste0(api, "bundle/", task_id),
+              add_headers(Authorization = token)) |>
+  content(as = "parsed")
+
+files_df <- do.call(rbind, lapply(bundle$files, as.data.frame))
+# Keep only NDVI tifs
+ndvi_files <- files_df[grepl("_NDVI_.*\\.tif$", files_df$file_name), ]
+
+# --- 1d. Download all NDVI files ---
+dest_dir <- getwd()
+dir.create(dest_dir, showWarnings = FALSE)
+
+for (i in seq_len(nrow(ndvi_files))) { # i = 1
+  file_id   <- ndvi_files$file_id[i]
+  file_name <- basename(ndvi_files$file_name[i])
+  dest_path <- file.path(dest_dir, file_name)
+  
+  if (file.exists(dest_path)) next  # skip if already downloaded
+  
+  GET(paste0(api, "bundle/", task_id, "/", file_id),
+      write_disk(dest_path, overwrite = TRUE),
+      progress(),
+      add_headers(Authorization = token))
+  
+  cat("Downloaded:", file_name, "\n")
+}
+
+## Parse filenames → year + DOY + month
+tif_files <- list.files(dest_dir, pattern = "_NDVI_.*\\.tif$",
+                        full.names = TRUE)
+length(tif_files)
+
+# Extract year and DOY from filename, e.g. "doy2011032000000"
+years <- as.integer(str_extract(tif_files, "(?<=doy)\\d{4}"))
+doys  <- as.integer(str_extract(tif_files, "(?<=doy\\d{4})\\d{3}"))
+
+file_info <- 
+  data.frame(path = tif_files, year = years, doy = doys)
+head(file_info)
+
+###### NDVI 2: Extract CONUS, Projectm Build Climatology and Fill NAs ######
+
+# Build Climatology (mean per DOY across all years) and fill NAs
+
+# Use Other year data to fill
+fill_na_with_climatology <- function(r_target, clim_mean) {
+  # Replace NA pixels in r_target with climatological mean
+  cover(r_target, clim_mean)
+}
+
+# If step 1 not work, then further use spatial nearby points to refill
+fill_remaining_na <- function(r) {
+  size <- 3
+  while (sum(is.na(values(r))) > 0 && size <= 51) {
+    w <- matrix(1, nrow = size, ncol = size)  # explicit odd matrix
+    r <- focal(r, w = w, fun = "mean",
+               na.policy = "only", na.rm = TRUE)
+    size <- size + 2  # 3, 5, 7, ... always odd values
+  }
+  # Last resort: if NAs still remain, replace with global mean
+  if (sum(is.na(values(r))) > 0) {
+    global_mean <- global(r, "mean", na.rm = TRUE)[1, 1]
+    r <- subst(r, NA, global_mean)
+  }
+  return(r)
+}
+
+unique_doys <- unique(file_info$doy)
+
+# Process and save one filled raster per original file
+filled_dir <- "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/NDVI_CONUS_noNA"
+dir.create(filled_dir, showWarnings = FALSE)
+
+for (d in unique_doys) { # d = unique_doys[2]
+  
+  d <- as.integer(d)  # force type match
+  rows      <- file_info[file_info$doy == d, ]
+  all_files <- rows$path
+  
+  # Stack all years for this DOY → compute pixel-wise mean (climatology)
+  stk      <- rast(all_files)
+  clim     <- mean(stk, na.rm = TRUE)
+  
+  # Resample to match us_grid
+  clim_resampled <- 
+    terra::resample(clim, us_grid_raster, method = "average")
+  
+  # Fill each year's raster
+  for (i in seq_len(nrow(rows))) { # i = 1
+    
+    # Read file and check crs
+    ndvi_org       <- rast(rows$path[i])
+    crs(ndvi_org) == crs(us_grid_raster) 
+    
+    ndvi_org_basename <- basename(rows$path[i])
+    
+    # Extract year and DOY from filename, e.g. "doy2011032000000"
+    ndvi_year <- as.integer(str_extract(ndvi_org_basename, "(?<=doy)\\d{4}"))
+    ndvi_doy  <- as.integer(str_extract(ndvi_org_basename, "(?<=doy\\d{4})\\d{3}"))
+    
+    # Convert DOY to calendar month
+    ndvi_date  <- as.Date(ndvi_doy - 1, origin = paste0(ndvi_year, "-01-01"))
+    ndvi_date  <- format(ndvi_date, "%Y-%m")
+    cat("NDVI file date:", ndvi_date, "\n")
+    
+    # Step 1: Resample to match us_grid
+    ndvi_conus <- 
+      terra::resample(ndvi_org, us_grid_raster, method = "average")
+    
+    # Step 2: Fill NA using climatology (both are rasters, same grid)
+    # cover, use the average of all years of the same month
+    ndvi_filled    <- cover(ndvi_conus, clim_resampled)
+    
+    # Use spatial points
+    ndvi_filled2 <- fill_remaining_na(ndvi_filled)
+    
+    summary(ndvi_filled); summary(ndvi_filled2)
+    
+    # Step 3. Clamp negatives to 0, cap at 1
+    ndvi_final   <- 
+      clamp(ndvi_filled2, lower = 0, upper = 1, values = TRUE)
+    cat("Remaining NAs:", sum(is.na(values(ndvi_final))), "\n")
+    cat("Negative values:", sum(values(ndvi_final) < 0, na.rm = TRUE), "\n")
+    
+    # Step 3: Extract AFTER filling — now you get complete data, no NA
+    ndvi_extracted <- terra::extract(ndvi_final, grid_points)
+    head(ndvi_extracted); dim(ndvi_extracted)
+    summary(ndvi_extracted)
+    
+    # Save
+    ndvi_vec <- ndvi_extracted[, 2] 
+    out_name <- paste0("NDVI_afterProcess_", ndvi_date, ".rds")
+    saveRDS(ndvi_vec, file.path(filled_dir, out_name))
+  }
+  cat("Done DOY:", d, "\n")
+}
+
+###### NDVI 3: Combine annual data ######
+
+for(year in 2011:2020) { # year = 2011
+  
+  # Detect files of this year
+  files <- 
+    sort(
+      list.files(
+        filled_dir,
+        pattern = paste0("NDVI_afterProcess_", year, "-\\d{2}\\.rds"),
+        full.names = TRUE))
+  
+  # Read all months into a data.table, each month = one column
+  monthly_list <- lapply(files, readRDS)
+  names(monthly_list) <- str_extract(basename(files), "\\d{4}-\\d{2}")
+  
+  annual_dt <- as.data.table(monthly_list)
+  setnames(annual_dt, paste0("NDVI_", names(monthly_list)))
+  head(annual_dt)
+  
+  # Add long & lat
+  annual_dt = cbind(us_point_coord, annual_dt)
+  setDT(annual_dt)
+  
+  # Long version
+  annual_long <- 
+    melt(annual_dt,
+         id.vars       = c("Longitude", "Latitude"),
+         variable.name = "YearMonth",
+         value.name    = "NDVI")
+  
+  # Convert YearMonth to Date (first day of month)
+  annual_long[, YearMonth := sub("NDVI_", "", YearMonth)]
+  head(annual_long)
+  
+  saveRDS(annual_dt, 
+          file.path(filled_dir, paste0("NDVI_", year, ".rds")))
+}
+
+#### ERA5 ECMWF data: BLH ####
+
+# setwd("/Users/ztttttt/Downloads")
+# blh_path = "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/ERA5_ECMWF_BLH"
+
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/ERA5_BLH_org")
+blh_path = "/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf"
+
+# library(ecmwfr)
+library(terra)
+library(dplyr)
+library(fst)
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+# US boundaries, and raster
+# us_point_coord = 
+#   read.fst("/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/MLresult_RF/Long_lat_Mainland_US_0.1_degree.fst")
+# 
+# us_grid_raster = 
+#   rast(
+#     file.path(
+#       "/Users/ztttttt/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/us_grid_raster_01.tif"))
+
+us_point_coord = 
+  read.fst("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/pmf_ncld_meteo_census/Long_lat_Mainland_US_0.1_degree.fst")
+us_grid_raster = 
+  rast("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/base_raster_grid_sf/us_grid_raster_01.tif")
+
+us_grid_raster = us_grid_raster
+
+dim(us_grid_raster); dim(us_point_coord)
+
+# conus_ext  <- ext(-125, -66.5, 24, 50)
+grid_points <- vect(us_point_coord,
+                    geom = c("Longitude", "Latitude"),
+                    crs  = "EPSG:4326")
+
+# ── Main loop — year by year, month by month ──────────────────────────────────
+for(yr in 2012:2018){ # yr = 2011  #2011:2020
+  
+  cat("\n========== Processing BLH Year:", yr, "==========\n")
+  
+  # Get annual nc file
+  blh_org <- rast(sprintf("ERA5_BLH_org_%s.nc", yr)) 
+  cat("  Dims:", dim(blh_org), "\n")
+  
+  # Generate dates
+  n_days <- nlyr(blh_org)
+  dates  <- 
+    seq(as.Date(sprintf("%d-01-01", yr)),
+        by = "day",
+        length.out = n_days)
+  cat("First three day:", as.character(dates[1:3]), "\n")
+  
+  # # Crop to CONUS
+  # blh_conus <- crop(blh_org, conus_ext)
+  
+  # Resample to 0.1° — bilinear since ERA5 (0.25°) → finer (0.1°)
+  blh_conus_01deg <- 
+    terra::resample(blh_org, # blh_conus
+                    us_grid_raster, 
+                    method = "bilinear")
+  
+  # Extract
+  blh_extracted <- 
+    terra::extract(blh_conus_01deg, grid_points)
+  head(blh_extracted); dim(blh_extracted)
+  summary(blh_extracted)
+  
+  rm(blh_org, blh_conus_01deg)
+  gc()
+  
+  # Long format
+  blh_extracted_yr <- 
+    blh_extracted |>
+    dplyr::select(-ID) |>
+    dplyr::mutate(
+      Longitude = round(us_point_coord$Longitude, 2),
+      Latitude  = round(us_point_coord$Latitude, 2)) |>
+    tidyr::pivot_longer(
+      cols      = -c(Longitude, Latitude),
+      names_to  = "layer",
+      values_to = "BLH"
+    ) |>
+    dplyr::mutate(
+      day_num = as.integer(gsub(".*=", "", layer)),
+      Date    = dates[day_num+1]) |>
+    dplyr::select(Longitude, Latitude, Date, BLH)
+  
+  head(blh_extracted_yr); dim(blh_extracted_yr)
+  summary(blh_extracted_yr)
+  
+  # ── Combine and save annual file ───────────────────────────────────────────
+  write_fst(blh_extracted_yr, 
+            file.path(blh_path, sprintf("ERA5_BLH_%s.fst", yr)))
+  cat("  Saved:", sprintf("ERA5_BLH_%s.fst", yr), "-", nrow(blh_extracted_yr), "rows\n")
+  
+  rm(blh_extracted, blh_extracted_yr)
+  gc()
+}
 
 
