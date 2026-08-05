@@ -3,15 +3,19 @@
 
 library(data.table)
 
-setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_monthly")
+# setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_monthly")
+setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_noBlowUp")
 getwd()
 
 # Define the list of cmaq_var values
-cmaq_var_rds_list = c("PM25_TOT_EGU", "PM25_TOT_OTA",
-                     "PM25_TOT_ONR", "PM25_TOT_NRD",  "PM25_TOT_ACM",
-                     "PM25_TOT_ASEA", "PM25_TOT_ARS", "PM25_TOT_DUST", 
-                     "PM25_TOT_BIOG", "PM25_TOT_AFI",
-                     "O3", "NH3", "SO2", "NO2")
+# cmaq_var_rds_list = c("PM25_TOT_EGU", "PM25_TOT_OTA",
+#                      "PM25_TOT_ONR", "PM25_TOT_NRD",  "PM25_TOT_ACM",
+#                      "PM25_TOT_ASEA", "PM25_TOT_ARS", "PM25_TOT_DUST", 
+#                      "PM25_TOT_BIOG", "PM25_TOT_AFI",
+#                      "O3", "NH3", "SO2", "NO2")
+
+cmaq_var_rds_list = c("O3", "NH3", "SO2", "NO2")
+
 
 # cmaq_var_rds_list = c("PM25_TOT_OTA",
 #                       "PM25_TOT_ACM",
@@ -21,15 +25,17 @@ cmaq_var_rds_list = c("PM25_TOT_EGU", "PM25_TOT_OTA",
 # 
 # cmaq_var_rds_list = c("PM25_TOT_DUST", "PM25_TOT_ARS")
 
-cmaq_var_years = c(2011, 2017) #
+# cmaq_var_years = c(2011, 2017) #
+cmaq_var_years = 2011:2020
 
 for (cmaq_year in cmaq_var_years){ # cmaq_year = cmaq_var_years[2]
   
   # Loop through each cmaq_var
-  for (cmaq_var in cmaq_var_rds_list) { # cmaq_var = cmaq_var_rds_list[10]
+  for (cmaq_var in cmaq_var_rds_list) { # cmaq_var = cmaq_var_rds_list[1]
     
     # Name pattern
-    name_pattern = paste0("_cmaq_", cmaq_year, ".*\\.rds$")
+    # name_pattern = paste0("_cmaq_", cmaq_year, ".*\\.rds$")
+    name_pattern <- paste0("_cmaq_", cmaq_year, "\\.\\d{2}\\.rds$") # for the pollutants in blow-up processed data in 2026.05
     
     # List all .rds files corresponding to the current cmaq_var
     cmaq_rds_files <- 
@@ -66,7 +72,8 @@ for (cmaq_year in cmaq_var_years){ # cmaq_year = cmaq_var_years[2]
     
     # Define the output filename
     output_file <- paste0(cmaq_var, "_cmaq_", first_date, "_", last_date, ".rds")
-    output_path <- "/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual"
+    # output_path <- "/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/cmaq_combined_annual"
+    output_path <- getwd()
     
     # Save the combined data to a new .rds file
     saveRDS(combined_data, file = file.path(output_path, output_file))
