@@ -85,7 +85,9 @@ rf_holdout_predictions_noUnc <-
     rf_hold_var_imp_df <- as.data.frame(rf_hold_var_imp)
     rf_hold_var_imp_df$Variable <- rownames(rf_hold_var_imp_df)
     rownames(rf_hold_var_imp_df) <- NULL
-    names(rf_hold_var_imp_df) <- c("Relative_Influence", "IncNodePurity", "Variable")
+    # names(rf_hold_var_imp_df) <- c("Relative_Influence", "IncNodePurity", "Variable")
+    ### Then rename properly — keep both importance metrics
+    names(rf_hold_var_imp_df) <- c("PctIncMSE", "IncNodePurity", "Variable")
     # Relative_Influence is %IncMSE (Percentage Increase in MSE), Prediction accuracy importance
     # IncNodePurity, Increase in Node Purity, How much each variable reduces variance when used for splitting
     

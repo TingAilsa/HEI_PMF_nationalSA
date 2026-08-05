@@ -9,8 +9,8 @@ getwd()
 
 # Get command line arguments
 args <- commandArgs(trailingOnly = TRUE)
-source.test <- args[1]
-cmaq_period <- args[2]
+source.test <- args[1] # source.test = "Biomass"
+cmaq_period <- args[2] # cmaq_period = "2011-2020"
 
 print(paste("Processing source:", source.test))
 print(paste("Period:", cmaq_period))
@@ -47,6 +47,22 @@ pred_perform_files[1:5]
 print("Number of pred_perform_files found:")
 length(pred_perform_files)
 
+# ### Check if any dataset is corrupted
+# corrupted <- c()
+# 
+# for (i in 1:50) {
+#   f <- paste0("RF_var_imp_AllYear_Biomass_2011-2020_iteration_", i, ".fst")
+#   tryCatch({
+#     dt <- read_fst(f)
+#   }, error = function(e) {
+#     cat("Iteration", i, "CORRUPTED:", e$message, "\n")
+#     corrupted <<- c(corrupted, i)
+#   })
+# }
+# 
+# cat("Corrupted iterations:", corrupted, "\n")
+
+
 #### Combine and save files ####
 # Create a list with both data and iteration number, and bind_rows()
 combined_train_test <- 
@@ -56,10 +72,35 @@ combined_train_test <-
   }, train_test_pred_files, 1:50) %>%
   bind_rows()
 
+# combined_pred_perform <- 
+#   Map(function(file, iter) {
+#     read_fst(file) %>%
+#       mutate(Iteration = iter)
+#   }, pred_perform_files, 1:50) %>%
+#   bind_rows()
+
+# Check column count and names for all 50 files
+file_info <- Map(function(file, iter) {
+  df <- read_fst(file)
+  data.frame(
+    Iteration = iter,
+    n_cols = ncol(df),
+    n_rows = nrow(df),
+    col_names = paste(colnames(df), collapse = ", "),
+    col_classes = paste(sapply(df, class), collapse = ", ")
+  )
+}, pred_perform_files, 1:50) %>%
+  bind_rows()
+
+# See the problematic ones
+file_info %>% filter(n_cols != 3)
+
 combined_pred_perform <- 
   Map(function(file, iter) {
-    read_fst(file) %>%
-      mutate(Iteration = iter)
+    df <- read_fst(file)
+    # Assign correct names by position regardless of what they currently are
+    names(df) <- c("PctIncMSE", "IncNodePurity", "Variable")
+    df %>% mutate(Iteration = iter)
   }, pred_perform_files, 1:50) %>%
   bind_rows()
 
@@ -69,11 +110,11 @@ combine_path <- "Annual_combine/"
 # Save combined results
 write_fst(combined_train_test,
           paste0(combine_path,
-                 "RF_Pred_HD_US_01_train_test_", 
+                 "RF_Pred_US_01_train_test_", 
                  source.test, "_", cmaq_period, ".fst"))
 
 write_fst(combined_pred_perform,
           paste0(combine_path,
-                 "RF_Pred_HD_US_01_predictor_perform_", 
+                 "RF_Pred_US_01_predictor_perform_", 
                  source.test, "_", cmaq_period, ".fst"))
 

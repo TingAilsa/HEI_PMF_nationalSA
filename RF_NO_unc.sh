@@ -1,13 +1,14 @@
 #!/bin/bash
 
 #SBATCH --partition=normal
-#SBATCH --job-name=RF_SA_unc
+#SBATCH --job-name=RF_noUnc
 
 ## Specify the needed settings from the server
 #SBATCH --nodes=1  # number of nodes
 #SBATCH --tasks-per-node=1  # tasks per node # up to 128;
-#SBATCH --mem-per-cpu=50G  # amount of memory the job requires, default is 2G  # memory per CORE
-#SBATCH --cpus-per-task=4
+##SBATCH --mem-per-cpu=50G  # amount of memory the job requires, default is 2G  # memory per CORE
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=200G
 
 ## Assign the name of job, output & error files
 ## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID
@@ -26,8 +27,7 @@
 module load gnu10 openmpi r/4.3.1-gnu-openblas gdal/3.4.1-27 udunits geos/3.7.2-gj proj/7.1.0-3w
 module load netcdf-c netcdf-fortran
 
-# run R 
-Rscript RF_holdout_with_unc_dust.R
-#Rscript RF_holdout_with_unc_sulfate.R
-
+# run R
+Rscript RF_no_unc.R
+#Rscript RF_no_unc_noCoords.R
 

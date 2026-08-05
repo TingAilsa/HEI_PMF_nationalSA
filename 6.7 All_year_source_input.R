@@ -12,12 +12,12 @@ base_dir = getwd()
 
 
 ## Parameter settings
-pred_sources = c("Sulfate", "Dust", "Biomass", "Traffic", "Nitrate", "PM25") # , "Industry",
+pred_sources = c("Sulfate", "Dust", "Biomass", "Nitrate", "Traffic", "PM25") # , "Industry",
 # pred_sources = c("Traffic") # , "Industry",
 
 # Define the years
-cmaq_years = 2011:2019
-# cmaq_years = 2011:2020
+# cmaq_years = 2011:2019
+cmaq_years = 2011:2020
 # Create period strings for each year
 cmaq_periods = paste0(cmaq_years, "-01_", cmaq_years, "-12")
 cat(cmaq_periods, "\n")
@@ -31,12 +31,14 @@ print(paste("Included years:", included_years))
 cat(included_year_title, "\n")
 
 # midfix_dfs = c("_ML_input_mainlandUS_", "_ML_input_only_PMF_sites_")
-midfix_dfs = c("_ML_Daily_mainlandUS_", "_ML_Daily_only_PMF_sites_")
+# midfix_dfs = c("_ML_Daily_mainlandUS_", "_ML_Daily_only_PMF_sites_")
+midfix_dfs = c("_ML_Daily_only_PMF_sites_")
 
 #### Process each source 
-for(midfix_data in midfix_dfs) {
-  for (source_name in pred_sources) { # source_name = "Biomass"
+for(midfix_data in midfix_dfs) { # midfix_data = "_ML_Daily_mainlandUS_"
+  for (source_name in pred_sources) { # source_name = "PM25"
     cat("Processing source:", source_name, "\n")
+    cat("Processing dataset:", midfix_data, "\n")
     
     #### Combine each source all year data into a list
     # Create the list
@@ -121,24 +123,27 @@ replace_na_with_geomean <- function(x, small_value = 1e-6) {
 }
 
 # Mainland
-# mainland_pm = read_fst("PM25_ML_input_mainlandUS_2011-2020.fst")
-mainland_pm = read_fst("PM25_ML_Daily_mainlandUS_2011-2019.fst")
+mainland_pm = read_fst("PM25_ML_input_mainlandUS_2011-2020.fst")
+# mainland_pm = read_fst("PM25_ML_Daily_mainlandUS_2011-2019.fst")
 mainland_pm$O3 =replace_na_with_geomean(mainland_pm$O3)
 mainland_pm$OTA =replace_na_with_geomean(mainland_pm$OTA)
 mainland_pm$NRD =replace_na_with_geomean(mainland_pm$NRD)
 mainland_pm$ASEA =replace_na_with_geomean(mainland_pm$ASEA)
 mainland_pm$ARS =replace_na_with_geomean(mainland_pm$ARS)
 mainland_pm$vs =replace_na_with_geomean(mainland_pm$vs)
-# write_fst(mainland_pm, "PM25_ML_input_mainlandUS_2011-2020.fst")
-write_fst(mainland_pm, "PM25_ML_Daily_mainlandUS_2011-2019.fst")
+write_fst(mainland_pm, "PM25_ML_input_mainlandUS_2011-2020.fst")
+# write_fst(mainland_pm, "PM25_ML_Daily_mainlandUS_2011-2019.fst")
 
 # PMF sites, all points
-# pmf_site_pm = read_fst("PM25_ML_input_only_PMF_sites_2011-2020.fst")
-pmf_site_pm = read_fst("PM25_ML_Daily_only_PMF_sites_2011-2019.fst")
+pmf_site_pm = read_fst("PM25_ML_input_only_PMF_sites_2011-2020.fst")
+# pmf_site_pm = read_fst("PM25_ML_Daily_only_PMF_sites_2011-2019.fst")
 summary(pmf_site_pm)
 pmf_site_pm$O3 =replace_na_with_geomean(pmf_site_pm$O3)
 pmf_site_pm$OTA =replace_na_with_geomean(pmf_site_pm$OTA)
+pmf_site_pm$NRD =replace_na_with_geomean(pmf_site_pm$NRD)
+pmf_site_pm$ASEA =replace_na_with_geomean(pmf_site_pm$ASEA)
+pmf_site_pm$ARS =replace_na_with_geomean(pmf_site_pm$ARS)
 pmf_site_pm$vs =replace_na_with_geomean(pmf_site_pm$vs)
-# pmf_site_pm = read_fst("PM25_ML_input_only_PMF_sites_2011-2020.fst")
-pmf_site_pm = read_fst("PM25_ML_Daily_only_PMF_sites_2011-2019.fst")
+write_fst(pmf_site_pm, "PM25_ML_input_only_PMF_sites_2011-2020.fst")
+# write_fst(pmf_site_pm, "PM25_ML_input_only_PMF_sites_2011-2019.fst")
 

@@ -1,13 +1,13 @@
 #!/bin/bash
 
 #SBATCH --partition=normal
-#SBATCH --job-name=RF_SA_unc
+#SBATCH --job-name=RF_dust_unc
 
 ## Specify the needed settings from the server
-#SBATCH --nodes=1  # number of nodes
-#SBATCH --tasks-per-node=1  # tasks per node # up to 128;
-#SBATCH --mem-per-cpu=50G  # amount of memory the job requires, default is 2G  # memory per CORE
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
 #SBATCH --cpus-per-task=4
+#SBATCH --mem=150G  # Request total memory needed
 
 ## Assign the name of job, output & error files
 ## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID
