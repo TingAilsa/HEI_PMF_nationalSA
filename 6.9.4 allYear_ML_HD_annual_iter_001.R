@@ -23,7 +23,7 @@ n_iter = 50
 
 # source.test = "sulfate"; time_year = 2013
 
-# source.test = "bbsoa"
+# source.test = "nitrate"
 
 cat("Processing source:", source.test, "\n")
 
@@ -31,8 +31,8 @@ cat("Processing source:", source.test, "\n")
 combine_path <- "Annual_combine/"
 pred_path_itr <- paste0("Prediction_results/", source.test)
 
-for (time_year in 2015:2020) {
-  # time_year = 2011
+# for (time_year in 2019:2020) {
+  time_year = 2020
   cat("Processing iterations 1 to 50 for year", time_year, "\n")
   
   # All dates of the year & day_tags
@@ -150,5 +150,5 @@ for (time_year in 2015:2020) {
             file.path(combine_path, sprintf("%s_US_RF_Daily_Unc_%s.fst", source.test, time_year)),
             compress = 75)
   rm(annual_Unc, unc_list); gc()
-}
+# }
 
