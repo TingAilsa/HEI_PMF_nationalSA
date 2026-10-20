@@ -66,7 +66,7 @@ head(pmf_source_date)
 
 ###### instead of SF, convert to RASTER for easier merging later
 
-# ###### 2 Census varaibles for Aim3 modeling preparation ######
+# ###### 2 Census, match with geometry, interpolate to 0.1 deg ######
 # # Geometry of each GEOID at the included census tract level
 # census_tract_geo =
 #   st_read(file.path("/Users/TingZhang/Dropbox/HEI_PMF_files_Ting/Nation_SA_data/US_census/ACS",
