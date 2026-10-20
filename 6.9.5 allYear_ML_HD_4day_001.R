@@ -6,7 +6,7 @@ library(data.table)
 setwd("/scratch/tzhang23/cmaq_sumaiya/var_combined_rds/ML_Final_Input_001/Annual_combine")
 
 # Source and 4 days
-sources   <- c("bbsoa", "sulfate", "nitrate", "dust", "traffic", "pm")
+sources   <- c("bbsoa", "sulfate", "nitrate", "traffic", "pm", "dust")
 selected_4days  <- c("20200117", "20200417", "20200717", "20201017")
 
 data_path <- getwd()

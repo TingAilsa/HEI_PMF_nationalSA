@@ -23,7 +23,7 @@ n_iter = 50
 
 # source.test = "sulfate"; time_year = 2013
 
-# source.test = "nitrate"
+# source.test = "traffic"
 
 cat("Processing source:", source.test, "\n")
 
